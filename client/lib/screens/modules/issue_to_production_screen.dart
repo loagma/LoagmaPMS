@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/common_widgets.dart';
 
 class IssueToProductionScreen extends StatelessWidget {
   const IssueToProductionScreen({super.key});
@@ -9,20 +10,22 @@ class IssueToProductionScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Issue to production'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Get.back(),
-        ),
+      appBar: ModuleAppBar(
+        title: 'Issue to Production',
+        subtitle: 'Loagma',
+        onBackPressed: () => Get.back(),
       ),
-      body: const Center(
-        child: Text(
-          'Issue to production module\n(implement details here)',
-          textAlign: TextAlign.center,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: ContentCard(
+            child: EmptyState(
+              icon: Icons.outbox_rounded,
+              message: 'Issue to production module\n(implement details here)',
+            ),
+          ),
         ),
       ),
     );
   }
 }
-

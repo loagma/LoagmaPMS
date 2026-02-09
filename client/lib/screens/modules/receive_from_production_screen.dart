@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/common_widgets.dart';
 
 class ReceiveFromProductionScreen extends StatelessWidget {
   const ReceiveFromProductionScreen({super.key});
@@ -9,20 +10,23 @@ class ReceiveFromProductionScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Receive from production'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Get.back(),
-        ),
+      appBar: ModuleAppBar(
+        title: 'Receive from Production',
+        subtitle: 'Loagma',
+        onBackPressed: () => Get.back(),
       ),
-      body: const Center(
-        child: Text(
-          'Receive from production module\n(implement details here)',
-          textAlign: TextAlign.center,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: ContentCard(
+            child: EmptyState(
+              icon: Icons.inbox_rounded,
+              message:
+                  'Receive from production module\n(implement details here)',
+            ),
+          ),
         ),
       ),
     );
   }
 }
-

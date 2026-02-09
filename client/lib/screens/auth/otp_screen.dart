@@ -44,8 +44,10 @@ class _OtpScreenState extends State<OtpScreen> {
         'Invalid OTP',
         'Please enter 4 digits',
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: const Color(0xFF2C2416),
-        colorText: const Color(0xFFFFFBF0),
+        backgroundColor: AppColors.textDark,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(12),
+        borderRadius: 8,
       );
       return;
     }
@@ -57,8 +59,10 @@ class _OtpScreenState extends State<OtpScreen> {
         'Wrong OTP',
         'Please check and try again',
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: const Color(0xFF2C2416),
-        colorText: const Color(0xFFFFFBF0),
+        backgroundColor: AppColors.textDark,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(12),
+        borderRadius: 8,
       );
     }
   }
@@ -134,18 +138,19 @@ class _OtpScreenState extends State<OtpScreen> {
                                   counterText: '',
                                   contentPadding: const EdgeInsets.symmetric(vertical: 16),
                                   filled: true,
-                                  fillColor: AppColors.primaryLighter,
+                                  fillColor: AppColors.surface,
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(color: AppColors.primaryLight),
+                                    borderSide: BorderSide(
+                                      color: AppColors.primary.withValues(alpha: 0.25),
+                                    ),
                                   ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide:
-                                        const BorderSide(color: AppColors.primary, width: 2),
+                                  focusedBorder: const OutlineInputBorder(
+                                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                                    borderSide: BorderSide(color: AppColors.primary, width: 2),
                                   ),
                                 ),
                                 onChanged: (v) => _onOtpChanged(i, v),
