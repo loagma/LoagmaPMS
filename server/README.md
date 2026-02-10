@@ -1,133 +1,59 @@
-## LoagmaPMS Backend (Laravel)
+<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
-This directory contains the **Laravel 12** backend for the LoagmaPMS application.
-It exposes REST APIs, handles database operations, and serves as the main backend for the Flutter client.
+<p align="center">
+<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
+<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
+<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
+<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
+</p>
 
----
+## About Laravel
 
-### Tech stack
+Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
 
-- **Framework**: Laravel 12 (PHP 8.2+)
-- **Database**: SQLite by default (can be switched to MySQL/PostgreSQL)
-- **Build tools**: Vite for frontend assets (if needed)
+- [Simple, fast routing engine](https://laravel.com/docs/routing).
+- [Powerful dependency injection container](https://laravel.com/docs/container).
+- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
+- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
+- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
+- [Robust background job processing](https://laravel.com/docs/queues).
+- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
 
----
+Laravel is accessible, powerful, and provides tools required for large, robust applications.
 
-### Folder structure (high level)
+## Learning Laravel
 
-- `app/`
-  - `Http/Controllers/` – HTTP controllers (e.g. `HealthController`)
-  - `Models/` – Eloquent models (e.g. `User`)
-  - `Providers/` – Application service providers
-- `bootstrap/` – Framework bootstrap and routing configuration
-- `config/` – Configuration files (app, database, cache, queue, etc.)
-- `database/` – Migrations, factories, and seeders
-- `public/` – Public web root (`index.php`)
-- `resources/` – Blade views, frontend assets
-- `routes/`
-  - `web.php` – Web routes (views, browser-focused)
-  - `api.php` – API routes (JSON APIs, prefixed with `/api`)
-- `storage/` – Logs, compiled views, cache, file storage
-- `tests/` – Feature and unit tests
+Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
 
----
+If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
 
-### Environment configuration
+## Laravel Sponsors
 
-1. **Create your `.env` file** (first time only):
-   ```bash
-   cp .env.example .env
-   ```
+We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
 
-2. **Generate the application key**:
-   ```bash
-   php artisan key:generate
-   ```
+### Premium Partners
 
-3. **Configure database** (default is SQLite):
-   - To use SQLite (recommended for quick start), keep:
-     - `DB_CONNECTION=sqlite`
-   - To switch to MySQL/PostgreSQL, update the DB section in `.env` accordingly.
+- **[Vehikl](https://vehikl.com)**
+- **[Tighten Co.](https://tighten.co)**
+- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
+- **[64 Robots](https://64robots.com)**
+- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
+- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
+- **[Redberry](https://redberry.international/laravel-development)**
+- **[Active Logic](https://activelogic.com)**
 
-4. **Useful `.env` variables** (from `.env.example`):
-   - `APP_NAME` – Application name (e.g. `LoagmaPMS`)
-   - `APP_ENV` – `local` / `production`
-   - `APP_DEBUG` – `true` for local, `false` for production
-   - `APP_URL` – Base URL for the backend (e.g. `http://localhost`)
+## Contributing
 
----
+Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
 
-### Running the backend (local)
+## Code of Conduct
 
-From the `server` directory:
+In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
 
-```bash
-composer install
-cp .env.example .env   # if not already done
-php artisan key:generate
-php artisan migrate
-php artisan serve
-```
+## Security Vulnerabilities
 
-By default the Laravel dev server runs on **`http://127.0.0.1:8000`**.
+If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
 
----
+## License
 
-### Health API
-
-The backend exposes a **health check** endpoint for monitoring and readiness checks.
-
-- **Method**: `GET`
-- **URL**: `http://127.0.0.1:8000/api/health`
-- **Response (200 OK)**:
-
-```json
-{
-  "status": "ok",
-  "service": "LoagmaPMS API",
-  "timestamp": "2026-02-10T12:34:56+00:00"
-}
-```
-
-Implementation details:
-- Route defined in `routes/api.php`
-- Handled by `App\Http\Controllers\HealthController` (single-action controller)
-
----
-
-### Swagger / OpenAPI documentation
-
-An **OpenAPI 3.0** specification is provided for the backend APIs.
-
-- File location: `docs/openapi.yaml`
-- Contains documentation for:
-  - `/api/health` – Health check endpoint
-
-You can view this documentation using:
-
-1. **Swagger UI (online)**  
-   - Open `https://editor.swagger.io` in your browser.
-   - Use `File` → `Import File` and select `docs/openapi.yaml`.
-
-2. **Postman**  
-   - In Postman, go to `APIs` → `Import` → `File` and select `docs/openapi.yaml`.
-
-As you add new endpoints, extend `docs/openapi.yaml` with new paths, request bodies, and responses.
-
----
-
-### Scripts (composer.json)
-
-From the `server` directory, some useful composer scripts:
-
-- `composer run setup` – Full initial setup (install deps, create `.env`, migrate, build assets).
-- `composer run dev` – Run Laravel dev server, queue listener, logs, and Vite dev server together.
-- `composer run test` – Run the test suite.
-
----
-
-### Notes
-
-- Keep your real `.env` file **out of version control**; only `.env.example` should be committed.
-- Database migrations live under `database/migrations` – use them to evolve your schema.
-- For new APIs, prefer creating dedicated controllers under `app/Http/Controllers` and registering routes in `routes/api.php`.
+The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).

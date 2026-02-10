@@ -33,69 +33,89 @@ class BomScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: Form(
-        key: controller.formKey,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final maxWidth = constraints.maxWidth > 600
-                ? 600.0
-                : constraints.maxWidth - 32;
-            return Column(
+      body: Obx(() {
+        if (controller.isLoading.value) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Expanded(
-                  child: Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(maxWidth: maxWidth),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _BomHeaderCard(controller: controller),
-                            const SizedBox(height: 16),
-                            _RawMaterialsCard(controller: controller),
-                          ],
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Loading products...',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 14),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Form(
+          key: controller.formKey,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final maxWidth = constraints.maxWidth > 600
+                  ? 600.0
+                  : constraints.maxWidth - 32;
+              return Column(
+                children: [
+                  Expanded(
+                    child: Center(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: maxWidth),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _BomHeaderCard(controller: controller),
+                              const SizedBox(height: 16),
+                              _RawMaterialsCard(controller: controller),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                Obx(
-                  () => ActionButtonBar(
-                    buttons: [
-                      ActionButton(
-                        label: 'Cancel',
-                        onPressed: controller.isReadOnly
-                            ? null
-                            : () => Get.back(),
-                      ),
-                      ActionButton(
-                        label: 'Save as Draft',
-                        isPrimary: true,
-                        isLoading: controller.isSaving.value,
-                        onPressed:
-                            controller.isReadOnly || controller.isSaving.value
-                            ? null
-                            : () => controller.saveAsDraft(),
-                      ),
-                      ActionButton(
-                        label: 'Approve BOM',
-                        isPrimary: true,
-                        backgroundColor: AppColors.primaryDark,
-                        isLoading: controller.isSaving.value,
-                        onPressed:
-                            controller.isReadOnly || controller.isSaving.value
-                            ? null
-                            : () => controller.approveBom(),
-                      ),
-                    ],
+                  Obx(
+                    () => ActionButtonBar(
+                      buttons: [
+                        ActionButton(
+                          label: 'Cancel',
+                          onPressed: controller.isReadOnly
+                              ? null
+                              : () => Get.back(),
+                        ),
+                        ActionButton(
+                          label: 'Save as Draft',
+                          isPrimary: true,
+                          isLoading: controller.isSaving.value,
+                          onPressed:
+                              controller.isReadOnly || controller.isSaving.value
+                              ? null
+                              : () => controller.saveAsDraft(),
+                        ),
+                        ActionButton(
+                          label: 'Approve BOM',
+                          isPrimary: true,
+                          backgroundColor: AppColors.primaryDark,
+                          isLoading: controller.isSaving.value,
+                          onPressed:
+                              controller.isReadOnly || controller.isSaving.value
+                              ? null
+                              : () => controller.approveBom(),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
+                ],
+              );
+            },
+          ),
+        );
+      }),
     );
   }
 }
@@ -187,16 +207,6 @@ class _RawMaterialsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return ContentCard(
       title: 'Raw Materials - Input',
-      titleAction: Obx(
-        () => TextButton.icon(
-          onPressed: controller.isReadOnly
-              ? null
-              : () => controller.addRawMaterial(),
-          icon: const Icon(Icons.add_rounded, size: 20),
-          label: const Text('Add Material'),
-          style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-        ),
-      ),
       child: Obx(() {
         if (controller.rawMaterials.isEmpty) {
           return EmptyState(
@@ -208,17 +218,34 @@ class _RawMaterialsCard extends StatelessWidget {
                 : () => controller.addRawMaterial(),
           );
         }
-        return ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: controller.rawMaterials.length,
-          itemBuilder: (context, index) {
-            return _RawMaterialRow(
-              controller: controller,
-              index: index,
-              row: controller.rawMaterials[index],
-            );
-          },
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: controller.rawMaterials.length,
+              itemBuilder: (context, index) {
+                return _RawMaterialRow(
+                  controller: controller,
+                  index: index,
+                  row: controller.rawMaterials[index],
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: controller.isReadOnly
+                    ? null
+                    : () => controller.addRawMaterial(),
+                icon: const Icon(Icons.add_rounded, size: 20),
+                label: const Text('Add Material'),
+                style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+              ),
+            ),
+          ],
         );
       }),
     );
@@ -347,17 +374,31 @@ class _RawMaterialRow extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
+                flex: 1,
                 child: Obx(
                   () => DropdownButtonFormField<String>(
                     initialValue: row.unitType.value,
                     decoration: AppInputDecoration.standard(
                       labelText: 'Unit *',
                     ),
+                    isDense: true,
                     items: const [
-                      DropdownMenuItem(value: 'KG', child: Text('KG')),
-                      DropdownMenuItem(value: 'Nos', child: Text('NOS')),
-                      DropdownMenuItem(value: 'LTR', child: Text('LTR')),
-                      DropdownMenuItem(value: 'MTR', child: Text('MTR')),
+                      DropdownMenuItem(
+                        value: 'KG',
+                        child: Text('KG', style: TextStyle(fontSize: 13)),
+                      ),
+                      DropdownMenuItem(
+                        value: 'PCS',
+                        child: Text('PCS', style: TextStyle(fontSize: 13)),
+                      ),
+                      DropdownMenuItem(
+                        value: 'LTR',
+                        child: Text('LTR', style: TextStyle(fontSize: 13)),
+                      ),
+                      DropdownMenuItem(
+                        value: 'MTR',
+                        child: Text('MTR', style: TextStyle(fontSize: 13)),
+                      ),
                     ],
                     onChanged: controller.isReadOnly
                         ? null

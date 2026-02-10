@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 import '../screens/auth/dashboard_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/otp_screen.dart';
-import '../screens/modules/bom_screen.dart';
+import '../screens/modules/bom_list_screen.dart';
 import '../screens/modules/issue_to_production_screen.dart';
 import '../screens/modules/receive_from_production_screen.dart';
 
@@ -43,6 +43,6 @@ final List<GetPage<dynamic>> appPages = [
   ),
   GetPage(
     name: AppRoutes.bom,
-    page: () => const BomScreen(),
+    page: () => const BomListScreen(),
   ),
 ];

@@ -1,5 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:http/http.dart' as http;
+
+import '../api_config.dart';
 import '../models/bom_model.dart';
 import '../models/product_model.dart';
 import '../theme/app_colors.dart';
@@ -17,7 +22,7 @@ class BomController extends GetxController {
   // Raw materials list
   final rawMaterials = <BomItemRow>[].obs;
 
-  // Products data (would come from API)
+  // Products data
   final finishedProducts = <Product>[].obs;
   final rawMaterialProducts = <Product>[].obs;
 
@@ -31,23 +36,71 @@ class BomController extends GetxController {
     _loadProducts();
   }
 
-  // TODO: Replace with actual API call
-  void _loadProducts() {
-    // Mock data - replace with API call
-    finishedProducts.value = [
-      Product(id: 1, name: '15kg tin', productType: 'FINISHED'),
-      Product(id: 2, name: '4*5 litre ', productType: 'FINISHED'),
-    ];
-    rawMaterialProducts.value = [
-      Product(id: 101, name: 'Empty tin', productType: 'RAW', defaultUnit: 'KG'),
-      Product(id: 102, name: 'Empty jar', productType: 'RAW', defaultUnit: 'KG'),
-      Product(id: 103, name: 'Empty carton', productType: 'RAW', defaultUnit: 'KG'),
-      Product(id: 104, name: 'Oil', productType: 'RAW', defaultUnit: 'KG'),
-      Product(id: 105, name: 'Cap', productType: 'RAW', defaultUnit: 'PCS'),
-      Product(id: 106, name: '5 litre Label', productType: 'RAW', defaultUnit: 'PCS'),
-      Product(id: 107, name: '15 kg Label', productType: 'RAW', defaultUnit: 'PCS'),
+  Future<void> _loadProducts() async {
+    try {
+      isLoading.value = true;
 
-    ];
+      final uri = Uri.parse(ApiConfig.products);
+      debugPrint('[BOM] GET $uri');
+
+      final response = await http.get(
+        uri,
+        headers: {'Accept': 'application/json; charset=utf-8'},
+      );
+
+      debugPrint('[BOM] Response status: ${response.statusCode}');
+      debugPrint('[BOM] Response body length: ${response.body.length} bytes');
+
+      if (response.statusCode != 200) {
+        _showError('Failed to load products (${response.statusCode})');
+        return;
+      }
+
+      // Parse JSON (backend now returns clean JSON)
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+
+      final data = decoded['data'] as List<dynamic>? ?? [];
+
+      debugPrint('[BOM] Total products received: ${data.length}');
+
+      final allProducts = <Product>[];
+
+      // Parse and collect all valid products in one list
+      for (final item in data) {
+        try {
+          final product = Product.fromJson(item as Map<String, dynamic>);
+
+          // Filter out products with empty or whitespace-only names
+          if (product.name.trim().isEmpty) {
+            continue;
+          }
+
+          allProducts.add(product);
+        } catch (_) {
+          // Skip invalid products silently
+          continue;
+        }
+      }
+
+      // Sort once by name for better UX
+      allProducts.sort((a, b) => a.name.compareTo(b.name));
+
+      // Use the same complete list for finished and raw materials.
+      finishedProducts.value = allProducts;
+      rawMaterialProducts.value = allProducts;
+
+      debugPrint('[BOM] Products available: ${allProducts.length}');
+
+      if (allProducts.isEmpty) {
+        _showError('No valid products found');
+      }
+    } catch (e, st) {
+      debugPrint('[BOM] Unexpected error while loading products: $e');
+      debugPrint('$st');
+      _showError('Failed to load products: $e');
+    } finally {
+      isLoading.value = false;
+    }
   }
 
   void setFinishedProduct(Product? product) {
@@ -215,10 +268,10 @@ void _showSuccess(String message) {
 
 void _showError(String message) {
   Get.snackbar(
-    'Validation Error',
+    'Error',
     message,
     snackPosition: SnackPosition.BOTTOM,
-    backgroundColor: AppColors.textDark,
+    backgroundColor: Colors.redAccent,
     colorText: Colors.white,
     margin: const EdgeInsets.all(12),
     borderRadius: 8,
