@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\HealthController;
+use App\Http\Controllers\ProductController;
 
 /*
 |--------------------------------------------------------------------------
@@ -15,4 +16,6 @@ use App\Http\Controllers\HealthController;
 */
 
 Route::get('/health', HealthController::class);
+
+Route::get('/products', [ProductController::class, 'index']);
 

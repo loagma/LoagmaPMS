@@ -5,7 +5,7 @@ info:
   description: |
     API documentation for the LoagmaPMS backend.
 
-    This specification currently documents the health check endpoint.
+    This specification currently documents the health and products endpoints.
 servers:
   - url: http://localhost/api
     description: Local development server
@@ -35,4 +35,43 @@ paths:
                     type: string
                     format: date-time
                     example: 2026-02-10T12:34:56Z
+
+  /products:
+    get:
+      summary: Get list of products
+      description: Returns all products from the legacy `product` table, shaped for the BOM module.
+      tags:
+        - Products
+      responses:
+        '200':
+          description: List of products
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        product_id:
+                          type: integer
+                          example: 12345
+                        product_name:
+                          type: string
+                          example: 15kg tin
+                        product_code:
+                          type: string
+                          nullable: true
+                          example: HSN1234
+                        product_type:
+                          type: string
+                          description: Product classification for BOM (FINISHED or RAW)
+                          example: FINISHED
+                        default_unit:
+                          type: string
+                          nullable: true
+                          description: Default unit for BOM calculations (e.g. KG, PCS)
+                          example: KG
 
