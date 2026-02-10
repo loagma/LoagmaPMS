@@ -35,13 +35,18 @@ class BomController extends GetxController {
   void _loadProducts() {
     // Mock data - replace with API call
     finishedProducts.value = [
-      Product(id: 1, name: 'Product A', productType: 'FINISHED'),
-      Product(id: 2, name: 'Product B', productType: 'FINISHED'),
+      Product(id: 1, name: '15kg tin', productType: 'FINISHED'),
+      Product(id: 2, name: '4*5 litre ', productType: 'FINISHED'),
     ];
     rawMaterialProducts.value = [
-      Product(id: 101, name: 'Steel', productType: 'RAW', defaultUnit: 'KG'),
-      Product(id: 102, name: 'Plastic', productType: 'RAW', defaultUnit: 'KG'),
-      Product(id: 103, name: 'Screws', productType: 'RAW', defaultUnit: 'PCS'),
+      Product(id: 101, name: 'Empty tin', productType: 'RAW', defaultUnit: 'KG'),
+      Product(id: 102, name: 'Empty jar', productType: 'RAW', defaultUnit: 'KG'),
+      Product(id: 103, name: 'Empty carton', productType: 'RAW', defaultUnit: 'KG'),
+      Product(id: 104, name: 'Oil', productType: 'RAW', defaultUnit: 'KG'),
+      Product(id: 105, name: 'Cap', productType: 'RAW', defaultUnit: 'PCS'),
+      Product(id: 106, name: '5 litre Label', productType: 'RAW', defaultUnit: 'PCS'),
+      Product(id: 107, name: '15 kg Label', productType: 'RAW', defaultUnit: 'PCS'),
+
     ];
   }
 

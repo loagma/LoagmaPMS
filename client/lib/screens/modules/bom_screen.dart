@@ -108,7 +108,7 @@ class _BomHeaderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ContentCard(
-      title: 'BOM Details',
+      title: 'Finished Product - Output',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -186,7 +186,7 @@ class _RawMaterialsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ContentCard(
-      title: 'Raw Materials',
+      title: 'Raw Materials - Input',
       titleAction: Obx(
         () => TextButton.icon(
           onPressed: controller.isReadOnly
@@ -355,7 +355,7 @@ class _RawMaterialRow extends StatelessWidget {
                     ),
                     items: const [
                       DropdownMenuItem(value: 'KG', child: Text('KG')),
-                      DropdownMenuItem(value: 'PCS', child: Text('PCS')),
+                      DropdownMenuItem(value: 'Nos', child: Text('NOS')),
                       DropdownMenuItem(value: 'LTR', child: Text('LTR')),
                       DropdownMenuItem(value: 'MTR', child: Text('MTR')),
                     ],
@@ -370,19 +370,19 @@ class _RawMaterialRow extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          TextFormField(
-            enabled: !controller.isReadOnly,
-            initialValue: row.wastagePercent.value,
-            decoration: AppInputDecoration.standard(
-              labelText: 'Wastage %',
-              hintText: '0',
-            ),
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-            ],
-            onChanged: (value) => row.wastagePercent.value = value,
-          ),
+          // TextFormField(
+          //   enabled: !controller.isReadOnly,
+          //   initialValue: row.wastagePercent.value,
+          //   decoration: AppInputDecoration.standard(
+          //     labelText: 'Wastage %',
+          //     hintText: '0',
+          //   ),
+          //   keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          //   inputFormatters: [
+          //     FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+          //   ],
+          //   onChanged: (value) => row.wastagePercent.value = value,
+          // ),
         ],
       ),
     );

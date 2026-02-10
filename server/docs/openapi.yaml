@@ -1,0 +1,38 @@
+openapi: 3.0.3
+info:
+  title: LoagmaPMS Backend API
+  version: 1.0.0
+  description: |
+    API documentation for the LoagmaPMS backend.
+
+    This specification currently documents the health check endpoint.
+servers:
+  - url: http://localhost/api
+    description: Local development server
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Returns the current health status of the LoagmaPMS backend.
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  service:
+                    type: string
+                    example: LoagmaPMS API
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: 2026-02-10T12:34:56Z
+

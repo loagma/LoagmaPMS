@@ -1,0 +1,39 @@
+### Environment & local config
+.env
+.env.*.local
+.env.production
+.env.backup
+
+### Logs & debug
+*.log
+storage/logs/*
+
+### OS / IDE / tooling
+.DS_Store
+Thumbs.db
+/.idea
+/.vscode
+/.fleet
+/.nova
+/.zed
+.phpactor.json
+.phpunit.result.cache
+/.phpunit.cache
+
+### Dependencies & build output
+/vendor
+/node_modules
+/public/build
+/public/hot
+
+### Storage (generated files)
+/public/storage
+/storage/*.key
+/storage/pail
+/storage/framework/*
+/storage/app/*.tmp
+
+### Auth / secrets
+/auth.json
+composer.lock
+
