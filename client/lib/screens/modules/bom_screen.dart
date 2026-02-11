@@ -7,15 +7,17 @@ import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 
 class BomScreen extends StatelessWidget {
-  const BomScreen({super.key});
+  final int? bomId; // null for create, non-null for edit
+
+  const BomScreen({super.key, this.bomId});
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(BomController());
+    final controller = Get.put(BomController(bomId: bomId));
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: ModuleAppBar(
-        title: 'Bill of Materials',
+        title: controller.isEditMode ? 'Edit BOM' : 'Create BOM',
         subtitle: 'Loagma',
         onBackPressed: () => Get.back(),
         actions: [
@@ -133,9 +135,11 @@ class _BomHeaderCard extends StatelessWidget {
         children: [
           Obx(
             () => _ProductDropdown(
+              key: const ValueKey('finished_product_dropdown'),
               label: 'Finished Product *',
               initialValue: controller.selectedFinishedProduct.value,
               items: controller.finishedProducts,
+              controller: controller,
               onChanged: controller.isReadOnly
                   ? null
                   : (product) => controller.setFinishedProduct(product),
@@ -314,6 +318,7 @@ class _RawMaterialRow extends StatelessWidget {
           const SizedBox(height: 16),
           Obx(
             () => _ProductDropdown(
+              key: ValueKey('raw_material_dropdown_$index'),
               label: 'Raw Material *',
               initialValue: row.rawMaterial.value,
               items: controller.rawMaterialProducts.where((p) {
@@ -323,6 +328,7 @@ class _RawMaterialRow extends StatelessWidget {
                 }
                 return true;
               }).toList(),
+              controller: controller,
               onChanged: controller.isReadOnly
                   ? null
                   : (product) {
@@ -380,24 +386,17 @@ class _RawMaterialRow extends StatelessWidget {
                       labelText: 'Unit *',
                     ),
                     isDense: true,
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'KG',
-                        child: Text('KG', style: TextStyle(fontSize: 13)),
-                      ),
-                      DropdownMenuItem(
-                        value: 'PCS',
-                        child: Text('PCS', style: TextStyle(fontSize: 13)),
-                      ),
-                      DropdownMenuItem(
-                        value: 'LTR',
-                        child: Text('LTR', style: TextStyle(fontSize: 13)),
-                      ),
-                      DropdownMenuItem(
-                        value: 'MTR',
-                        child: Text('MTR', style: TextStyle(fontSize: 13)),
-                      ),
-                    ],
+                    items: controller.unitTypes
+                        .map(
+                          (unit) => DropdownMenuItem(
+                            value: unit,
+                            child: Text(
+                              unit,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        )
+                        .toList(),
                     onChanged: controller.isReadOnly
                         ? null
                         : (value) {
@@ -428,39 +427,294 @@ class _RawMaterialRow extends StatelessWidget {
   }
 }
 
-// Simple Dropdown Widget - No Model
-class _ProductDropdown extends StatelessWidget {
+// Searchable Dropdown Widget
+class _ProductDropdown extends StatefulWidget {
   final String label;
   final Map<String, dynamic>? initialValue;
   final List<Map<String, dynamic>> items;
   final ValueChanged<Map<String, dynamic>?>? onChanged;
   final String? Function(Map<String, dynamic>?)? validator;
+  final BomController controller;
 
   const _ProductDropdown({
+    super.key,
     required this.label,
     required this.initialValue,
     required this.items,
     required this.onChanged,
+    required this.controller,
     this.validator,
   });
 
   @override
+  State<_ProductDropdown> createState() => _ProductDropdownState();
+}
+
+class _ProductDropdownState extends State<_ProductDropdown> {
+  final TextEditingController _searchController = TextEditingController();
+  Map<String, dynamic>? _selectedValue;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedValue = widget.initialValue;
+    if (_selectedValue != null) {
+      _searchController.text = _selectedValue!['name']?.toString() ?? '';
+    }
+  }
+
+  @override
+  void didUpdateWidget(_ProductDropdown oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Update when initialValue changes from outside
+    if (widget.initialValue != oldWidget.initialValue) {
+      _selectedValue = widget.initialValue;
+      // Use post-frame callback to avoid setState during build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          if (_selectedValue != null) {
+            _searchController.text = _selectedValue!['name']?.toString() ?? '';
+          } else {
+            _searchController.clear();
+          }
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _showSearchDialog() async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => _SearchProductDialog(
+        controller: widget.controller,
+        currentSelection: _selectedValue,
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _selectedValue = result;
+        _searchController.text = result['name']?.toString() ?? '';
+      });
+      widget.onChanged?.call(result);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return DropdownButtonFormField<Map<String, dynamic>>(
-      value: initialValue,
-      decoration: AppInputDecoration.standard(labelText: label),
-      items: items
-          .map(
-            (p) => DropdownMenuItem(
-              value: p,
-              child: Text(p['name']?.toString() ?? 'Unknown'),
+    return FormField<Map<String, dynamic>>(
+      initialValue: _selectedValue,
+      validator: widget.validator,
+      builder: (formFieldState) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextFormField(
+              controller: _searchController,
+              decoration: AppInputDecoration.standard(
+                labelText: widget.label,
+                hintText: 'Tap to search...',
+                suffixIcon: SizedBox(
+                  width: 48,
+                  child: _selectedValue != null && widget.onChanged != null
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: () {
+                            if (mounted) {
+                              setState(() {
+                                _selectedValue = null;
+                                _searchController.clear();
+                              });
+                              widget.onChanged?.call(null);
+                              formFieldState.didChange(null);
+                            }
+                          },
+                        )
+                      : IconButton(
+                          icon: const Icon(Icons.search, size: 18),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: widget.onChanged == null
+                              ? null
+                              : _showSearchDialog,
+                        ),
+                ),
+              ),
+              readOnly: true,
+              onTap: widget.onChanged == null ? null : _showSearchDialog,
             ),
-          )
-          .toList(),
-      onChanged: onChanged,
-      validator: validator,
-      isExpanded: true,
-      menuMaxHeight: 300,
+            if (formFieldState.hasError)
+              Padding(
+                padding: const EdgeInsets.only(left: 12, top: 8),
+                child: Text(
+                  formFieldState.errorText!,
+                  style: const TextStyle(color: Colors.red, fontSize: 12),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _SearchProductDialog extends StatefulWidget {
+  final BomController controller;
+  final Map<String, dynamic>? currentSelection;
+
+  const _SearchProductDialog({required this.controller, this.currentSelection});
+
+  @override
+  State<_SearchProductDialog> createState() => _SearchProductDialogState();
+}
+
+class _SearchProductDialogState extends State<_SearchProductDialog> {
+  final TextEditingController _searchController = TextEditingController();
+  List<Map<String, dynamic>> _filteredProducts = [];
+  bool _isSearching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredProducts = widget.controller.finishedProducts.take(50).toList();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String query) async {
+    if (query.isEmpty) {
+      setState(() {
+        _filteredProducts = widget.controller.finishedProducts
+            .take(50)
+            .toList();
+      });
+      return;
+    }
+
+    if (query.length < 2) return;
+
+    setState(() => _isSearching = true);
+
+    try {
+      await widget.controller.searchProducts(query);
+      setState(() {
+        _filteredProducts = widget.controller.finishedProducts;
+      });
+    } finally {
+      setState(() => _isSearching = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      child: Container(
+        width: 500,
+        height: 600,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Search Products',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _searchController,
+              decoration: AppInputDecoration.standard(
+                labelText: 'Search by name or ID',
+                hintText: 'Type at least 2 characters...',
+                prefixIcon: const Icon(Icons.search),
+              ),
+              autofocus: true,
+              onChanged: _onSearchChanged,
+            ),
+            const SizedBox(height: 16),
+            if (_isSearching)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else
+              Expanded(
+                child: _filteredProducts.isEmpty
+                    ? Center(
+                        child: Text(
+                          _searchController.text.isEmpty
+                              ? 'Start typing to search'
+                              : 'No products found',
+                          style: const TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 14,
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: _filteredProducts.length,
+                        itemBuilder: (context, index) {
+                          final product = _filteredProducts[index];
+                          final isSelected =
+                              widget.currentSelection?['product_id'] ==
+                              product['product_id'];
+
+                          return ListTile(
+                            selected: isSelected,
+                            selectedTileColor: AppColors.primary.withValues(
+                              alpha: 0.1,
+                            ),
+                            leading: CircleAvatar(
+                              backgroundColor: AppColors.primary.withValues(
+                                alpha: 0.2,
+                              ),
+                              child: Text(
+                                product['product_id'].toString(),
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: AppColors.primaryDark,
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              product['name']?.toString() ?? 'Unknown',
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                            subtitle: Text(
+                              'ID: ${product['product_id']} • ${product['inventory_type']}',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            onTap: () => Navigator.pop(context, product),
+                          );
+                        },
+                      ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

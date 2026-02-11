@@ -15,7 +15,7 @@ class Product {
 
   factory Product.fromJson(Map<String, dynamic> json) {
     // Handle product_id - can be int or string
-    final productId = json['product_id'];
+    final productId = json['product_id'] ?? json['id'];
     final int id;
     if (productId is int) {
       id = productId;
@@ -25,24 +25,22 @@ class Product {
       throw FormatException('Invalid product_id: $productId');
     }
 
-    // Handle product_name
-    final productName = json['product_name'];
+    // Handle product_name - support both 'name' and 'product_name'
+    final productName = json['name'] ?? json['product_name'];
     if (productName == null || productName.toString().trim().isEmpty) {
       throw FormatException('Product name is required');
     }
 
-    // Handle product_type
-    final productType = json['product_type'];
-    if (productType == null || productType.toString().trim().isEmpty) {
-      throw FormatException('Product type is required');
-    }
+    // Handle product_type - support both 'inventory_type' and 'product_type'
+    final productType =
+        json['inventory_type'] ?? json['product_type'] ?? 'SINGLE';
 
     return Product(
       id: id,
       name: productName.toString().trim(),
       code: json['product_code']?.toString(),
       productType: productType.toString().toUpperCase(),
-      defaultUnit: json['default_unit']?.toString(),
+      defaultUnit: json['default_unit'] ?? json['inventory_unit_type'],
     );
   }
 

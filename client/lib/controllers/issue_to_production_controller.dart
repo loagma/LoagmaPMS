@@ -11,6 +11,7 @@ import '../theme/app_colors.dart';
 class IssueToProductionController extends GetxController {
   // Form state
   final formKey = GlobalKey<FormState>();
+  final int? issueId; // null for create, non-null for edit
 
   // Header fields
   final finishedProduct = Rxn<Product>();
@@ -27,59 +28,98 @@ class IssueToProductionController extends GetxController {
   final isLoading = false.obs;
   final isSaving = false.obs;
 
+  IssueToProductionController({this.issueId});
+
   @override
   void onInit() {
     super.onInit();
     _loadProducts();
+
+    // If editing, load issue data
+    if (issueId != null) {
+      _loadIssueData();
+    }
+  }
+
+  Future<void> _loadIssueData() async {
+    try {
+      isLoading.value = true;
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.issues}/$issueId'),
+        headers: {'Accept': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+        if (data['success'] == true) {
+          final issueData = data['data'] as Map<String, dynamic>;
+          final issue = issueData['issue'];
+          final items = issueData['items'] as List;
+
+          // Set issue master data
+          quantityToProduce.value =
+              issue['quantity_to_produce']?.toString() ?? '';
+          remarks.value = issue['remarks']?.toString() ?? '';
+
+          // Set finished product
+          finishedProduct.value = Product(
+            id: issue['finished_product_id'],
+            name: issue['finished_product_name'],
+            productType: 'FINISHED',
+          );
+
+          // Set materials
+          materials.clear();
+          for (var item in items) {
+            final row = IssueMaterialRow();
+            row.rawMaterial.value = Product(
+              id: item['raw_material_id'],
+              name: item['raw_material_name'],
+              productType: 'RAW',
+            );
+            row.quantity.value = item['quantity']?.toString() ?? '';
+            row.unitType.value = item['unit_type']?.toString() ?? 'KG';
+            materials.add(row);
+          }
+
+          debugPrint('[ISSUE] ✅ Loaded issue data for editing');
+        }
+      }
+    } catch (e) {
+      debugPrint('[ISSUE] ❌ Failed to load issue data: $e');
+      _showError('Failed to load issue data');
+    } finally {
+      isLoading.value = false;
+    }
   }
 
   Future<void> _loadProducts() async {
     try {
       isLoading.value = true;
 
-      final uri = Uri.parse(ApiConfig.products);
+      final uri = Uri.parse('${ApiConfig.products}?limit=50');
       debugPrint('[ISSUE] GET $uri');
 
-      final response = await http.get(
-        uri,
-        headers: {'Accept': 'application/json; charset=utf-8'},
-      );
+      final response = await http
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 30));
 
       debugPrint('[ISSUE] Response status: ${response.statusCode}');
-      debugPrint('[ISSUE] Response body length: ${response.body.length} bytes');
 
       if (response.statusCode != 200) {
         _showError('Failed to load products (${response.statusCode})');
         return;
       }
 
-      List<dynamic> data;
-      try {
-        final decoded = jsonDecode(response.body);
-        if (decoded is List) {
-          data = decoded;
-        } else if (decoded is Map<String, dynamic>) {
-          data = decoded['data'] as List<dynamic>? ?? <dynamic>[];
-        } else {
-          data = <dynamic>[];
-        }
-      } on FormatException {
-        final body = response.body;
-        final start = body.indexOf('[');
-        final end = body.lastIndexOf(']');
-        if (start != -1 && end != -1 && end > start) {
-          final arrayJson = body.substring(start, end + 1);
-          final decoded = jsonDecode(arrayJson);
-          if (decoded is List) {
-            data = decoded;
-          } else {
-            data = <dynamic>[];
-          }
-        } else {
-          rethrow;
-        }
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+
+      if (decoded['success'] == false) {
+        throw Exception(decoded['message'] ?? 'API error');
       }
 
+      final List data = decoded['data'] ?? [];
       debugPrint('[ISSUE] Total products received: ${data.length}');
 
       final list = data
@@ -93,6 +133,32 @@ class IssueToProductionController extends GetxController {
       _showError('Failed to load products: $e');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> searchProducts(String query) async {
+    if (query.length < 2) return;
+
+    try {
+      final url =
+          '${ApiConfig.products}?search=${Uri.encodeComponent(query)}&limit=100';
+      final response = await http
+          .get(Uri.parse(url), headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        if (decoded['success'] == true) {
+          final List data = decoded['data'] ?? [];
+          final list = data
+              .map((item) => Product.fromJson(item as Map<String, dynamic>))
+              .toList();
+          products.value = list;
+          debugPrint('[ISSUE] ✅ Search found ${list.length} products');
+        }
+      }
+    } catch (e) {
+      debugPrint('[ISSUE] ❌ Search error: $e');
     }
   }
 
@@ -143,33 +209,106 @@ class IssueToProductionController extends GetxController {
     return true;
   }
 
-  Future<void> saveDraft() async {
+  Future<void> _saveIssue(String saveStatus) async {
     if (!validateForm()) return;
 
     isSaving.value = true;
     try {
-      await Future.delayed(const Duration(seconds: 1));
-      _showSuccess('Issue to production saved as draft');
+      final issueData = {
+        'finished_product_id': finishedProduct.value!.id,
+        'quantity_to_produce': double.parse(quantityToProduce.value),
+        'status': saveStatus,
+        'remarks': remarks.value.trim(),
+        'materials': materials.map((row) {
+          return {
+            'raw_material_id': row.rawMaterial.value!.id,
+            'quantity': double.parse(row.quantity.value),
+            'unit_type': row.unitType.value,
+          };
+        }).toList(),
+      };
+
+      final isEdit = issueId != null;
+      final url = isEdit
+          ? '${ApiConfig.issues}/$issueId'
+          : ApiConfig.createIssue;
+
+      debugPrint(
+        '[ISSUE] ${isEdit ? 'Updating' : 'Creating'}: ${jsonEncode(issueData)}',
+      );
+
+      final response = isEdit
+          ? await http.put(
+              Uri.parse(url),
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+              },
+              body: jsonEncode(issueData),
+            )
+          : await http.post(
+              Uri.parse(url),
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+              },
+              body: jsonEncode(issueData),
+            );
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+      if ((response.statusCode == 201 || response.statusCode == 200) &&
+          data['success'] == true) {
+        final message = isEdit
+            ? 'Issue updated successfully'
+            : (saveStatus == 'DRAFT'
+                  ? 'Issue saved as draft'
+                  : 'Materials issued successfully');
+        _showSuccess(message);
+        debugPrint('[ISSUE] ✅ Success: ${data['data']}');
+
+        await Future.delayed(const Duration(seconds: 1));
+        Get.back(result: true);
+      } else {
+        throw Exception(data['message'] ?? 'Failed to save issue');
+      }
     } catch (e) {
-      _showError('Failed to save draft: $e');
+      debugPrint('[ISSUE] ❌ Save failed: $e');
+      _showError('Failed to save issue: $e');
     } finally {
       isSaving.value = false;
     }
+  }
+
+  Future<void> saveDraft() async {
+    await _saveIssue('DRAFT');
   }
 
   Future<void> confirmIssue() async {
-    if (!validateForm()) return;
+    final confirmed = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('Issue Materials'),
+        content: const Text(
+          'Are you sure you want to issue these materials to production?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Get.back(result: true),
+            child: const Text('Issue Now'),
+          ),
+        ],
+      ),
+    );
 
-    isSaving.value = true;
-    try {
-      await Future.delayed(const Duration(seconds: 1));
-      _showSuccess('Materials issued to production');
-    } catch (e) {
-      _showError('Failed to issue materials: $e');
-    } finally {
-      isSaving.value = false;
-    }
+    if (confirmed != true) return;
+    await _saveIssue('ISSUED');
   }
+
+  bool get isEditMode => issueId != null;
 }
 
 class IssueMaterialRow {
@@ -201,4 +340,3 @@ void _showError(String message) {
     borderRadius: 8,
   );
 }
-

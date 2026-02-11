@@ -45,4 +45,16 @@ class ApiConfig {
 
   /// GET ${ApiConfig.apiBaseUrl}/boms
   static String get boms => '$apiBaseUrl/boms';
+
+  /// POST ${ApiConfig.apiBaseUrl}/boms
+  static String get createBom => '$apiBaseUrl/boms';
+
+  /// GET ${ApiConfig.apiBaseUrl}/unit-types
+  static String get unitTypes => '$apiBaseUrl/unit-types';
+
+  /// GET ${ApiConfig.apiBaseUrl}/issues
+  static String get issues => '$apiBaseUrl/issues';
+
+  /// POST ${ApiConfig.apiBaseUrl}/issues
+  static String get createIssue => '$apiBaseUrl/issues';
 }
