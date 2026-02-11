@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/bom_controller.dart';
-import '../../models/product_model.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 
@@ -135,7 +134,7 @@ class _BomHeaderCard extends StatelessWidget {
           Obx(
             () => _ProductDropdown(
               label: 'Finished Product *',
-              initialValue: controller.finishedProduct.value,
+              initialValue: controller.selectedFinishedProduct.value,
               items: controller.finishedProducts,
               onChanged: controller.isReadOnly
                   ? null
@@ -255,7 +254,7 @@ class _RawMaterialsCard extends StatelessWidget {
 class _RawMaterialRow extends StatelessWidget {
   final BomController controller;
   final int index;
-  final BomItemRow row;
+  final RawMaterialRow row;
 
   const _RawMaterialRow({
     required this.controller,
@@ -318,8 +317,9 @@ class _RawMaterialRow extends StatelessWidget {
               label: 'Raw Material *',
               initialValue: row.rawMaterial.value,
               items: controller.rawMaterialProducts.where((p) {
-                if (controller.finishedProduct.value != null) {
-                  return p.id != controller.finishedProduct.value!.id;
+                if (controller.selectedFinishedProduct.value != null) {
+                  return p['product_id'] !=
+                      controller.selectedFinishedProduct.value!['product_id'];
                 }
                 return true;
               }).toList(),
@@ -327,9 +327,7 @@ class _RawMaterialRow extends StatelessWidget {
                   ? null
                   : (product) {
                       row.rawMaterial.value = product;
-                      if (product != null && product.defaultUnit != null) {
-                        row.unitType.value = product.defaultUnit!;
-                      }
+                      // No auto-select unit for now - keep it simple
                     },
               validator: (value) {
                 if (value == null) {
@@ -430,13 +428,13 @@ class _RawMaterialRow extends StatelessWidget {
   }
 }
 
-// Product Dropdown Widget
+// Simple Dropdown Widget - No Model
 class _ProductDropdown extends StatelessWidget {
   final String label;
-  final Product? initialValue;
-  final List<Product> items;
-  final ValueChanged<Product?>? onChanged;
-  final String? Function(Product?)? validator;
+  final Map<String, dynamic>? initialValue;
+  final List<Map<String, dynamic>> items;
+  final ValueChanged<Map<String, dynamic>?>? onChanged;
+  final String? Function(Map<String, dynamic>?)? validator;
 
   const _ProductDropdown({
     required this.label,
@@ -448,11 +446,16 @@ class _ProductDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonFormField<Product>(
-      initialValue: initialValue,
+    return DropdownButtonFormField<Map<String, dynamic>>(
+      value: initialValue,
       decoration: AppInputDecoration.standard(labelText: label),
       items: items
-          .map((p) => DropdownMenuItem(value: p, child: Text(p.name)))
+          .map(
+            (p) => DropdownMenuItem(
+              value: p,
+              child: Text(p['name']?.toString() ?? 'Unknown'),
+            ),
+          )
           .toList(),
       onChanged: onChanged,
       validator: validator,
