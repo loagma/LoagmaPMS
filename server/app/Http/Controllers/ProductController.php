@@ -14,9 +14,14 @@ class ProductController extends Controller
             $search = request()->query('search', '');
             $limit = (int) request()->query('limit', 50);
             $limit = min(max($limit, 1), 500);
+            $includeStock = filter_var(request()->query('include_stock', false), FILTER_VALIDATE_BOOLEAN);
 
+            $selectCols = ['product_id', 'name', 'inventory_type', 'inventory_unit_type'];
+            if ($includeStock) {
+                $selectCols[] = 'stock';
+            }
             $query = DB::table('product')
-                ->select('product_id', 'name', 'inventory_type', 'inventory_unit_type')
+                ->select($selectCols)
                 ->where('is_deleted', 0)
                 ->where('is_published', 1)
                 ->whereNotNull('product_id')
@@ -45,7 +50,7 @@ class ProductController extends Controller
 
             $products = $query->orderBy('name')->limit($limit)->get();
 
-            $cleanProducts = $products->map(function ($product) {
+            $cleanProducts = $products->map(function ($product) use ($includeStock) {
                 $cleanName = trim($product->name);
                 $cleanName = str_replace(['"', '\\', "\n", "\r", "\t"], '', $cleanName);
 
@@ -59,12 +64,16 @@ class ProductController extends Controller
                     $unitType = 'WEIGHT';
                 }
 
-                return [
+                $result = [
                     'product_id' => (int) $product->product_id,
                     'name' => $cleanName,
                     'inventory_type' => $inventoryType,
                     'inventory_unit_type' => $unitType,
                 ];
+                if ($includeStock && isset($product->stock)) {
+                    $result['stock'] = $product->stock !== null ? (float) $product->stock : 0;
+                }
+                return $result;
             })->filter(fn ($p) => !empty($p['name']))->values();
 
             Log::info('Products API', ['search' => $search, 'count' => $cleanProducts->count()]);

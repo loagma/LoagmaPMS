@@ -32,12 +32,15 @@ class IssueToProductionController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _loadProducts();
     _loadUnitTypes();
-
-    // If editing, load issue data
-    if (issueId != null) {
-      _loadIssueData();
+    // Load products first; when editing, load issue data after so we can match stock
+    _loadProducts().then((_) {
+      if (issueId != null) {
+        _loadIssueData();
+      }
+    });
+    if (issueId == null) {
+      // Create mode: products loading is enough
     }
   }
 
@@ -61,15 +64,20 @@ class IssueToProductionController extends GetxController {
           // Set issue master data
           remarks.value = issue['remarks']?.toString() ?? '';
 
-          // Set materials
+          // Set materials - prefer product from products list (has stock) if available
           materials.clear();
           for (var item in items) {
             final row = IssueMaterialRow();
-            row.rawMaterial.value = Product(
-              id: item['raw_material_id'],
-              name: item['raw_material_name'],
-              productType: 'RAW',
-            );
+            final productId = item['raw_material_id'] as int?;
+            final productFromList = products
+                .where((p) => p.id == productId)
+                .firstOrNull;
+            row.rawMaterial.value = productFromList ??
+                Product(
+                  id: productId ?? 0,
+                  name: item['raw_material_name']?.toString() ?? '',
+                  productType: 'RAW',
+                );
             row.quantity.value = item['quantity']?.toString() ?? '';
             row.unitType.value = item['unit_type']?.toString() ?? 'KG';
             materials.add(row);
@@ -90,7 +98,7 @@ class IssueToProductionController extends GetxController {
     try {
       isLoading.value = true;
 
-      final uri = Uri.parse('${ApiConfig.products}?limit=50');
+      final uri = Uri.parse('${ApiConfig.products}?limit=50&include_stock=1');
       debugPrint('[ISSUE] GET $uri');
 
       final response = await http
@@ -151,7 +159,7 @@ class IssueToProductionController extends GetxController {
 
     try {
       final url =
-          '${ApiConfig.products}?search=${Uri.encodeComponent(query)}&limit=100';
+          '${ApiConfig.products}?search=${Uri.encodeComponent(query)}&limit=100&include_stock=1';
       final response = await http
           .get(Uri.parse(url), headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: 30));
@@ -256,7 +264,17 @@ class IssueToProductionController extends GetxController {
         Get.back(result: true);
         _showSuccess(message);
       } else {
-        throw Exception(data['message'] ?? 'Failed to save issue');
+        final errors = data['errors'] as Map<String, dynamic>?;
+        String? errMsg = data['message']?.toString();
+        if (errors != null && errors.isNotEmpty) {
+          final firstValue = errors.values.first;
+          if (firstValue is List && firstValue.isNotEmpty) {
+            errMsg = firstValue.first.toString();
+          } else if (firstValue is String) {
+            errMsg = firstValue;
+          }
+        }
+        throw Exception(errMsg ?? 'Failed to save issue');
       }
     } catch (e) {
       debugPrint('[ISSUE] ❌ Save failed: $e');

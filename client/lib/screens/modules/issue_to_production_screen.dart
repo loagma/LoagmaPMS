@@ -287,27 +287,50 @@ class _IssueMaterialRow extends StatelessWidget {
               Expanded(
                 flex: 2,
                 child: Obx(
-                  () => TextFormField(
-                    initialValue: row.quantity.value,
-                    decoration: AppInputDecoration.standard(
-                      labelText: 'Issue Quantity *',
-                      hintText: '0.00',
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Required';
-                      }
-                      final qty = double.tryParse(value);
-                      if (qty == null || qty <= 0) {
-                        return 'Must be > 0';
-                      }
-                      return null;
-                    },
-                    onChanged: (value) => row.quantity.value = value,
-                  ),
+                  () {
+                    final product = row.rawMaterial.value;
+                    final available = product?.stock;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextFormField(
+                          initialValue: row.quantity.value,
+                          decoration: AppInputDecoration.standard(
+                            labelText: 'Issue Quantity *',
+                            hintText: '0.00',
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Required';
+                            }
+                            final qty = double.tryParse(value);
+                            if (qty == null || qty <= 0) {
+                              return 'Must be > 0';
+                            }
+                            if (available != null && qty > available) {
+                              return 'Exceeds available ($available)';
+                            }
+                            return null;
+                          },
+                          onChanged: (value) => row.quantity.value = value,
+                        ),
+                        if (available != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              'Available: $available',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 12),
@@ -621,7 +644,9 @@ class _SearchProductDialogState extends State<_SearchProductDialog> {
                               style: const TextStyle(fontSize: 14),
                             ),
                             subtitle: Text(
-                              'ID: ${product.id} • ${product.productType}',
+                              product.stock != null
+                                  ? 'ID: ${product.id} • Stock: ${product.stock}'
+                                  : 'ID: ${product.id} • ${product.productType}',
                               style: const TextStyle(fontSize: 12),
                             ),
                             onTap: () => Navigator.pop(context, product),

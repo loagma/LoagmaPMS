@@ -4,6 +4,7 @@ class Product {
   final String? code;
   final String productType; // 'FINISHED' or 'RAW'
   final String? defaultUnit; // 'WEIGHT', 'QUANTITY', 'LITRE', 'METER'
+  final double? stock; // Available stock (optional, when include_stock=1)
 
   Product({
     required this.id,
@@ -11,6 +12,7 @@ class Product {
     this.code,
     required this.productType,
     this.defaultUnit,
+    this.stock,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -35,12 +37,22 @@ class Product {
     final productType =
         json['inventory_type'] ?? json['product_type'] ?? 'SINGLE';
 
+    double? stock;
+    if (json['stock'] != null) {
+      if (json['stock'] is num) {
+        stock = (json['stock'] as num).toDouble();
+      } else if (json['stock'] is String) {
+        stock = double.tryParse(json['stock'] as String);
+      }
+    }
+
     return Product(
       id: id,
       name: productName.toString().trim(),
       code: json['product_code']?.toString(),
       productType: productType.toString().toUpperCase(),
       defaultUnit: json['default_unit'] ?? json['inventory_unit_type'],
+      stock: stock,
     );
   }
 

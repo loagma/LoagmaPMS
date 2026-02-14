@@ -131,6 +131,17 @@ class IssueToProductionController extends Controller
                 ], 422);
             }
 
+            if ($request->status === 'ISSUED') {
+                $stockError = $this->validateStock($request->materials);
+                if ($stockError) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $stockError['message'],
+                        'errors' => $stockError['errors'],
+                    ], 422);
+                }
+            }
+
             DB::beginTransaction();
 
             // Insert issue master (raw materials only)
@@ -156,6 +167,10 @@ class IssueToProductionController extends Controller
             }
 
             DB::table('issue_to_production_items')->insert($issueItems);
+
+            if ($request->status === 'ISSUED') {
+                $this->reduceStock($request->materials);
+            }
 
             DB::commit();
 
@@ -220,6 +235,35 @@ class IssueToProductionController extends Controller
                 ], 404);
             }
 
+            $existingItems = DB::table('issue_to_production_items')
+                ->where('issue_id', $id)
+                ->get()
+                ->map(fn ($r) => [
+                    'raw_material_id' => $r->raw_material_id,
+                    'quantity' => (float) $r->quantity,
+                ])
+                ->all();
+
+            if ($existingIssue->status === 'ISSUED' && count($existingItems) > 0) {
+                $this->restoreStock($existingItems);
+            }
+
+            if ($request->status === 'ISSUED') {
+                $materialsForValidation = array_map(fn ($m) => [
+                    'raw_material_id' => $m['raw_material_id'],
+                    'quantity' => (float) $m['quantity'],
+                ], $request->materials);
+                $stockError = $this->validateStock($materialsForValidation);
+                if ($stockError) {
+                    DB::rollBack();
+                    return response()->json([
+                        'success' => false,
+                        'message' => $stockError['message'],
+                        'errors' => $stockError['errors'],
+                    ], 422);
+                }
+            }
+
             // Update issue master (raw materials only)
             DB::table('issue_to_production')
                 ->where('issue_id', $id)
@@ -250,6 +294,10 @@ class IssueToProductionController extends Controller
 
             DB::table('issue_to_production_items')->insert($issueItems);
 
+            if ($request->status === 'ISSUED') {
+                $this->reduceStock($request->materials);
+            }
+
             DB::commit();
 
             Log::info('Issue to production updated', ['issue_id' => $id]);
@@ -275,6 +323,87 @@ class IssueToProductionController extends Controller
                 'message' => 'Failed to update issue',
                 'error' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Validate that sufficient stock exists for each material.
+     * Returns null if valid, or array with message and errors if invalid.
+     *
+     * @param array $materials Array of ['raw_material_id' => int, 'quantity' => float]
+     * @return array|null ['message' => string, 'errors' => array] or null
+     */
+    private function validateStock(array $materials): ?array
+    {
+        $errors = [];
+        foreach ($materials as $index => $material) {
+            $productId = (int) $material['raw_material_id'];
+            $quantity = (float) $material['quantity'];
+            $product = DB::table('product')
+                ->where('product_id', $productId)
+                ->select('product_id', 'name', 'stock')
+                ->first();
+            if (!$product) {
+                $errors["materials.{$index}"] = ['Product not found'];
+                continue;
+            }
+            $available = $product->stock !== null ? (float) $product->stock : 0;
+            if ($available < $quantity) {
+                $productName = $product->name ?? "Product #{$productId}";
+                $errors["materials.{$index}"] = [
+                    "Insufficient stock for {$productName}. Available: {$available}, Required: {$quantity}",
+                ];
+            }
+        }
+        if (count($errors) > 0) {
+            return [
+                'message' => 'Insufficient stock',
+                'errors' => $errors,
+            ];
+        }
+        return null;
+    }
+
+    /**
+     * Reduce product stock for each material.
+     * Uses conditional update to avoid race conditions (negative stock).
+     *
+     * @param array $materials Array of ['raw_material_id' => int, 'quantity' => float]
+     * @throws \RuntimeException if any product has insufficient stock at update time
+     */
+    private function reduceStock(array $materials): void
+    {
+        foreach ($materials as $material) {
+            $productId = (int) $material['raw_material_id'];
+            $quantity = (float) $material['quantity'];
+            $affected = DB::update(
+                'UPDATE product SET stock = COALESCE(stock, 0) - ? WHERE product_id = ? AND COALESCE(stock, 0) >= ?',
+                [$quantity, $productId, $quantity]
+            );
+            if ($affected === 0) {
+                $product = DB::table('product')->where('product_id', $productId)->first();
+                $name = $product->name ?? "Product #{$productId}";
+                throw new \RuntimeException(
+                    "Insufficient stock for {$name} at update time (concurrent modification?)."
+                );
+            }
+        }
+    }
+
+    /**
+     * Restore product stock for each material (reverse of reduceStock).
+     *
+     * @param array $materials Array of ['raw_material_id' => int, 'quantity' => float]
+     */
+    private function restoreStock(array $materials): void
+    {
+        foreach ($materials as $material) {
+            $productId = (int) $material['raw_material_id'];
+            $quantity = (float) $material['quantity'];
+            DB::statement(
+                'UPDATE product SET stock = COALESCE(stock, 0) + ? WHERE product_id = ?',
+                [$quantity, $productId]
+            );
         }
     }
 }
