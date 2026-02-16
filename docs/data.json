@@ -1,0 +1,33 @@
+{
+  "BJFK": {
+    "tx": "5 ",
+    // label
+    "op": "40", 
+    // original price
+    "rp": "40",
+    // retail price
+    "sn": 0,
+    // serial no
+    "ps": "1",
+    // labels
+    "pu": "nos",
+    // packaging unit
+    "pi": "BJFK",
+    // package id
+    "stk": -995,
+    "in_stk": 0
+  },
+  "qL0f": {
+    "tx": "10 ",
+    "op": "400",
+    "rp": "400",
+    "sn": 0,
+    "ps": "10",
+    "pu": "nos",
+    "pi": "qL0f",
+    "stk": -995,
+    "in_stk": 0
+  }
+}
+// if one stock change all will chagne package
+
