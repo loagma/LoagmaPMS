@@ -7,6 +7,7 @@ import '../screens/modules/bom_list_screen.dart';
 import '../screens/modules/issue_to_production_list_screen.dart';
 import '../screens/modules/receive_from_production_list_screen.dart';
 import '../screens/modules/stock_voucher_list_screen.dart';
+import '../screens/modules/inventory_list_screen.dart';
 
 /// Central route names. Use these instead of raw strings.
 abstract class AppRoutes {
@@ -19,22 +20,14 @@ abstract class AppRoutes {
   static const String receiveFromProduction = '/receive-from-production';
   static const String bom = '/bom';
   static const String stockVoucher = '/stock-voucher';
+  static const String inventory = '/inventory';
 }
 
 /// All app routes. Used by [GetMaterialApp] in [main.dart].
 final List<GetPage<dynamic>> appPages = [
-  GetPage(
-    name: AppRoutes.login,
-    page: () => LoginScreen(),
-  ),
-  GetPage(
-    name: AppRoutes.otp,
-    page: () => const OtpScreen(),
-  ),
-  GetPage(
-    name: AppRoutes.dashboard,
-    page: () => const DashboardScreen(),
-  ),
+  GetPage(name: AppRoutes.login, page: () => LoginScreen()),
+  GetPage(name: AppRoutes.otp, page: () => const OtpScreen()),
+  GetPage(name: AppRoutes.dashboard, page: () => const DashboardScreen()),
   GetPage(
     name: AppRoutes.issueToProduction,
     page: () => const IssueToProductionListScreen(),
@@ -43,12 +36,10 @@ final List<GetPage<dynamic>> appPages = [
     name: AppRoutes.receiveFromProduction,
     page: () => const ReceiveFromProductionListScreen(),
   ),
-  GetPage(
-    name: AppRoutes.bom,
-    page: () => const BomListScreen(),
-  ),
+  GetPage(name: AppRoutes.bom, page: () => const BomListScreen()),
   GetPage(
     name: AppRoutes.stockVoucher,
     page: () => const StockVoucherListScreen(),
   ),
+  GetPage(name: AppRoutes.inventory, page: () => const InventoryListScreen()),
 ];

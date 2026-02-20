@@ -127,6 +127,14 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        'stock_audit' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/stock_audit.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => env('STOCK_AUDIT_LOG_RETENTION_DAYS', 90),
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];

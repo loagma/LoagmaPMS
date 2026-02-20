@@ -174,6 +174,14 @@ class DashboardScreen extends StatelessWidget {
                     Get.toNamed(AppRoutes.stockVoucher);
                   },
                 ),
+                _ModuleCard(
+                  title: 'Inventory',
+                  subtitle: 'Manage vendor product inventory',
+                  icon: Icons.inventory_2_outlined,
+                  onTap: () {
+                    Get.toNamed(AppRoutes.inventory);
+                  },
+                ),
               ];
 
               return Padding(
@@ -317,6 +325,14 @@ class _DashboardDrawer extends StatelessWidget {
                     onTap: () {
                       Navigator.of(context).pop();
                       Get.toNamed(AppRoutes.stockVoucher);
+                    },
+                  ),
+                  _DrawerItem(
+                    icon: Icons.inventory_2_outlined,
+                    label: 'Inventory',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      Get.toNamed(AppRoutes.inventory);
                     },
                   ),
                 ],

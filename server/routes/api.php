@@ -7,9 +7,15 @@ use App\Http\Controllers\BomController;
 use App\Http\Controllers\IssueToProductionController;
 use App\Http\Controllers\ReceiveFromProductionController;
 use App\Http\Controllers\StockVoucherController;
+use App\Http\Controllers\StockController;
+use App\Http\Controllers\VendorProductController;
 
 Route::get('/health', [HealthController::class, 'index']);
 Route::get('/products', [ProductController::class, 'index']);
+
+// Vendor Products routes
+Route::get('/vendor-products', [VendorProductController::class, 'index']);
+Route::get('/vendor-products/{id}', [VendorProductController::class, 'show']);
 
 // BOM routes
 Route::get('/boms', [BomController::class, 'index']);
@@ -35,3 +41,10 @@ Route::get('/stock-vouchers', [StockVoucherController::class, 'index']);
 Route::post('/stock-vouchers', [StockVoucherController::class, 'store']);
 Route::get('/stock-vouchers/{id}', [StockVoucherController::class, 'show']);
 Route::put('/stock-vouchers/{id}', [StockVoucherController::class, 'update']);
+
+// Stock Management routes
+Route::middleware(['App\Http\Middleware\StockApiErrorHandler'])->group(function () {
+    Route::post('/vendor-products/{id}/packs/{packId}/stock', [StockController::class, 'updatePackStock']);
+    Route::post('/inventory-transactions', [StockController::class, 'processInventoryTransaction']);
+    Route::get('/vendor-products/{id}/stock-consistency', [StockController::class, 'validateStockConsistency']);
+});

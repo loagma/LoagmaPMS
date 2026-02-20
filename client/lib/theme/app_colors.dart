@@ -20,5 +20,7 @@ class AppColors {
   /// Text colors.
   static const Color textDark = Color(0xFF2C2416);
   static const Color textMuted = Color(0xFF6B5D4A);
-}
 
+  /// Border color for inputs and dividers.
+  static const Color border = Color(0xFFE0E0E0);
+}

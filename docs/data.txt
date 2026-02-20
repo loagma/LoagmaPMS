@@ -1,0 +1,41 @@
+{
+  "BJFK": {
+    "tx": "5 ",
+    // label
+    "op": "40", 
+    // original price
+    "rp": "40",
+    // retail price
+    "sn": 0,
+    // serial no
+    "ps": "1",
+    // labels
+    "pu": "nos",
+    // packaging unit
+    "pi": "BJFK",
+    // package id
+    "stk": -995,
+    "in_stk": 0
+  },
+  "qL0f": {
+    "tx": "10 ",
+    "op": "400",
+    "rp": "400",
+    "sn": 0,
+    "ps": "10",
+    "pu": "nos",
+    "pi": "qL0f",
+    "stk": -995,
+    "in_stk": 0
+  }
+}
+// if one stock change all will chagne package
+
+# product_id, cat_id, parent_cat_id, brand, ctype_id, seq_no, start_date, is_published, is_used, is_deleted, in_stock, inventory_type, inventory_unit_type, name, description, display_photo, keywords, spec_params, packs, default_pack_id, hsn_code, gst_percent, offers, cache_txt, img_last_updated, stock, stock_ut_id
+'539', '32', '29', 'LOAGMA', 'vegetables_fruits', '0', '1508359659', '0', '1', '1', '0', 'SINGLE', 'WEIGHT', 'xx', 'xx', '/img/product/h/4/t/dmsyf_539_1508359665.2639_621137_59e7bdf1406ae.png', 'xx', '[]', '{\"XhsO\":{\"tx\":\"1 piece(s)\",\"op\":25,\"rp\":15,\"pi\":\"XhsO\",\"sn\":1,\"ps\":\"1\",\"pu\":\"piece\"},\"79BI\":{\"tx\":\"50 kg\",\"op\":550,\"rp\":480,\"sn\":0,\"ps\":\"50\",\"pu\":\"kg\",\"pi\":\"79BI\"},\"5KQE\":{\"tx\":\"5 kg\",\"op\":90,\"rp\":70,\"sn\":0,\"ps\":\"5\",\"pu\":\"kg\",\"pi\":\"5KQE\"},\"030g\":{\"tx\":\"10 kg\",\"op\":180,\"rp\":130,\"sn\":0,\"ps\":\"10\",\"pu\":\"kg\",\"pi\":\"030g\"}}', 'XhsO', '', '0.00', '{\"uo\":40}', '', '1623493999', '0.000', 'gm'
+
+
+issue to production ask for approval from admin 
+
+role base access control important  discusion in next meet .
+
