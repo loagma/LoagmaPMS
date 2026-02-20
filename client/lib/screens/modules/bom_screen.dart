@@ -211,16 +211,6 @@ class _RawMaterialsCard extends StatelessWidget {
     return ContentCard(
       title: 'Raw Materials - Input',
       child: Obx(() {
-        if (controller.rawMaterials.isEmpty) {
-          return EmptyState(
-            icon: Icons.inventory_2_outlined,
-            message: 'No raw materials added yet.',
-            actionLabel: 'Add Material',
-            onAction: controller.isReadOnly
-                ? null
-                : () => controller.addRawMaterial(),
-          );
-        }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -335,12 +325,11 @@ class _RawMaterialRow extends StatelessWidget {
                       row.rawMaterial.value = product;
                       final unit = product?['inventory_unit_type']?.toString();
                       if (unit != null && unit.isNotEmpty) {
-                        row.unitType.value = controller.unitTypes
-                                .contains(unit)
+                        row.unitType.value = controller.unitTypes.contains(unit)
                             ? unit
                             : (controller.unitTypes.isNotEmpty
-                                ? controller.unitTypes.first
-                                : 'KG');
+                                  ? controller.unitTypes.first
+                                  : 'KG');
                       }
                     },
               validator: (value) {

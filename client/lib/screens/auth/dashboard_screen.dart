@@ -182,6 +182,14 @@ class DashboardScreen extends StatelessWidget {
                     Get.toNamed(AppRoutes.inventory);
                   },
                 ),
+                _ModuleCard(
+                  title: 'Reports',
+                  subtitle: 'View all module reports',
+                  icon: Icons.assessment_rounded,
+                  onTap: () {
+                    Get.toNamed(AppRoutes.reports);
+                  },
+                ),
               ];
 
               return Padding(
@@ -335,6 +343,16 @@ class _DashboardDrawer extends StatelessWidget {
                       Get.toNamed(AppRoutes.inventory);
                     },
                   ),
+                  const Divider(height: 1, indent: 16, endIndent: 16),
+                  const SizedBox(height: 8),
+                  _DrawerItem(
+                    icon: Icons.assessment_rounded,
+                    label: 'Reports',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      Get.toNamed(AppRoutes.reports);
+                    },
+                  ),
                 ],
               ),
             ),
@@ -450,7 +468,7 @@ class _ModuleCard extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
@@ -469,6 +487,8 @@ class _ModuleCard extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                   color: AppColors.textDark,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 4),
               Text(

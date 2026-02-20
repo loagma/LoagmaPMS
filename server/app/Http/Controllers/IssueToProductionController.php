@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\StockManagerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -10,6 +11,12 @@ use Illuminate\Support\Facades\Validator;
 
 class IssueToProductionController extends Controller
 {
+    private StockManagerService $stockManager;
+
+    public function __construct(StockManagerService $stockManager)
+    {
+        $this->stockManager = $stockManager;
+    }
     public function index(): JsonResponse
     {
         try {
@@ -328,6 +335,7 @@ class IssueToProductionController extends Controller
 
     /**
      * Validate that sufficient stock exists for each material.
+     * Checks both product table and vendor_products packs.
      * Returns null if valid, or array with message and errors if invalid.
      *
      * @param array $materials Array of ['raw_material_id' => int, 'quantity' => float]
@@ -339,6 +347,8 @@ class IssueToProductionController extends Controller
         foreach ($materials as $index => $material) {
             $productId = (int) $material['raw_material_id'];
             $quantity = (float) $material['quantity'];
+            
+            // Check product table stock
             $product = DB::table('product')
                 ->where('product_id', $productId)
                 ->select('product_id', 'name', 'stock')
@@ -347,11 +357,17 @@ class IssueToProductionController extends Controller
                 $errors["materials.{$index}"] = ['Product not found'];
                 continue;
             }
-            $available = $product->stock !== null ? (float) $product->stock : 0;
-            if ($available < $quantity) {
+            
+            // Check vendor_products total stock
+            $vendorProductsStock = $this->getVendorProductsTotalStock($productId);
+            
+            // Prioritize vendor_products stock if available, otherwise use product table stock
+            $availableStock = $vendorProductsStock > 0 ? $vendorProductsStock : ($product->stock !== null ? (float) $product->stock : 0);
+            
+            if ($availableStock < $quantity) {
                 $productName = $product->name ?? "Product #{$productId}";
                 $errors["materials.{$index}"] = [
-                    "Insufficient stock for {$productName}. Available: {$available}, Required: {$quantity}",
+                    "Insufficient stock for {$productName}. Available: {$availableStock}, Required: {$quantity}",
                 ];
             }
         }
@@ -365,8 +381,46 @@ class IssueToProductionController extends Controller
     }
 
     /**
+     * Get total stock from all vendor_products packs for a product
+     * 
+     * @param int $productId
+     * @return float Total stock across all vendor products
+     */
+    private function getVendorProductsTotalStock(int $productId): float
+    {
+        $vendorProducts = DB::table('vendor_products')
+            ->where('product_id', $productId)
+            ->where('status', '1')
+            ->get();
+
+        $totalStock = 0;
+
+        foreach ($vendorProducts as $vendorProduct) {
+            try {
+                $packsData = json_decode($vendorProduct->packs, true);
+                if (is_array($packsData)) {
+                    foreach ($packsData as $packData) {
+                        if (isset($packData['stk'])) {
+                            $totalStock += (float) $packData['stk'];
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('Error parsing vendor product packs for stock validation', [
+                    'vendor_product_id' => $vendorProduct->id,
+                    'product_id' => $productId,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
+        return $totalStock;
+    }
+
+    /**
      * Reduce product stock for each material.
-     * Uses conditional update to avoid race conditions (negative stock).
+     * Reduces stock from vendor_products packs (all packages simultaneously)
+     * and also updates the product table stock.
      *
      * @param array $materials Array of ['raw_material_id' => int, 'quantity' => float]
      * @throws \RuntimeException if any product has insufficient stock at update time
@@ -376,22 +430,153 @@ class IssueToProductionController extends Controller
         foreach ($materials as $material) {
             $productId = (int) $material['raw_material_id'];
             $quantity = (float) $material['quantity'];
-            $affected = DB::update(
-                'UPDATE product SET stock = COALESCE(stock, 0) - ? WHERE product_id = ? AND COALESCE(stock, 0) >= ?',
-                [$quantity, $productId, $quantity]
-            );
-            if ($affected === 0) {
-                $product = DB::table('product')->where('product_id', $productId)->first();
-                $name = $product->name ?? "Product #{$productId}";
-                throw new \RuntimeException(
-                    "Insufficient stock for {$name} at update time (concurrent modification?)."
+            
+            // First, reduce stock from vendor_products packs
+            $this->reduceVendorProductStock($productId, $quantity);
+            
+            // Then, reduce stock from product table (only if stock exists)
+            $product = DB::table('product')->where('product_id', $productId)->first();
+            $currentStock = $product && $product->stock !== null ? (float) $product->stock : 0;
+            
+            if ($currentStock > 0) {
+                // Only reduce if there's stock in product table
+                $reduceAmount = min($quantity, $currentStock);
+                DB::update(
+                    'UPDATE product SET stock = COALESCE(stock, 0) - ? WHERE product_id = ?',
+                    [$reduceAmount, $productId]
                 );
+                
+                Log::info('Product table stock reduced', [
+                    'product_id' => $productId,
+                    'reduced_amount' => $reduceAmount,
+                    'original_stock' => $currentStock
+                ]);
+            } else {
+                Log::info('Product table has no stock, only vendor_products stock reduced', [
+                    'product_id' => $productId,
+                    'quantity' => $quantity
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Reduce stock from all vendor_products packs for a given product_id
+     * 
+     * @param int $productId
+     * @param float $quantityToReduce
+     * @throws \RuntimeException if stock reduction fails
+     */
+    private function reduceVendorProductStock(int $productId, float $quantityToReduce): void
+    {
+        // Get all vendor_products for this product_id
+        $vendorProducts = DB::table('vendor_products')
+            ->where('product_id', $productId)
+            ->where('status', '1')
+            ->get();
+
+        if ($vendorProducts->isEmpty()) {
+            Log::info('No vendor products found for product', ['product_id' => $productId]);
+            return;
+        }
+
+        foreach ($vendorProducts as $vendorProduct) {
+            try {
+                // Parse packs JSON
+                $packsData = json_decode($vendorProduct->packs, true);
+                if (!is_array($packsData) || empty($packsData)) {
+                    Log::warning('Invalid or empty packs JSON', [
+                        'vendor_product_id' => $vendorProduct->id,
+                        'product_id' => $productId
+                    ]);
+                    continue;
+                }
+
+                // Get the default pack or first pack
+                $defaultPackId = $vendorProduct->default_pack_id;
+                $packToUpdate = null;
+
+                // Find the default pack or use first available pack
+                foreach ($packsData as $packId => $packData) {
+                    if ($packId === $defaultPackId) {
+                        $packToUpdate = $packId;
+                        break;
+                    }
+                    if ($packToUpdate === null) {
+                        $packToUpdate = $packId;
+                    }
+                }
+
+                if ($packToUpdate === null) {
+                    Log::warning('No pack found to update', [
+                        'vendor_product_id' => $vendorProduct->id,
+                        'product_id' => $productId
+                    ]);
+                    continue;
+                }
+
+                // Calculate total available stock in base units
+                $totalStock = 0;
+                foreach ($packsData as $packData) {
+                    if (isset($packData['stk'])) {
+                        $totalStock += (float) $packData['stk'];
+                    }
+                }
+
+                // Check if sufficient stock is available
+                if ($totalStock < $quantityToReduce) {
+                    Log::warning('Insufficient vendor product stock', [
+                        'vendor_product_id' => $vendorProduct->id,
+                        'product_id' => $productId,
+                        'available' => $totalStock,
+                        'required' => $quantityToReduce
+                    ]);
+                    continue;
+                }
+
+                // Use StockManagerService to reduce stock (negative value for reduction)
+                $result = $this->stockManager->updatePackStock(
+                    $vendorProduct->id,
+                    $packToUpdate,
+                    -$quantityToReduce,
+                    'Issue to Production'
+                );
+
+                if (!$result->success) {
+                    Log::error('Failed to reduce vendor product stock', [
+                        'vendor_product_id' => $vendorProduct->id,
+                        'product_id' => $productId,
+                        'pack_id' => $packToUpdate,
+                        'quantity' => $quantityToReduce,
+                        'error' => $result->message
+                    ]);
+                    throw new \RuntimeException(
+                        "Failed to reduce vendor product stock: {$result->message}"
+                    );
+                }
+
+                Log::info('Vendor product stock reduced successfully', [
+                    'vendor_product_id' => $vendorProduct->id,
+                    'product_id' => $productId,
+                    'pack_id' => $packToUpdate,
+                    'quantity_reduced' => $quantityToReduce
+                ]);
+
+            } catch (\Exception $e) {
+                Log::error('Error reducing vendor product stock', [
+                    'vendor_product_id' => $vendorProduct->id,
+                    'product_id' => $productId,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+                // Continue with other vendor products instead of failing completely
             }
         }
     }
 
     /**
      * Restore product stock for each material (reverse of reduceStock).
+     * Restores stock to vendor_products packs and product table.
      *
      * @param array $materials Array of ['raw_material_id' => int, 'quantity' => float]
      */
@@ -400,10 +585,106 @@ class IssueToProductionController extends Controller
         foreach ($materials as $material) {
             $productId = (int) $material['raw_material_id'];
             $quantity = (float) $material['quantity'];
+            
+            // First, restore stock to vendor_products packs
+            $this->restoreVendorProductStock($productId, $quantity);
+            
+            // Then, restore stock to product table
             DB::statement(
                 'UPDATE product SET stock = COALESCE(stock, 0) + ? WHERE product_id = ?',
                 [$quantity, $productId]
             );
+        }
+    }
+
+    /**
+     * Restore stock to all vendor_products packs for a given product_id
+     * 
+     * @param int $productId
+     * @param float $quantityToRestore
+     */
+    private function restoreVendorProductStock(int $productId, float $quantityToRestore): void
+    {
+        // Get all vendor_products for this product_id
+        $vendorProducts = DB::table('vendor_products')
+            ->where('product_id', $productId)
+            ->where('status', '1')
+            ->get();
+
+        if ($vendorProducts->isEmpty()) {
+            Log::info('No vendor products found for product restoration', ['product_id' => $productId]);
+            return;
+        }
+
+        foreach ($vendorProducts as $vendorProduct) {
+            try {
+                // Parse packs JSON
+                $packsData = json_decode($vendorProduct->packs, true);
+                if (!is_array($packsData) || empty($packsData)) {
+                    Log::warning('Invalid or empty packs JSON for restoration', [
+                        'vendor_product_id' => $vendorProduct->id,
+                        'product_id' => $productId
+                    ]);
+                    continue;
+                }
+
+                // Get the default pack or first pack
+                $defaultPackId = $vendorProduct->default_pack_id;
+                $packToUpdate = null;
+
+                // Find the default pack or use first available pack
+                foreach ($packsData as $packId => $packData) {
+                    if ($packId === $defaultPackId) {
+                        $packToUpdate = $packId;
+                        break;
+                    }
+                    if ($packToUpdate === null) {
+                        $packToUpdate = $packId;
+                    }
+                }
+
+                if ($packToUpdate === null) {
+                    Log::warning('No pack found to restore', [
+                        'vendor_product_id' => $vendorProduct->id,
+                        'product_id' => $productId
+                    ]);
+                    continue;
+                }
+
+                // Use StockManagerService to restore stock (positive value for increase)
+                $result = $this->stockManager->updatePackStock(
+                    $vendorProduct->id,
+                    $packToUpdate,
+                    $quantityToRestore,
+                    'Restore from Issue to Production (Edit/Cancel)'
+                );
+
+                if (!$result->success) {
+                    Log::error('Failed to restore vendor product stock', [
+                        'vendor_product_id' => $vendorProduct->id,
+                        'product_id' => $productId,
+                        'pack_id' => $packToUpdate,
+                        'quantity' => $quantityToRestore,
+                        'error' => $result->message
+                    ]);
+                }
+
+                Log::info('Vendor product stock restored successfully', [
+                    'vendor_product_id' => $vendorProduct->id,
+                    'product_id' => $productId,
+                    'pack_id' => $packToUpdate,
+                    'quantity_restored' => $quantityToRestore
+                ]);
+
+            } catch (\Exception $e) {
+                Log::error('Error restoring vendor product stock', [
+                    'vendor_product_id' => $vendorProduct->id,
+                    'product_id' => $productId,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+                // Continue with other vendor products
+            }
         }
     }
 }

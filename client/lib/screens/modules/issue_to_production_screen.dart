@@ -131,14 +131,6 @@ class _IssueMaterialsCard extends StatelessWidget {
     return ContentCard(
       title: 'Raw Materials to Issue',
       child: Obx(() {
-        if (controller.materials.isEmpty) {
-          return EmptyState(
-            icon: Icons.inventory_outlined,
-            message: 'No materials added yet.',
-            actionLabel: 'Add Material',
-            onAction: () => controller.addMaterialRow(),
-          );
-        }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -269,8 +261,8 @@ class _IssueMaterialRow extends StatelessWidget {
                   row.unitType.value = controller.unitTypes.contains(unit)
                       ? unit
                       : (controller.unitTypes.isNotEmpty
-                          ? controller.unitTypes.first
-                          : 'KG');
+                            ? controller.unitTypes.first
+                            : 'KG');
                 }
               },
               validator: (value) {
@@ -286,52 +278,50 @@ class _IssueMaterialRow extends StatelessWidget {
             children: [
               Expanded(
                 flex: 2,
-                child: Obx(
-                  () {
-                    final product = row.rawMaterial.value;
-                    final available = product?.stock;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        TextFormField(
-                          initialValue: row.quantity.value,
-                          decoration: AppInputDecoration.standard(
-                            labelText: 'Issue Quantity *',
-                            hintText: '0.00',
-                          ),
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Required';
-                            }
-                            final qty = double.tryParse(value);
-                            if (qty == null || qty <= 0) {
-                              return 'Must be > 0';
-                            }
-                            if (available != null && qty > available) {
-                              return 'Exceeds available ($available)';
-                            }
-                            return null;
-                          },
-                          onChanged: (value) => row.quantity.value = value,
+                child: Obx(() {
+                  final product = row.rawMaterial.value;
+                  final available = product?.stock;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextFormField(
+                        initialValue: row.quantity.value,
+                        decoration: AppInputDecoration.standard(
+                          labelText: 'Issue Quantity *',
+                          hintText: '0.00',
                         ),
-                        if (available != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 6),
-                            child: Text(
-                              'Available: $available',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textMuted,
-                              ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Required';
+                          }
+                          final qty = double.tryParse(value);
+                          if (qty == null || qty <= 0) {
+                            return 'Must be > 0';
+                          }
+                          if (available != null && qty > available) {
+                            return 'Exceeds available ($available)';
+                          }
+                          return null;
+                        },
+                        onChanged: (value) => row.quantity.value = value,
+                      ),
+                      if (available != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            'Available: $available',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textMuted,
                             ),
                           ),
-                      ],
-                    );
-                  },
-                ),
+                        ),
+                    ],
+                  );
+                }),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -341,8 +331,8 @@ class _IssueMaterialRow extends StatelessWidget {
                     value: controller.unitTypes.contains(row.unitType.value)
                         ? row.unitType.value
                         : (controller.unitTypes.isNotEmpty
-                            ? controller.unitTypes.first
-                            : 'KG'),
+                              ? controller.unitTypes.first
+                              : 'KG'),
                     decoration: AppInputDecoration.standard(
                       labelText: 'Unit *',
                     ),

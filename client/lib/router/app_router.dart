@@ -3,11 +3,12 @@ import 'package:get/get.dart';
 import '../screens/auth/dashboard_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/otp_screen.dart';
-import '../screens/modules/bom_list_screen.dart';
-import '../screens/modules/issue_to_production_list_screen.dart';
-import '../screens/modules/receive_from_production_list_screen.dart';
-import '../screens/modules/stock_voucher_list_screen.dart';
+import '../screens/modules/bom_screen.dart';
+import '../screens/modules/issue_to_production_screen.dart';
+import '../screens/modules/receive_from_production_screen.dart';
+import '../screens/modules/stock_voucher_screen.dart';
 import '../screens/modules/inventory_list_screen.dart';
+import '../screens/modules/reports_screen.dart';
 
 /// Central route names. Use these instead of raw strings.
 abstract class AppRoutes {
@@ -21,6 +22,7 @@ abstract class AppRoutes {
   static const String bom = '/bom';
   static const String stockVoucher = '/stock-voucher';
   static const String inventory = '/inventory';
+  static const String reports = '/reports';
 }
 
 /// All app routes. Used by [GetMaterialApp] in [main.dart].
@@ -30,16 +32,14 @@ final List<GetPage<dynamic>> appPages = [
   GetPage(name: AppRoutes.dashboard, page: () => const DashboardScreen()),
   GetPage(
     name: AppRoutes.issueToProduction,
-    page: () => const IssueToProductionListScreen(),
+    page: () => const IssueToProductionScreen(),
   ),
   GetPage(
     name: AppRoutes.receiveFromProduction,
-    page: () => const ReceiveFromProductionListScreen(),
+    page: () => const ReceiveFromProductionScreen(),
   ),
-  GetPage(name: AppRoutes.bom, page: () => const BomListScreen()),
-  GetPage(
-    name: AppRoutes.stockVoucher,
-    page: () => const StockVoucherListScreen(),
-  ),
+  GetPage(name: AppRoutes.bom, page: () => const BomScreen()),
+  GetPage(name: AppRoutes.stockVoucher, page: () => const StockVoucherScreen()),
   GetPage(name: AppRoutes.inventory, page: () => const InventoryListScreen()),
+  GetPage(name: AppRoutes.reports, page: () => const ReportsScreen()),
 ];

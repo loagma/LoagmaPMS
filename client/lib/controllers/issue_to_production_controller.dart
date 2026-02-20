@@ -37,11 +37,11 @@ class IssueToProductionController extends GetxController {
     _loadProducts().then((_) {
       if (issueId != null) {
         _loadIssueData();
+      } else {
+        // Create mode: add one empty row by default
+        addMaterialRow();
       }
     });
-    if (issueId == null) {
-      // Create mode: products loading is enough
-    }
   }
 
   Future<void> _loadIssueData() async {
@@ -72,7 +72,8 @@ class IssueToProductionController extends GetxController {
             final productFromList = products
                 .where((p) => p.id == productId)
                 .firstOrNull;
-            row.rawMaterial.value = productFromList ??
+            row.rawMaterial.value =
+                productFromList ??
                 Product(
                   id: productId ?? 0,
                   name: item['raw_material_name']?.toString() ?? '',

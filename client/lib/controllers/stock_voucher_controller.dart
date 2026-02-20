@@ -32,6 +32,8 @@ class StockVoucherController extends GetxController {
     _loadUnitTypes();
     if (voucherId == null) {
       voucherDate.value = _formatDate(DateTime.now());
+      // Create mode: add one empty row by default
+      addItemRow();
     }
     if (voucherId != null) {
       _loadVoucherData();
@@ -54,7 +56,9 @@ class StockVoucherController extends GetxController {
           final vData = data['data'] as Map<String, dynamic>;
           final voucher = vData['voucher'];
           voucherType.value = voucher['voucher_type'] ?? 'IN';
-          voucherDate.value = voucher['voucher_date']?.toString().split(' ').first ?? _formatDate(DateTime.now());
+          voucherDate.value =
+              voucher['voucher_date']?.toString().split(' ').first ??
+              _formatDate(DateTime.now());
           remarks.value = voucher['remarks']?.toString() ?? '';
           final itemsData = vData['items'] as List? ?? [];
           items.clear();
@@ -98,8 +102,9 @@ class StockVoucherController extends GetxController {
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
       if (decoded['success'] == false) throw Exception(decoded['message']);
       final List data = decoded['data'] ?? [];
-      products.value =
-          data.map((e) => Product.fromJson(e as Map<String, dynamic>)).toList();
+      products.value = data
+          .map((e) => Product.fromJson(e as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       debugPrint('[STOCK_VOUCHER] Products error: $e');
       _showError('Failed to load products: $e');
@@ -232,18 +237,22 @@ class StockVoucherController extends GetxController {
       try {
         data = jsonDecode(response.body) as Map<String, dynamic>;
       } catch (_) {
-        _showError('Server error ${response.statusCode}. Ensure migrations are run.');
+        _showError(
+          'Server error ${response.statusCode}. Ensure migrations are run.',
+        );
         return;
       }
 
       if ((response.statusCode == 201 || response.statusCode == 200) &&
           data['success'] == true) {
         Get.back(result: true);
-        _showSuccess(isEdit
-            ? 'Voucher updated'
-            : saveStatus == 'DRAFT'
-                ? 'Voucher saved as draft'
-                : 'Stock voucher posted');
+        _showSuccess(
+          isEdit
+              ? 'Voucher updated'
+              : saveStatus == 'DRAFT'
+              ? 'Voucher saved as draft'
+              : 'Stock voucher posted',
+        );
       } else {
         final msg = data['message'] ?? 'Failed to save voucher';
         final err = data['error'];

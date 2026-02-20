@@ -36,6 +36,9 @@ class BomController extends GetxController {
     // If editing, load BOM data
     if (bomId != null) {
       _loadBomData();
+    } else {
+      // Create mode: add one empty row by default
+      addRawMaterial();
     }
   }
 

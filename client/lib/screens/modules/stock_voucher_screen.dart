@@ -13,9 +13,7 @@ class StockVoucherScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(
-      StockVoucherController(voucherId: voucherId),
-    );
+    final controller = Get.put(StockVoucherController(voucherId: voucherId));
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -60,8 +58,9 @@ class StockVoucherScreen extends StatelessWidget {
           key: controller.formKey,
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final maxWidth =
-                  constraints.maxWidth > 600 ? 600.0 : constraints.maxWidth - 32;
+              final maxWidth = constraints.maxWidth > 600
+                  ? 600.0
+                  : constraints.maxWidth - 32;
 
               return Column(
                 children: [
@@ -139,9 +138,7 @@ class _VoucherHeaderCard extends StatelessWidget {
           Obx(
             () => DropdownButtonFormField<String>(
               value: controller.voucherType.value,
-              decoration: AppInputDecoration.standard(
-                labelText: 'Type *',
-              ),
+              decoration: AppInputDecoration.standard(labelText: 'Type *'),
               items: const [
                 DropdownMenuItem(value: 'IN', child: Text('Stock IN')),
                 DropdownMenuItem(value: 'OUT', child: Text('Stock OUT')),
@@ -178,14 +175,6 @@ class _VoucherItemsCard extends StatelessWidget {
     return ContentCard(
       title: 'Items',
       child: Obx(() {
-        if (controller.items.isEmpty) {
-          return EmptyState(
-            icon: Icons.inventory_outlined,
-            message: 'No items added yet.',
-            actionLabel: 'Add Item',
-            onAction: () => controller.addItemRow(),
-          );
-        }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -252,7 +241,10 @@ class _VoucherItemRow extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
@@ -294,8 +286,8 @@ class _VoucherItemRow extends StatelessWidget {
                   row.unitType.value = controller.unitTypes.contains(unit)
                       ? unit
                       : (controller.unitTypes.isNotEmpty
-                          ? controller.unitTypes.first
-                          : 'KG');
+                            ? controller.unitTypes.first
+                            : 'KG');
                 }
               },
               validator: (value) {
@@ -320,7 +312,8 @@ class _VoucherItemRow extends StatelessWidget {
                       decimal: true,
                     ),
                     validator: (value) {
-                      if (value == null || value.trim().isEmpty) return 'Required';
+                      if (value == null || value.trim().isEmpty)
+                        return 'Required';
                       final qty = double.tryParse(value);
                       if (qty == null || qty <= 0) return 'Must be > 0';
                       return null;
@@ -337,9 +330,11 @@ class _VoucherItemRow extends StatelessWidget {
                     value: controller.unitTypes.contains(row.unitType.value)
                         ? row.unitType.value
                         : (controller.unitTypes.isNotEmpty
-                            ? controller.unitTypes.first
-                            : 'KG'),
-                    decoration: AppInputDecoration.standard(labelText: 'Unit *'),
+                              ? controller.unitTypes.first
+                              : 'KG'),
+                    decoration: AppInputDecoration.standard(
+                      labelText: 'Unit *',
+                    ),
                     isDense: true,
                     items: controller.unitTypes
                         .map(
@@ -595,10 +590,7 @@ class _SearchProductDialogState extends State<_SearchProductDialog> {
                 const Expanded(
                   child: Text(
                     'Search Products',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
                 IconButton(

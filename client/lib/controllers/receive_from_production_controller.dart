@@ -30,6 +30,9 @@ class ReceiveFromProductionController extends GetxController {
     _loadUnitTypes();
     if (receiveId != null) {
       _loadReceiveData();
+    } else {
+      // Create mode: add one empty row by default
+      addItemRow();
     }
   }
 
@@ -91,8 +94,9 @@ class ReceiveFromProductionController extends GetxController {
       }
 
       final List data = decoded['data'] ?? [];
-      products.value =
-          data.map((item) => Product.fromJson(item as Map<String, dynamic>)).toList();
+      products.value = data
+          .map((item) => Product.fromJson(item as Map<String, dynamic>))
+          .toList();
     } catch (e, st) {
       debugPrint('[RECEIVE] Error: $e\n$st');
       _showError('Failed to load products: $e');
@@ -219,18 +223,22 @@ class ReceiveFromProductionController extends GetxController {
       try {
         data = jsonDecode(response.body) as Map<String, dynamic>;
       } catch (_) {
-        _showError('Server error ${response.statusCode}. Ensure migrations are run.');
+        _showError(
+          'Server error ${response.statusCode}. Ensure migrations are run.',
+        );
         return;
       }
 
       if ((response.statusCode == 201 || response.statusCode == 200) &&
           data['success'] == true) {
         Get.back(result: true);
-        _showSuccess(isEdit
-            ? 'Receive updated'
-            : saveStatus == 'DRAFT'
-                ? 'Receive saved as draft'
-                : 'Production receive recorded');
+        _showSuccess(
+          isEdit
+              ? 'Receive updated'
+              : saveStatus == 'DRAFT'
+              ? 'Receive saved as draft'
+              : 'Production receive recorded',
+        );
       } else {
         final msg = data['message'] ?? 'Failed to save receive';
         final err = data['error'];

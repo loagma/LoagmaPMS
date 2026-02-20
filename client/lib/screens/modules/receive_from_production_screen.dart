@@ -20,7 +20,9 @@ class ReceiveFromProductionScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: ModuleAppBar(
-        title: controller.isEditMode ? 'Edit Receive' : 'Receive from Production',
+        title: controller.isEditMode
+            ? 'Edit Receive'
+            : 'Receive from Production',
         subtitle: 'Loagma',
         onBackPressed: () => Get.back(),
         actions: [
@@ -60,8 +62,9 @@ class ReceiveFromProductionScreen extends StatelessWidget {
           key: controller.formKey,
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final maxWidth =
-                  constraints.maxWidth > 600 ? 600.0 : constraints.maxWidth - 32;
+              final maxWidth = constraints.maxWidth > 600
+                  ? 600.0
+                  : constraints.maxWidth - 32;
 
               return Column(
                 children: [
@@ -132,14 +135,6 @@ class _ReceiveItemsCard extends StatelessWidget {
     return ContentCard(
       title: 'Finished Goods Received',
       child: Obx(() {
-        if (controller.items.isEmpty) {
-          return EmptyState(
-            icon: Icons.inventory_2_outlined,
-            message: 'No items added yet.',
-            actionLabel: 'Add Item',
-            onAction: () => controller.addItemRow(),
-          );
-        }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -230,7 +225,10 @@ class _ReceiveItemRow extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
@@ -272,8 +270,8 @@ class _ReceiveItemRow extends StatelessWidget {
                   row.unitType.value = controller.unitTypes.contains(unit)
                       ? unit
                       : (controller.unitTypes.isNotEmpty
-                          ? controller.unitTypes.first
-                          : 'KG');
+                            ? controller.unitTypes.first
+                            : 'KG');
                 }
               },
               validator: (value) {
@@ -317,15 +315,20 @@ class _ReceiveItemRow extends StatelessWidget {
                     value: controller.unitTypes.contains(row.unitType.value)
                         ? row.unitType.value
                         : (controller.unitTypes.isNotEmpty
-                            ? controller.unitTypes.first
-                            : 'KG'),
-                    decoration: AppInputDecoration.standard(labelText: 'Unit *'),
+                              ? controller.unitTypes.first
+                              : 'KG'),
+                    decoration: AppInputDecoration.standard(
+                      labelText: 'Unit *',
+                    ),
                     isDense: true,
                     items: controller.unitTypes
                         .map(
                           (unit) => DropdownMenuItem(
                             value: unit,
-                            child: Text(unit, style: const TextStyle(fontSize: 13)),
+                            child: Text(
+                              unit,
+                              style: const TextStyle(fontSize: 13),
+                            ),
                           ),
                         )
                         .toList(),
@@ -548,10 +551,7 @@ class _SearchProductDialogState extends State<_SearchProductDialog> {
                 const Expanded(
                   child: Text(
                     'Search Finished Products',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
                 IconButton(
