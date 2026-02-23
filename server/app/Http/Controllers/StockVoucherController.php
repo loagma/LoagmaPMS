@@ -106,6 +106,18 @@ class StockVoucherController extends Controller
                 ], 422);
             }
 
+            // Validate stock for OUT vouchers
+            if ($request->status === 'POSTED' && $request->voucher_type === 'OUT') {
+                $stockError = $this->validateStock($request->items);
+                if ($stockError) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $stockError['message'],
+                        'errors' => $stockError['errors'],
+                    ], 422);
+                }
+            }
+
             DB::beginTransaction();
 
             $voucherId = DB::table('stock_voucher')->insertGetId([
@@ -127,6 +139,15 @@ class StockVoucherController extends Controller
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
+            }
+
+            // Update stock if posted
+            if ($request->status === 'POSTED') {
+                if ($request->voucher_type === 'IN') {
+                    $this->increaseStock($request->items);
+                } else {
+                    $this->reduceStock($request->items);
+                }
             }
 
             DB::commit();
@@ -179,6 +200,42 @@ class StockVoucherController extends Controller
 
             DB::beginTransaction();
 
+            // Get existing items to reverse stock if needed
+            $existingItems = DB::table('stock_voucher_items')
+                ->where('voucher_id', $id)
+                ->get()
+                ->map(fn ($r) => [
+                    'product_id' => $r->product_id,
+                    'quantity' => (float) $r->quantity,
+                ])
+                ->all();
+
+            // Reverse previous stock changes if voucher was posted
+            if ($existing->status === 'POSTED' && count($existingItems) > 0) {
+                if ($existing->voucher_type === 'IN') {
+                    $this->reduceStock($existingItems);
+                } else {
+                    $this->increaseStock($existingItems);
+                }
+            }
+
+            // Validate stock for OUT vouchers
+            if ($request->status === 'POSTED' && $request->voucher_type === 'OUT') {
+                $itemsForValidation = array_map(fn ($m) => [
+                    'product_id' => $m['product_id'],
+                    'quantity' => (float) $m['quantity'],
+                ], $request->items);
+                $stockError = $this->validateStock($itemsForValidation);
+                if ($stockError) {
+                    DB::rollBack();
+                    return response()->json([
+                        'success' => false,
+                        'message' => $stockError['message'],
+                        'errors' => $stockError['errors'],
+                    ], 422);
+                }
+            }
+
             DB::table('stock_voucher')
                 ->where('id', $id)
                 ->update([
@@ -205,6 +262,15 @@ class StockVoucherController extends Controller
                 ]);
             }
 
+            // Apply new stock changes if posted
+            if ($request->status === 'POSTED') {
+                if ($request->voucher_type === 'IN') {
+                    $this->increaseStock($request->items);
+                } else {
+                    $this->reduceStock($request->items);
+                }
+            }
+
             DB::commit();
 
             return response()->json([
@@ -221,5 +287,187 @@ class StockVoucherController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    private function validateStock(array $items): ?array
+    {
+        $errors = [];
+        foreach ($items as $index => $item) {
+            $productId = (int) $item['product_id'];
+            $quantity = (float) $item['quantity'];
+            
+            $product = DB::table('product')
+                ->where('product_id', $productId)
+                ->select('product_id', 'name', 'stock')
+                ->first();
+            if (!$product) {
+                $errors["items.{$index}"] = ['Product not found'];
+                continue;
+            }
+            
+            $vendorProductsStock = $this->getVendorProductsTotalStock($productId);
+            $availableStock = $vendorProductsStock > 0 ? $vendorProductsStock : ($product->stock !== null ? (float) $product->stock : 0);
+            
+            if ($availableStock < $quantity) {
+                $productName = $product->name ?? "Product #{$productId}";
+                $errors["items.{$index}"] = [
+                    "Insufficient stock for {$productName}. Available: {$availableStock}, Required: {$quantity}",
+                ];
+            }
+        }
+        if (count($errors) > 0) {
+            return [
+                'message' => 'Insufficient stock',
+                'errors' => $errors,
+            ];
+        }
+        return null;
+    }
+
+    private function getVendorProductsTotalStock(int $productId): float
+    {
+        $vendorProducts = DB::table('vendor_products')
+            ->where('product_id', $productId)
+            ->where('status', '1')
+            ->get();
+
+        $totalStock = 0;
+        foreach ($vendorProducts as $vendorProduct) {
+            try {
+                $packsData = json_decode($vendorProduct->packs, true);
+                if (is_array($packsData)) {
+                    foreach ($packsData as $packData) {
+                        if (isset($packData['stk'])) {
+                            $totalStock += (float) $packData['stk'];
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('Error parsing vendor product packs', [
+                    'vendor_product_id' => $vendorProduct->id,
+                    'product_id' => $productId,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+        return $totalStock;
+    }
+
+    private function increaseStock(array $items): void
+    {
+        foreach ($items as $item) {
+            $productId = (int) $item['product_id'];
+            $quantity = (float) $item['quantity'];
+            
+            $this->updateVendorProductStock($productId, $quantity, 'increase');
+            
+            DB::statement(
+                'UPDATE product SET stock = COALESCE(stock, 0) + ? WHERE product_id = ?',
+                [$quantity, $productId]
+            );
+        }
+    }
+
+    private function reduceStock(array $items): void
+    {
+        foreach ($items as $item) {
+            $productId = (int) $item['product_id'];
+            $quantity = (float) $item['quantity'];
+            
+            $this->updateVendorProductStock($productId, $quantity, 'reduce');
+            
+            $product = DB::table('product')->where('product_id', $productId)->first();
+            $currentStock = $product && $product->stock !== null ? (float) $product->stock : 0;
+            
+            if ($currentStock > 0) {
+                $reduceAmount = min($quantity, $currentStock);
+                DB::update(
+                    'UPDATE product SET stock = COALESCE(stock, 0) - ? WHERE product_id = ?',
+                    [$reduceAmount, $productId]
+                );
+            }
+        }
+    }
+
+    private function updateVendorProductStock(int $productId, float $quantity, string $operation): void
+    {
+        $vendorProducts = DB::table('vendor_products')
+            ->where('product_id', $productId)
+            ->where('status', '1')
+            ->get();
+
+        if ($vendorProducts->isEmpty()) {
+            return;
+        }
+
+        foreach ($vendorProducts as $vendorProduct) {
+            try {
+                $packsData = json_decode($vendorProduct->packs, true);
+                if (!is_array($packsData) || empty($packsData)) {
+                    continue;
+                }
+
+                $totalStock = 0;
+                foreach ($packsData as $packData) {
+                    if (isset($packData['stk'])) {
+                        $totalStock += (float) $packData['stk'];
+                    }
+                }
+
+                if ($operation === 'reduce' && $totalStock <= 0) {
+                    continue;
+                }
+
+                $updatedPacks = [];
+                foreach ($packsData as $packId => $packData) {
+                    if (isset($packData['stk'])) {
+                        $currentStock = (float) $packData['stk'];
+                        
+                        if ($operation === 'increase') {
+                            $newStock = $currentStock + $quantity;
+                        } else {
+                            $newStock = max(0, $currentStock - $quantity);
+                        }
+                        
+                        $packData['stk'] = $newStock;
+                        $packData['in_stk'] = $newStock > 0 ? 1 : 0;
+                    }
+                    $updatedPacks[$packId] = $packData;
+                }
+
+                $updatedPacksJson = json_encode($updatedPacks);
+                DB::table('vendor_products')
+                    ->where('id', $vendorProduct->id)
+                    ->update([
+                        'packs' => $updatedPacksJson,
+                        'in_stock' => $this->hasAnyStock($updatedPacks) ? '1' : '0'
+                    ]);
+
+                Log::info("Vendor product stock {$operation}d", [
+                    'vendor_product_id' => $vendorProduct->id,
+                    'product_id' => $productId,
+                    'quantity' => $quantity,
+                    'operation' => $operation
+                ]);
+
+                break;
+            } catch (\Exception $e) {
+                Log::error('Error updating vendor product stock', [
+                    'vendor_product_id' => $vendorProduct->id,
+                    'product_id' => $productId,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+    }
+
+    private function hasAnyStock(array $packs): bool
+    {
+        foreach ($packs as $pack) {
+            if (isset($pack['stk']) && (float) $pack['stk'] > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 }

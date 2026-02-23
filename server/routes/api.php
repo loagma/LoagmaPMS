@@ -29,6 +29,7 @@ Route::get('/issues', [IssueToProductionController::class, 'index']);
 Route::post('/issues', [IssueToProductionController::class, 'store']);
 Route::get('/issues/{id}', [IssueToProductionController::class, 'show']);
 Route::put('/issues/{id}', [IssueToProductionController::class, 'update']);
+Route::get('/issues/debug/vendor-product-stock', [IssueToProductionController::class, 'debugVendorProductStock']);
 
 // Receive from Production routes
 Route::get('/receives', [ReceiveFromProductionController::class, 'index']);

@@ -125,6 +125,11 @@ class ReceiveFromProductionController extends Controller
                 ]);
             }
 
+            // Update stock if received
+            if ($request->status === 'RECEIVED') {
+                $this->increaseStock($request->items);
+            }
+
             DB::commit();
 
             return response()->json([
@@ -173,6 +178,21 @@ class ReceiveFromProductionController extends Controller
 
             DB::beginTransaction();
 
+            // Get existing items to reverse stock if needed
+            $existingItems = DB::table('receive_from_production_items')
+                ->where('receive_id', $id)
+                ->get()
+                ->map(fn ($r) => [
+                    'finished_product_id' => $r->finished_product_id,
+                    'quantity' => (float) $r->quantity,
+                ])
+                ->all();
+
+            // Reverse previous stock changes if receive was posted
+            if ($existing->status === 'RECEIVED' && count($existingItems) > 0) {
+                $this->reduceStock($existingItems);
+            }
+
             DB::table('receive_from_production')
                 ->where('id', $id)
                 ->update([
@@ -197,6 +217,11 @@ class ReceiveFromProductionController extends Controller
                 ]);
             }
 
+            // Apply new stock changes if received
+            if ($request->status === 'RECEIVED') {
+                $this->increaseStock($request->items);
+            }
+
             DB::commit();
 
             return response()->json([
@@ -213,5 +238,123 @@ class ReceiveFromProductionController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    private function increaseStock(array $items): void
+    {
+        foreach ($items as $item) {
+            $productId = (int) $item['finished_product_id'];
+            $quantity = (float) $item['quantity'];
+            
+            $this->updateVendorProductStock($productId, $quantity, 'increase');
+            
+            DB::statement(
+                'UPDATE product SET stock = COALESCE(stock, 0) + ? WHERE product_id = ?',
+                [$quantity, $productId]
+            );
+        }
+    }
+
+    private function reduceStock(array $items): void
+    {
+        foreach ($items as $item) {
+            $productId = (int) $item['finished_product_id'];
+            $quantity = (float) $item['quantity'];
+            
+            $this->updateVendorProductStock($productId, $quantity, 'reduce');
+            
+            $product = DB::table('product')->where('product_id', $productId)->first();
+            $currentStock = $product && $product->stock !== null ? (float) $product->stock : 0;
+            
+            if ($currentStock > 0) {
+                $reduceAmount = min($quantity, $currentStock);
+                DB::update(
+                    'UPDATE product SET stock = COALESCE(stock, 0) - ? WHERE product_id = ?',
+                    [$reduceAmount, $productId]
+                );
+            }
+        }
+    }
+
+    private function updateVendorProductStock(int $productId, float $quantity, string $operation): void
+    {
+        $vendorProducts = DB::table('vendor_products')
+            ->where('product_id', $productId)
+            ->where('status', '1')
+            ->get();
+
+        if ($vendorProducts->isEmpty()) {
+            return;
+        }
+
+        foreach ($vendorProducts as $vendorProduct) {
+            try {
+                $packsData = json_decode($vendorProduct->packs, true);
+                if (!is_array($packsData) || empty($packsData)) {
+                    continue;
+                }
+
+                $totalStock = 0;
+                foreach ($packsData as $packData) {
+                    if (isset($packData['stk'])) {
+                        $totalStock += (float) $packData['stk'];
+                    }
+                }
+
+                if ($operation === 'reduce' && $totalStock <= 0) {
+                    continue;
+                }
+
+                $updatedPacks = [];
+                foreach ($packsData as $packId => $packData) {
+                    if (isset($packData['stk'])) {
+                        $currentStock = (float) $packData['stk'];
+                        
+                        if ($operation === 'increase') {
+                            $newStock = $currentStock + $quantity;
+                        } else {
+                            $newStock = max(0, $currentStock - $quantity);
+                        }
+                        
+                        $packData['stk'] = $newStock;
+                        $packData['in_stk'] = $newStock > 0 ? 1 : 0;
+                    }
+                    $updatedPacks[$packId] = $packData;
+                }
+
+                $updatedPacksJson = json_encode($updatedPacks);
+                DB::table('vendor_products')
+                    ->where('id', $vendorProduct->id)
+                    ->update([
+                        'packs' => $updatedPacksJson,
+                        'in_stock' => $this->hasAnyStock($updatedPacks) ? '1' : '0'
+                    ]);
+
+                Log::info("Vendor product stock {$operation}d for finished goods", [
+                    'vendor_product_id' => $vendorProduct->id,
+                    'product_id' => $productId,
+                    'quantity' => $quantity,
+                    'operation' => $operation
+                ]);
+
+                break;
+            } catch (\Exception $e) {
+                Log::error('Error updating vendor product stock', [
+                    'vendor_product_id' => $vendorProduct->id,
+                    'product_id' => $productId,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+    }
+
+    private function hasAnyStock(array $packs): bool
+    {
+        foreach ($packs as $pack) {
+            if (isset($pack['stk']) && (float) $pack['stk'] > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -72,4 +72,7 @@ class ApiConfig {
 
   /// GET ${ApiConfig.apiBaseUrl}/vendor-products
   static String get vendorProducts => '$apiBaseUrl/vendor-products';
+
+  /// GET/POST ${ApiConfig.apiBaseUrl}/suppliers
+  static String get suppliers => '$apiBaseUrl/suppliers';
 }

@@ -9,6 +9,7 @@ import '../screens/modules/receive_from_production_screen.dart';
 import '../screens/modules/stock_voucher_screen.dart';
 import '../screens/modules/inventory_list_screen.dart';
 import '../screens/modules/reports_screen.dart';
+import '../screens/modules/supplier_list_screen.dart';
 
 /// Central route names. Use these instead of raw strings.
 abstract class AppRoutes {
@@ -23,6 +24,7 @@ abstract class AppRoutes {
   static const String stockVoucher = '/stock-voucher';
   static const String inventory = '/inventory';
   static const String reports = '/reports';
+  static const String suppliers = '/suppliers';
 }
 
 /// All app routes. Used by [GetMaterialApp] in [main.dart].
@@ -42,4 +44,5 @@ final List<GetPage<dynamic>> appPages = [
   GetPage(name: AppRoutes.stockVoucher, page: () => const StockVoucherScreen()),
   GetPage(name: AppRoutes.inventory, page: () => const InventoryListScreen()),
   GetPage(name: AppRoutes.reports, page: () => const ReportsScreen()),
+  GetPage(name: AppRoutes.suppliers, page: () => const SupplierListScreen()),
 ];

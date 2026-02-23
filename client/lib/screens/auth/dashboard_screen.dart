@@ -183,6 +183,14 @@ class DashboardScreen extends StatelessWidget {
                   },
                 ),
                 _ModuleCard(
+                  title: 'Suppliers',
+                  subtitle: 'Manage supplier profiles & products',
+                  icon: Icons.local_shipping_outlined,
+                  onTap: () {
+                    Get.toNamed(AppRoutes.suppliers);
+                  },
+                ),
+                _ModuleCard(
                   title: 'Reports',
                   subtitle: 'View all module reports',
                   icon: Icons.assessment_rounded,
@@ -341,6 +349,14 @@ class _DashboardDrawer extends StatelessWidget {
                     onTap: () {
                       Navigator.of(context).pop();
                       Get.toNamed(AppRoutes.inventory);
+                    },
+                  ),
+                  _DrawerItem(
+                    icon: Icons.local_shipping_outlined,
+                    label: 'Suppliers',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      Get.toNamed(AppRoutes.suppliers);
                     },
                   ),
                   const Divider(height: 1, indent: 16, endIndent: 16),
