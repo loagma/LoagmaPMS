@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -59,8 +58,9 @@ class SupplierFormScreen extends StatelessWidget {
           key: controller.formKey,
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final maxWidth =
-                  constraints.maxWidth > 700 ? 700.0 : constraints.maxWidth - 32;
+              final maxWidth = constraints.maxWidth > 700
+                  ? 700.0
+                  : constraints.maxWidth - 32;
 
               return Column(
                 children: [
@@ -99,15 +99,17 @@ class SupplierFormScreen extends StatelessWidget {
                       buttons: [
                         ActionButton(
                           label: 'Cancel',
-                          onPressed:
-                              controller.isSaving.value ? null : () => Get.back(),
+                          onPressed: controller.isSaving.value
+                              ? null
+                              : () => Get.back(),
                         ),
                         ActionButton(
                           label: controller.isEditMode ? 'Update' : 'Save',
                           isPrimary: true,
                           isLoading: controller.isSaving.value,
-                          onPressed:
-                              controller.isSaving.value ? null : controller.saveSupplier,
+                          onPressed: controller.isSaving.value
+                              ? null
+                              : controller.saveSupplier,
                         ),
                       ],
                     ),
@@ -138,25 +140,6 @@ class _SupplierBasicsCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Obx(
-                  () => TextFormField(
-                    initialValue: controller.supplierCode.value,
-                    decoration: AppInputDecoration.standard(
-                      labelText: 'Supplier Code *',
-                      hintText: 'SUP-001',
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Required';
-                      }
-                      return null;
-                    },
-                    onChanged: (value) => controller.supplierCode.value = value,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Obx(
                   () => DropdownButtonFormField<String>(
                     value: controller.status.value,
                     decoration: AppInputDecoration.standard(
@@ -164,7 +147,10 @@ class _SupplierBasicsCard extends StatelessWidget {
                     ),
                     items: const [
                       DropdownMenuItem(value: 'ACTIVE', child: Text('Active')),
-                      DropdownMenuItem(value: 'INACTIVE', child: Text('Inactive')),
+                      DropdownMenuItem(
+                        value: 'INACTIVE',
+                        child: Text('Inactive'),
+                      ),
                       DropdownMenuItem(
                         value: 'SUSPENDED',
                         child: Text('Suspended'),
@@ -181,7 +167,7 @@ class _SupplierBasicsCard extends StatelessWidget {
           const SizedBox(height: 16),
           Obx(
             () => TextFormField(
-              initialValue: controller.name.value,
+              initialValue: controller.supplierName.value,
               decoration: AppInputDecoration.standard(
                 labelText: 'Supplier Name *',
                 hintText: 'ABC Traders',
@@ -192,17 +178,15 @@ class _SupplierBasicsCard extends StatelessWidget {
                 }
                 return null;
               },
-              onChanged: (value) => controller.name.value = value,
+              onChanged: (value) => controller.supplierName.value = value,
             ),
           ),
           const SizedBox(height: 16),
           Obx(
             () => TextFormField(
-              initialValue: controller.legalName.value,
-              decoration: AppInputDecoration.standard(
-                labelText: 'Legal Name',
-              ),
-              onChanged: (value) => controller.legalName.value = value,
+              initialValue: controller.shortName.value,
+              decoration: AppInputDecoration.standard(labelText: 'Short Name'),
+              onChanged: (value) => controller.shortName.value = value,
             ),
           ),
           const SizedBox(height: 16),
@@ -216,8 +200,7 @@ class _SupplierBasicsCard extends StatelessWidget {
                       labelText: 'Business Type',
                       hintText: 'Manufacturer / Distributor',
                     ),
-                    onChanged: (value) =>
-                        controller.businessType.value = value,
+                    onChanged: (value) => controller.businessType.value = value,
                   ),
                 ),
               ),
@@ -225,12 +208,12 @@ class _SupplierBasicsCard extends StatelessWidget {
               Expanded(
                 child: Obx(
                   () => TextFormField(
-                    initialValue: controller.industry.value,
+                    initialValue: controller.department.value,
                     decoration: AppInputDecoration.standard(
-                      labelText: 'Industry',
+                      labelText: 'Department',
                       hintText: 'Food & Beverages',
                     ),
-                    onChanged: (value) => controller.industry.value = value,
+                    onChanged: (value) => controller.department.value = value,
                   ),
                 ),
               ),
@@ -315,9 +298,11 @@ class _SupplierContactCard extends StatelessWidget {
               Expanded(
                 child: Obx(
                   () => TextFormField(
-                    initialValue: controller.fax.value,
-                    decoration: AppInputDecoration.standard(labelText: 'Fax'),
-                    onChanged: (value) => controller.fax.value = value,
+                    initialValue: controller.website.value,
+                    decoration: AppInputDecoration.standard(
+                      labelText: 'Website',
+                    ),
+                    onChanged: (value) => controller.website.value = value,
                   ),
                 ),
               ),
@@ -326,27 +311,16 @@ class _SupplierContactCard extends StatelessWidget {
           const SizedBox(height: 16),
           Obx(
             () => TextFormField(
-              initialValue: controller.website.value,
-              decoration: AppInputDecoration.standard(labelText: 'Website'),
-              onChanged: (value) => controller.website.value = value,
+              initialValue: controller.contactPerson.value,
+              decoration: AppInputDecoration.standard(
+                labelText: 'Contact Person',
+              ),
+              onChanged: (value) => controller.contactPerson.value = value,
             ),
           ),
           const SizedBox(height: 16),
           Row(
             children: [
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: controller.contactPerson.value,
-                    decoration: AppInputDecoration.standard(
-                      labelText: 'Contact Person',
-                    ),
-                    onChanged: (value) =>
-                        controller.contactPerson.value = value,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
               Expanded(
                 child: Obx(
                   () => TextFormField(
@@ -359,11 +333,7 @@ class _SupplierContactCard extends StatelessWidget {
                   ),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
+              const SizedBox(width: 12),
               Expanded(
                 child: Obx(
                   () => TextFormField(
@@ -377,21 +347,18 @@ class _SupplierContactCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: controller.contactPersonPhone.value,
-                    decoration: AppInputDecoration.standard(
-                      labelText: 'Contact Phone',
-                    ),
-                    keyboardType: TextInputType.phone,
-                    onChanged: (value) =>
-                        controller.contactPersonPhone.value = value,
-                  ),
-                ),
-              ),
             ],
+          ),
+          const SizedBox(height: 16),
+          Obx(
+            () => TextFormField(
+              initialValue: controller.contactPersonPhone.value,
+              decoration: AppInputDecoration.standard(
+                labelText: 'Contact Phone',
+              ),
+              keyboardType: TextInputType.phone,
+              onChanged: (value) => controller.contactPersonPhone.value = value,
+            ),
           ),
         ],
       ),
@@ -407,32 +374,114 @@ class _SupplierAddressCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ContentCard(
-      title: 'Addresses',
+      title: 'Address',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Billing Address',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textMuted,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Obx(
-            () => TextFormField(
-              initialValue: controller.billingAddressLine1.value,
-              decoration: AppInputDecoration.standard(labelText: 'Address Line 1'),
-              onChanged: (value) => controller.billingAddressLine1.value = value,
-            ),
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: Obx(
+                  () => TextFormField(
+                    controller: controller.pincodeController,
+                    decoration: AppInputDecoration.standard(
+                      labelText: 'Pincode *',
+                      hintText: '400001',
+                      suffixIcon: controller.isLoadingPincode.value
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : null,
+                    ).copyWith(counterText: ''),
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    onChanged: (value) {
+                      controller.pincode.value = value;
+                      if (value.length == 6) {
+                        controller.lookupPincode(value);
+                      }
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 3,
+                child: Obx(() {
+                  if (controller.isLoadingPincode.value) {
+                    return Container(
+                      height: 56,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.border),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    );
+                  }
+
+                  if (controller.areas.isEmpty) {
+                    return TextFormField(
+                      key: ValueKey('area_text_${controller.area.value}'),
+                      initialValue: controller.area.value,
+                      decoration: AppInputDecoration.standard(
+                        labelText: 'Area',
+                        hintText: 'Enter area name',
+                      ),
+                      onChanged: (value) => controller.area.value = value,
+                    );
+                  }
+
+                  return DropdownButtonFormField<String>(
+                    key: ValueKey('area_dropdown_${controller.areas.length}'),
+                    value: controller.area.value.isEmpty
+                        ? null
+                        : controller.area.value,
+                    decoration: AppInputDecoration.standard(labelText: 'Area'),
+                    isExpanded: true,
+                    items: controller.areas
+                        .map(
+                          (area) => DropdownMenuItem(
+                            value: area,
+                            child: Text(area, overflow: TextOverflow.ellipsis),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) controller.area.value = value;
+                    },
+                  );
+                }),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Obx(
             () => TextFormField(
-              initialValue: controller.billingAddressLine2.value,
-              decoration: AppInputDecoration.standard(labelText: 'Address Line 2'),
-              onChanged: (value) => controller.billingAddressLine2.value = value,
+              key: ValueKey('address_${controller.addressLine1.value}'),
+              initialValue: controller.addressLine1.value,
+              decoration: AppInputDecoration.standard(
+                labelText: 'Address Line',
+                hintText: 'Building, Street, Landmark',
+              ),
+              maxLines: 2,
+              onChanged: (value) => controller.addressLine1.value = value,
             ),
           ),
           const SizedBox(height: 12),
@@ -441,9 +490,11 @@ class _SupplierAddressCard extends StatelessWidget {
               Expanded(
                 child: Obx(
                   () => TextFormField(
-                    initialValue: controller.billingCity.value,
+                    key: ValueKey('city_${controller.city.value}'),
+                    initialValue: controller.city.value,
                     decoration: AppInputDecoration.standard(labelText: 'City'),
-                    onChanged: (value) => controller.billingCity.value = value,
+                    enabled: controller.city.value.isEmpty,
+                    onChanged: (value) => controller.city.value = value,
                   ),
                 ),
               ),
@@ -451,122 +502,32 @@ class _SupplierAddressCard extends StatelessWidget {
               Expanded(
                 child: Obx(
                   () => TextFormField(
-                    initialValue: controller.billingState.value,
+                    key: ValueKey('state_${controller.state.value}'),
+                    initialValue: controller.state.value,
                     decoration: AppInputDecoration.standard(labelText: 'State'),
-                    onChanged: (value) => controller.billingState.value = value,
+                    enabled: controller.state.value.isEmpty,
+                    onChanged: (value) => controller.state.value = value,
                   ),
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: controller.billingCountry.value,
-                    decoration: AppInputDecoration.standard(labelText: 'Country'),
-                    onChanged: (value) =>
-                        controller.billingCountry.value = value,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: controller.billingPostalCode.value,
-                    decoration:
-                        AppInputDecoration.standard(labelText: 'Postal Code'),
-                    onChanged: (value) =>
-                        controller.billingPostalCode.value = value,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Shipping Address',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textMuted,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Obx(
-            () => TextFormField(
-              initialValue: controller.shippingAddressLine1.value,
-              decoration: AppInputDecoration.standard(labelText: 'Address Line 1'),
-              onChanged: (value) => controller.shippingAddressLine1.value = value,
-            ),
           ),
           const SizedBox(height: 12),
           Obx(
             () => TextFormField(
-              initialValue: controller.shippingAddressLine2.value,
-              decoration: AppInputDecoration.standard(labelText: 'Address Line 2'),
-              onChanged: (value) => controller.shippingAddressLine2.value = value,
+              key: ValueKey('country_${controller.country.value}'),
+              initialValue: controller.country.value,
+              decoration: AppInputDecoration.standard(labelText: 'Country'),
+              enabled: controller.country.value.isEmpty,
+              onChanged: (value) => controller.country.value = value,
             ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: controller.shippingCity.value,
-                    decoration: AppInputDecoration.standard(labelText: 'City'),
-                    onChanged: (value) => controller.shippingCity.value = value,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: controller.shippingState.value,
-                    decoration: AppInputDecoration.standard(labelText: 'State'),
-                    onChanged: (value) => controller.shippingState.value = value,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: controller.shippingCountry.value,
-                    decoration: AppInputDecoration.standard(labelText: 'Country'),
-                    onChanged: (value) =>
-                        controller.shippingCountry.value = value,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: controller.shippingPostalCode.value,
-                    decoration:
-                        AppInputDecoration.standard(labelText: 'Postal Code'),
-                    onChanged: (value) =>
-                        controller.shippingPostalCode.value = value,
-                  ),
-                ),
-              ),
-            ],
           ),
         ],
       ),
     );
   }
 }
+
 class _SupplierTaxCard extends StatelessWidget {
   final SupplierFormController controller;
 
@@ -584,75 +545,92 @@ class _SupplierTaxCard extends StatelessWidget {
               Expanded(
                 child: Obx(
                   () => TextFormField(
-                    initialValue: controller.gstin.value,
-                    decoration: AppInputDecoration.standard(labelText: 'GSTIN'),
-                    onChanged: (value) => controller.gstin.value = value,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: controller.pan.value,
-                    decoration: AppInputDecoration.standard(labelText: 'PAN'),
-                    onChanged: (value) => controller.pan.value = value,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: controller.tan.value,
-                    decoration: AppInputDecoration.standard(labelText: 'TAN'),
-                    onChanged: (value) => controller.tan.value = value,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: controller.cin.value,
-                    decoration: AppInputDecoration.standard(labelText: 'CIN'),
-                    onChanged: (value) => controller.cin.value = value,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: controller.vatNumber.value,
-                    decoration:
-                        AppInputDecoration.standard(labelText: 'VAT Number'),
-                    onChanged: (value) => controller.vatNumber.value = value,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: controller.registrationNumber.value,
+                    initialValue: controller.gstNo.value,
                     decoration: AppInputDecoration.standard(
-                      labelText: 'Registration No.',
+                      labelText: 'GST No',
+                    ),
+                    onChanged: (value) => controller.gstNo.value = value,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Obx(
+                  () => TextFormField(
+                    initialValue: controller.panNo.value,
+                    decoration: AppInputDecoration.standard(
+                      labelText: 'PAN No',
+                    ),
+                    onChanged: (value) => controller.panNo.value = value,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Obx(
+                  () => TextFormField(
+                    initialValue: controller.tanNo.value,
+                    decoration: AppInputDecoration.standard(
+                      labelText: 'TAN No',
+                    ),
+                    onChanged: (value) => controller.tanNo.value = value,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Obx(
+                  () => TextFormField(
+                    initialValue: controller.cinNo.value,
+                    decoration: AppInputDecoration.standard(
+                      labelText: 'CIN No',
+                    ),
+                    onChanged: (value) => controller.cinNo.value = value,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Obx(
+                  () => TextFormField(
+                    initialValue: controller.vatNo.value,
+                    decoration: AppInputDecoration.standard(
+                      labelText: 'VAT No',
+                    ),
+                    onChanged: (value) => controller.vatNo.value = value,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Obx(
+                  () => TextFormField(
+                    initialValue: controller.registrationNo.value,
+                    decoration: AppInputDecoration.standard(
+                      labelText: 'Registration No',
                     ),
                     onChanged: (value) =>
-                        controller.registrationNumber.value = value,
+                        controller.registrationNo.value = value,
                   ),
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          Obx(
+            () => TextFormField(
+              initialValue: controller.fssaiNo.value,
+              decoration: AppInputDecoration.standard(labelText: 'FSSAI No'),
+              onChanged: (value) => controller.fssaiNo.value = value,
+            ),
           ),
         ],
       ),
@@ -688,8 +666,9 @@ class _SupplierBankingCard extends StatelessWidget {
                 child: Obx(
                   () => TextFormField(
                     initialValue: controller.bankBranch.value,
-                    decoration:
-                        AppInputDecoration.standard(labelText: 'Branch'),
+                    decoration: AppInputDecoration.standard(
+                      labelText: 'Branch',
+                    ),
                     onChanged: (value) => controller.bankBranch.value = value,
                   ),
                 ),
@@ -700,8 +679,9 @@ class _SupplierBankingCard extends StatelessWidget {
           Obx(
             () => TextFormField(
               initialValue: controller.bankAccountName.value,
-              decoration:
-                  AppInputDecoration.standard(labelText: 'Account Name'),
+              decoration: AppInputDecoration.standard(
+                labelText: 'Account Name',
+              ),
               onChanged: (value) => controller.bankAccountName.value = value,
             ),
           ),
@@ -709,8 +689,9 @@ class _SupplierBankingCard extends StatelessWidget {
           Obx(
             () => TextFormField(
               initialValue: controller.bankAccountNumber.value,
-              decoration:
-                  AppInputDecoration.standard(labelText: 'Account Number'),
+              decoration: AppInputDecoration.standard(
+                labelText: 'Account Number',
+              ),
               onChanged: (value) => controller.bankAccountNumber.value = value,
             ),
           ),
@@ -779,8 +760,9 @@ class _SupplierTermsCard extends StatelessWidget {
                     decoration: AppInputDecoration.standard(
                       labelText: 'Credit Limit',
                     ),
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     onChanged: (value) => controller.creditLimit.value = value,
                   ),
                 ),
@@ -794,7 +776,9 @@ class _SupplierTermsCard extends StatelessWidget {
               decoration: AppInputDecoration.standard(
                 labelText: 'Rating (0 - 5)',
               ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               onChanged: (value) => controller.rating.value = value,
             ),
           ),
@@ -947,8 +931,7 @@ class _SupplierProductRow extends StatelessWidget {
                     decoration: AppInputDecoration.standard(
                       labelText: 'Supplier Product Name',
                     ),
-                    onChanged: (value) =>
-                        row.supplierProductName.value = value,
+                    onChanged: (value) => row.supplierProductName.value = value,
                   ),
                 ),
               ),
@@ -964,8 +947,9 @@ class _SupplierProductRow extends StatelessWidget {
                     decoration: AppInputDecoration.standard(
                       labelText: 'Pack Size',
                     ),
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     onChanged: (value) => row.packSize.value = value,
                   ),
                 ),
@@ -994,8 +978,9 @@ class _SupplierProductRow extends StatelessWidget {
                     decoration: AppInputDecoration.standard(
                       labelText: 'Min Order Qty',
                     ),
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     onChanged: (value) => row.minOrderQty.value = value,
                   ),
                 ),
@@ -1022,11 +1007,10 @@ class _SupplierProductRow extends StatelessWidget {
                 child: Obx(
                   () => TextFormField(
                     initialValue: row.price.value,
-                    decoration: AppInputDecoration.standard(
-                      labelText: 'Price',
+                    decoration: AppInputDecoration.standard(labelText: 'Price'),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
                     ),
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
                     onChanged: (value) => row.price.value = value,
                   ),
                 ),
@@ -1052,11 +1036,10 @@ class _SupplierProductRow extends StatelessWidget {
                 child: Obx(
                   () => TextFormField(
                     initialValue: row.taxPercent.value,
-                    decoration: AppInputDecoration.standard(
-                      labelText: 'Tax %',
+                    decoration: AppInputDecoration.standard(labelText: 'Tax %'),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
                     ),
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
                     onChanged: (value) => row.taxPercent.value = value,
                   ),
                 ),
@@ -1069,8 +1052,9 @@ class _SupplierProductRow extends StatelessWidget {
                     decoration: AppInputDecoration.standard(
                       labelText: 'Discount %',
                     ),
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     onChanged: (value) => row.discountPercent.value = value,
                   ),
                 ),
@@ -1145,6 +1129,7 @@ class _SupplierNotesCard extends StatelessWidget {
     );
   }
 }
+
 class _ProductDropdown extends StatefulWidget {
   final String label;
   final Product? initialValue;
@@ -1258,8 +1243,9 @@ class _ProductDropdownState extends State<_ProductDropdown> {
                           icon: const Icon(Icons.search, size: 18),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
-                          onPressed:
-                              widget.onChanged == null ? null : _showSearchDialog,
+                          onPressed: widget.onChanged == null
+                              ? null
+                              : _showSearchDialog,
                         ),
                 ),
               ),

@@ -7,6 +7,7 @@ import 'issue_to_production_list_screen.dart';
 import 'receive_from_production_list_screen.dart';
 import 'stock_voucher_list_screen.dart';
 import 'inventory_list_screen.dart';
+import 'supplier_list_screen.dart';
 
 class ReportsScreen extends StatelessWidget {
   const ReportsScreen({super.key});
@@ -86,6 +87,14 @@ class ReportsScreen extends StatelessWidget {
                 icon: Icons.inventory_2_outlined,
                 onTap: () {
                   Get.to(() => const InventoryListScreen());
+                },
+              ),
+              _ReportCard(
+                title: 'Suppliers',
+                subtitle: 'View all suppliers',
+                icon: Icons.local_shipping_outlined,
+                onTap: () {
+                  Get.to(() => const SupplierListScreen());
                 },
               ),
             ];

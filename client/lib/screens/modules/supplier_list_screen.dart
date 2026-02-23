@@ -37,14 +37,14 @@ class SupplierListScreen extends StatelessWidget {
               controller: controller.searchController,
               decoration: InputDecoration(
                 hintText: 'Search suppliers...',
-                prefixIcon: const Icon(Icons.search, color: AppColors.textMuted),
+                prefixIcon: const Icon(
+                  Icons.search,
+                  color: AppColors.textMuted,
+                ),
                 suffixIcon: Obx(() {
                   if (controller.searchQuery.value.isNotEmpty) {
                     return IconButton(
-                      icon: const Icon(
-                        Icons.clear,
-                        color: AppColors.textMuted,
-                      ),
+                      icon: const Icon(Icons.clear, color: AppColors.textMuted),
                       onPressed: controller.clearSearch,
                     );
                   }
@@ -110,20 +110,39 @@ class SupplierListScreen extends StatelessWidget {
                       child: Padding(
                         padding: const EdgeInsets.all(16),
                         child: ContentCard(
-                          child: EmptyState(
-                            icon: Icons.local_shipping_outlined,
-                            message: controller.searchQuery.value.isNotEmpty
-                                ? 'No suppliers found for "${controller.searchQuery.value}"'
-                                : 'No suppliers added yet.',
-                            actionLabel: 'Add Supplier',
-                            onAction: () async {
-                              final result = await Get.to(
-                                () => const SupplierFormScreen(),
-                              );
-                              if (result == true) {
-                                controller.refreshSuppliers();
-                              }
-                            },
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.local_shipping_outlined,
+                                  size: 64,
+                                  color: AppColors.textMuted.withValues(
+                                    alpha: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  controller.searchQuery.value.isNotEmpty
+                                      ? 'No suppliers found for "${controller.searchQuery.value}"'
+                                      : 'No suppliers added yet.',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    color: AppColors.textMuted,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Go to Dashboard to create a new supplier',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.textMuted,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -184,17 +203,6 @@ class SupplierListScreen extends StatelessWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Get.to(() => const SupplierFormScreen());
-          if (result == true) {
-            controller.refreshSuppliers();
-          }
-        },
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        child: const Icon(Icons.add_rounded),
-      ),
     );
   }
 }
@@ -249,7 +257,7 @@ class _SupplierCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      supplier.name,
+                      supplier.supplierName,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -287,8 +295,7 @@ class _SupplierCard extends StatelessWidget {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color:
-                                  AppColors.primary.withValues(alpha: 0.12),
+                              color: AppColors.primary.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Text(
