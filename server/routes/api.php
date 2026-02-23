@@ -9,6 +9,8 @@ use App\Http\Controllers\ReceiveFromProductionController;
 use App\Http\Controllers\StockVoucherController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\VendorProductController;
+use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\SupplierProductController;
 
 Route::get('/health', [HealthController::class, 'index']);
 Route::get('/products', [ProductController::class, 'index']);
@@ -49,3 +51,19 @@ Route::middleware(['App\Http\Middleware\StockApiErrorHandler'])->group(function 
     Route::post('/inventory-transactions', [StockController::class, 'processInventoryTransaction']);
     Route::get('/vendor-products/{id}/stock-consistency', [StockController::class, 'validateStockConsistency']);
 });
+
+// Supplier routes
+Route::get('/suppliers', [SupplierController::class, 'index']);
+Route::post('/suppliers', [SupplierController::class, 'store']);
+Route::get('/suppliers/{id}', [SupplierController::class, 'show']);
+Route::put('/suppliers/{id}', [SupplierController::class, 'update']);
+Route::get('/suppliers/{id}/products', [SupplierController::class, 'getSupplierProducts']);
+
+// Supplier Product routes
+Route::get('/supplier-products', [SupplierProductController::class, 'index']);
+Route::post('/supplier-products', [SupplierProductController::class, 'store']);
+Route::get('/supplier-products/{id}', [SupplierProductController::class, 'show']);
+Route::put('/supplier-products/{id}', [SupplierProductController::class, 'update']);
+Route::delete('/supplier-products/{id}', [SupplierProductController::class, 'destroy']);
+
+

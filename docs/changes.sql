@@ -106,8 +106,8 @@ CREATE TABLE IF NOT EXISTS `suppliers` (
     `deleted_at` timestamp NULL DEFAULT NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `suppliers_supplier_code_unique` (`supplier_code`),
-    KEY `suppliers_gstin_index` (`gstin`),
-    KEY `suppliers_pan_index` (`pan`)
+    KEY `suppliers_gst_no_index` (`gst_no`),
+    KEY `suppliers_pan_no_index` (`pan_no`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `supplier_products` (
