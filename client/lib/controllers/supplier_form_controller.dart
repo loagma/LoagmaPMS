@@ -16,38 +16,41 @@ class SupplierFormController extends GetxController {
   final isLoading = false.obs;
   final isSaving = false.obs;
 
+  // Text editing controllers
+  final pincodeController = TextEditingController();
+
+  // Updated fields to match new schema
   final supplierCode = ''.obs;
-  final name = ''.obs;
-  final legalName = ''.obs;
+  final supplierName = ''.obs;
+  final shortName = ''.obs;
   final businessType = ''.obs;
-  final industry = ''.obs;
-  final gstin = ''.obs;
-  final pan = ''.obs;
-  final tan = ''.obs;
-  final cin = ''.obs;
-  final vatNumber = ''.obs;
-  final registrationNumber = ''.obs;
+  final department = ''.obs;
+  final gstNo = ''.obs;
+  final panNo = ''.obs;
+  final tanNo = ''.obs;
+  final cinNo = ''.obs;
+  final vatNo = ''.obs;
+  final registrationNo = ''.obs;
+  final fssaiNo = ''.obs;
   final website = ''.obs;
   final email = ''.obs;
   final phone = ''.obs;
   final alternatePhone = ''.obs;
-  final fax = ''.obs;
   final contactPerson = ''.obs;
   final contactPersonEmail = ''.obs;
   final contactPersonPhone = ''.obs;
   final contactPersonDesignation = ''.obs;
-  final billingAddressLine1 = ''.obs;
-  final billingAddressLine2 = ''.obs;
-  final billingCity = ''.obs;
-  final billingState = ''.obs;
-  final billingCountry = ''.obs;
-  final billingPostalCode = ''.obs;
-  final shippingAddressLine1 = ''.obs;
-  final shippingAddressLine2 = ''.obs;
-  final shippingCity = ''.obs;
-  final shippingState = ''.obs;
-  final shippingCountry = ''.obs;
-  final shippingPostalCode = ''.obs;
+  final addressLine1 = ''.obs;
+  final area = ''.obs;
+  final city = ''.obs;
+  final state = ''.obs;
+  final country = ''.obs;
+  final pincode = ''.obs;
+
+  // Pincode API related
+  final isLoadingPincode = false.obs;
+  final areas = <String>[].obs;
+
   final bankName = ''.obs;
   final bankBranch = ''.obs;
   final bankAccountName = ''.obs;
@@ -79,6 +82,12 @@ class SupplierFormController extends GetxController {
     }
   }
 
+  @override
+  void onClose() {
+    pincodeController.dispose();
+    super.onClose();
+  }
+
   Future<void> _initEdit() async {
     await _loadProducts();
     await _loadSupplier();
@@ -94,8 +103,9 @@ class SupplierFormController extends GetxController {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         if (data['success'] == true) {
-          final supplier =
-              Supplier.fromJson(data['data'] as Map<String, dynamic>);
+          final supplier = Supplier.fromJson(
+            data['data'] as Map<String, dynamic>,
+          );
           _applySupplier(supplier);
           await _loadSupplierProducts();
         }
@@ -121,9 +131,7 @@ class SupplierFormController extends GetxController {
           final List items = data['data'] ?? [];
           supplierProducts.clear();
           for (final item in items) {
-            final sp = SupplierProduct.fromJson(
-              item as Map<String, dynamic>,
-            );
+            final sp = SupplierProduct.fromJson(item as Map<String, dynamic>);
             final row = SupplierProductRow.fromSupplierProduct(sp);
             row.product.value = _findProductById(sp.productId);
             supplierProducts.add(row);
@@ -140,45 +148,38 @@ class SupplierFormController extends GetxController {
 
   void _applySupplier(Supplier supplier) {
     supplierCode.value = supplier.supplierCode;
-    name.value = supplier.name;
-    legalName.value = supplier.legalName ?? '';
+    supplierName.value = supplier.supplierName;
+    shortName.value = supplier.shortName ?? '';
     businessType.value = supplier.businessType ?? '';
-    industry.value = supplier.industry ?? '';
-    gstin.value = supplier.gstin ?? '';
-    pan.value = supplier.pan ?? '';
-    tan.value = supplier.tan ?? '';
-    cin.value = supplier.cin ?? '';
-    vatNumber.value = supplier.vatNumber ?? '';
-    registrationNumber.value = supplier.registrationNumber ?? '';
+    department.value = supplier.department ?? '';
+    gstNo.value = supplier.gstNo ?? '';
+    panNo.value = supplier.panNo ?? '';
+    tanNo.value = supplier.tanNo ?? '';
+    cinNo.value = supplier.cinNo ?? '';
+    vatNo.value = supplier.vatNo ?? '';
+    registrationNo.value = supplier.registrationNo ?? '';
+    fssaiNo.value = supplier.fssaiNo ?? '';
     website.value = supplier.website ?? '';
     email.value = supplier.email ?? '';
     phone.value = supplier.phone ?? '';
     alternatePhone.value = supplier.alternatePhone ?? '';
-    fax.value = supplier.fax ?? '';
     contactPerson.value = supplier.contactPerson ?? '';
     contactPersonEmail.value = supplier.contactPersonEmail ?? '';
     contactPersonPhone.value = supplier.contactPersonPhone ?? '';
     contactPersonDesignation.value = supplier.contactPersonDesignation ?? '';
-    billingAddressLine1.value = supplier.billingAddressLine1 ?? '';
-    billingAddressLine2.value = supplier.billingAddressLine2 ?? '';
-    billingCity.value = supplier.billingCity ?? '';
-    billingState.value = supplier.billingState ?? '';
-    billingCountry.value = supplier.billingCountry ?? '';
-    billingPostalCode.value = supplier.billingPostalCode ?? '';
-    shippingAddressLine1.value = supplier.shippingAddressLine1 ?? '';
-    shippingAddressLine2.value = supplier.shippingAddressLine2 ?? '';
-    shippingCity.value = supplier.shippingCity ?? '';
-    shippingState.value = supplier.shippingState ?? '';
-    shippingCountry.value = supplier.shippingCountry ?? '';
-    shippingPostalCode.value = supplier.shippingPostalCode ?? '';
+    addressLine1.value = supplier.addressLine1 ?? '';
+    city.value = supplier.city ?? '';
+    state.value = supplier.state ?? '';
+    country.value = supplier.country ?? '';
+    pincode.value = supplier.pincode ?? '';
+    pincodeController.text = supplier.pincode ?? '';
     bankName.value = supplier.bankName ?? '';
     bankBranch.value = supplier.bankBranch ?? '';
     bankAccountName.value = supplier.bankAccountName ?? '';
     bankAccountNumber.value = supplier.bankAccountNumber ?? '';
     ifscCode.value = supplier.ifscCode ?? '';
     swiftCode.value = supplier.swiftCode ?? '';
-    paymentTermsDays.value =
-        supplier.paymentTermsDays?.toString() ?? '';
+    paymentTermsDays.value = supplier.paymentTermsDays?.toString() ?? '';
     creditLimit.value = supplier.creditLimit?.toStringAsFixed(2) ?? '';
     rating.value = supplier.rating?.toStringAsFixed(1) ?? '';
     isPreferred.value = supplier.isPreferred;
@@ -217,6 +218,56 @@ class SupplierFormController extends GetxController {
     }
   }
 
+  Future<void> lookupPincode(String pin) async {
+    if (pin.length != 6) return;
+
+    try {
+      isLoadingPincode.value = true;
+      areas.clear();
+
+      // Using India Post Pincode API
+      final response = await http
+          .get(Uri.parse('https://api.postalpincode.in/pincode/$pin'))
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        if (data.isNotEmpty && data[0]['Status'] == 'Success') {
+          final postOffices = data[0]['PostOffice'] as List;
+          if (postOffices.isNotEmpty) {
+            // Extract unique areas
+            final areaSet = <String>{};
+            for (final office in postOffices) {
+              final name = office['Name']?.toString();
+              if (name != null && name.isNotEmpty) {
+                areaSet.add(name);
+              }
+            }
+            areas.value = areaSet.toList()..sort();
+
+            // Set first office details
+            final firstOffice = postOffices[0];
+            city.value = firstOffice['District']?.toString() ?? '';
+            state.value = firstOffice['State']?.toString() ?? '';
+            country.value = firstOffice['Country']?.toString() ?? 'India';
+
+            // Auto-select first area if only one
+            if (areas.length == 1) {
+              area.value = areas[0];
+            }
+          }
+        } else {
+          _showError('Invalid pincode or no data found');
+        }
+      }
+    } catch (e) {
+      debugPrint('[SUPPLIER_FORM] Pincode lookup error: $e');
+      _showError('Failed to lookup pincode');
+    } finally {
+      isLoadingPincode.value = false;
+    }
+  }
+
   Future<void> searchProducts(String query) async {
     if (query.length < 2) {
       await _loadProducts();
@@ -250,7 +301,7 @@ class SupplierFormController extends GetxController {
     }
     for (final row in supplierProducts) {
       if (row.product.value == null) {
-        _showError('Please select product for all supplier items');
+        _showError('Please select a product for all supplier products');
         return false;
       }
     }
@@ -260,133 +311,212 @@ class SupplierFormController extends GetxController {
   Future<void> saveSupplier() async {
     if (!_validateForm()) return;
 
-    isSaving.value = true;
     try {
-      final payload = _buildPayload();
-      final isEdit = supplierId != null;
-      final url = isEdit
+      isSaving.value = true;
+
+      final payload = {
+        // supplier_code is auto-generated by backend
+        'supplier_name': supplierName.value.trim(),
+        'short_name': shortName.value.trim().isEmpty
+            ? null
+            : shortName.value.trim(),
+        'business_type': businessType.value.trim().isEmpty
+            ? null
+            : businessType.value.trim(),
+        'department': department.value.trim().isEmpty
+            ? null
+            : department.value.trim(),
+        'gst_no': gstNo.value.trim().isEmpty ? null : gstNo.value.trim(),
+        'pan_no': panNo.value.trim().isEmpty ? null : panNo.value.trim(),
+        'tan_no': tanNo.value.trim().isEmpty ? null : tanNo.value.trim(),
+        'cin_no': cinNo.value.trim().isEmpty ? null : cinNo.value.trim(),
+        'vat_no': vatNo.value.trim().isEmpty ? null : vatNo.value.trim(),
+        'registration_no': registrationNo.value.trim().isEmpty
+            ? null
+            : registrationNo.value.trim(),
+        'fssai_no': fssaiNo.value.trim().isEmpty ? null : fssaiNo.value.trim(),
+        'website': website.value.trim().isEmpty ? null : website.value.trim(),
+        'email': email.value.trim().isEmpty ? null : email.value.trim(),
+        'phone': phone.value.trim().isEmpty ? null : phone.value.trim(),
+        'alternate_phone': alternatePhone.value.trim().isEmpty
+            ? null
+            : alternatePhone.value.trim(),
+        'contact_person': contactPerson.value.trim().isEmpty
+            ? null
+            : contactPerson.value.trim(),
+        'contact_person_email': contactPersonEmail.value.trim().isEmpty
+            ? null
+            : contactPersonEmail.value.trim(),
+        'contact_person_phone': contactPersonPhone.value.trim().isEmpty
+            ? null
+            : contactPersonPhone.value.trim(),
+        'contact_person_designation':
+            contactPersonDesignation.value.trim().isEmpty
+            ? null
+            : contactPersonDesignation.value.trim(),
+        'address_line1': addressLine1.value.trim().isEmpty
+            ? null
+            : addressLine1.value.trim(),
+        'city': city.value.trim().isEmpty ? null : city.value.trim(),
+        'state': state.value.trim().isEmpty ? null : state.value.trim(),
+        'country': country.value.trim().isEmpty ? null : country.value.trim(),
+        'pincode': pincode.value.trim().isEmpty ? null : pincode.value.trim(),
+        'bank_name': bankName.value.trim().isEmpty
+            ? null
+            : bankName.value.trim(),
+        'bank_branch': bankBranch.value.trim().isEmpty
+            ? null
+            : bankBranch.value.trim(),
+        'bank_account_name': bankAccountName.value.trim().isEmpty
+            ? null
+            : bankAccountName.value.trim(),
+        'bank_account_number': bankAccountNumber.value.trim().isEmpty
+            ? null
+            : bankAccountNumber.value.trim(),
+        'ifsc_code': ifscCode.value.trim().isEmpty
+            ? null
+            : ifscCode.value.trim(),
+        'swift_code': swiftCode.value.trim().isEmpty
+            ? null
+            : swiftCode.value.trim(),
+        'payment_terms_days': paymentTermsDays.value.trim().isEmpty
+            ? null
+            : int.tryParse(paymentTermsDays.value.trim()),
+        'credit_limit': creditLimit.value.trim().isEmpty
+            ? null
+            : double.tryParse(creditLimit.value.trim()),
+        'rating': rating.value.trim().isEmpty
+            ? null
+            : double.tryParse(rating.value.trim()),
+        'is_preferred': isPreferred.value ? 1 : 0,
+        'status': status.value,
+        'notes': notes.value.trim().isEmpty ? null : notes.value.trim(),
+        'supplier_products': supplierProducts
+            .where((row) => row.product.value != null)
+            .map(
+              (row) => {
+                'product_id': row.product.value!.id,
+                'supplier_sku': row.supplierSku.value.trim().isEmpty
+                    ? null
+                    : row.supplierSku.value.trim(),
+                'supplier_product_name':
+                    row.supplierProductName.value.trim().isEmpty
+                    ? null
+                    : row.supplierProductName.value.trim(),
+                'description': row.description.value.trim().isEmpty
+                    ? null
+                    : row.description.value.trim(),
+                'pack_size': row.packSize.value.trim().isEmpty
+                    ? null
+                    : double.tryParse(row.packSize.value.trim()),
+                'pack_unit': row.packUnit.value.trim().isEmpty
+                    ? null
+                    : row.packUnit.value.trim(),
+                'min_order_qty': row.minOrderQty.value.trim().isEmpty
+                    ? null
+                    : double.tryParse(row.minOrderQty.value.trim()),
+                'price': row.price.value.trim().isEmpty
+                    ? null
+                    : double.tryParse(row.price.value.trim()),
+                'currency': row.currency.value.trim().isEmpty
+                    ? null
+                    : row.currency.value.trim(),
+                'tax_percent': row.taxPercent.value.trim().isEmpty
+                    ? null
+                    : double.tryParse(row.taxPercent.value.trim()),
+                'discount_percent': row.discountPercent.value.trim().isEmpty
+                    ? null
+                    : double.tryParse(row.discountPercent.value.trim()),
+                'lead_time_days': row.leadTimeDays.value.trim().isEmpty
+                    ? null
+                    : int.tryParse(row.leadTimeDays.value.trim()),
+                'is_preferred': row.isPreferred.value ? 1 : 0,
+                'is_active': row.isActive.value ? 1 : 0,
+              },
+            )
+            .toList(),
+      };
+
+      final url = isEditMode
           ? '${ApiConfig.suppliers}/$supplierId'
           : ApiConfig.suppliers;
-
-      final response = isEdit
+      final response = isEditMode
           ? await http.put(
               Uri.parse(url),
               headers: {
-                'Accept': 'application/json',
                 'Content-Type': 'application/json',
+                'Accept': 'application/json',
               },
               body: jsonEncode(payload),
             )
           : await http.post(
               Uri.parse(url),
               headers: {
-                'Accept': 'application/json',
                 'Content-Type': 'application/json',
+                'Accept': 'application/json',
               },
               body: jsonEncode(payload),
             );
 
-      Map<String, dynamic> data = {};
-      try {
-        data = jsonDecode(response.body) as Map<String, dynamic>;
-      } catch (_) {
-        _showError('Server error ${response.statusCode}');
-        return;
-      }
-
-      if ((response.statusCode == 201 || response.statusCode == 200) &&
-          data['success'] == true) {
-        Get.back(result: true);
-        _showSuccess(isEdit ? 'Supplier updated' : 'Supplier created');
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        if (data['success'] == true) {
+          _showSuccess(
+            isEditMode
+                ? 'Supplier updated successfully'
+                : 'Supplier created successfully',
+          );
+          Get.back(result: true);
+        } else {
+          _showError(data['message'] ?? 'Failed to save supplier');
+        }
       } else {
-        final msg = data['message'] ?? 'Failed to save supplier';
-        final err = data['error'];
-        final errs = data['errors'];
-        final detail = err != null
-            ? (err is String ? err : err.toString())
-            : (errs != null ? errs.toString() : null);
-        _showError(detail != null ? '$msg: $detail' : msg);
+        _showError('Server error: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('[SUPPLIER_FORM] Save failed: $e');
-      _showError('Failed to save: $e');
+      debugPrint('[SUPPLIER_FORM] Save error: $e');
+      _showError('Failed to save supplier');
     } finally {
       isSaving.value = false;
     }
   }
 
-  Map<String, dynamic> _buildPayload() {
-    return {
-      'supplier_code': supplierCode.value.trim(),
-      'name': name.value.trim(),
-      'legal_name': legalName.value.trim(),
-      'business_type': businessType.value.trim(),
-      'industry': industry.value.trim(),
-      'gstin': gstin.value.trim(),
-      'pan': pan.value.trim(),
-      'tan': tan.value.trim(),
-      'cin': cin.value.trim(),
-      'vat_number': vatNumber.value.trim(),
-      'registration_number': registrationNumber.value.trim(),
-      'website': website.value.trim(),
-      'email': email.value.trim(),
-      'phone': phone.value.trim(),
-      'alternate_phone': alternatePhone.value.trim(),
-      'fax': fax.value.trim(),
-      'contact_person': contactPerson.value.trim(),
-      'contact_person_email': contactPersonEmail.value.trim(),
-      'contact_person_phone': contactPersonPhone.value.trim(),
-      'contact_person_designation': contactPersonDesignation.value.trim(),
-      'billing_address_line1': billingAddressLine1.value.trim(),
-      'billing_address_line2': billingAddressLine2.value.trim(),
-      'billing_city': billingCity.value.trim(),
-      'billing_state': billingState.value.trim(),
-      'billing_country': billingCountry.value.trim(),
-      'billing_postal_code': billingPostalCode.value.trim(),
-      'shipping_address_line1': shippingAddressLine1.value.trim(),
-      'shipping_address_line2': shippingAddressLine2.value.trim(),
-      'shipping_city': shippingCity.value.trim(),
-      'shipping_state': shippingState.value.trim(),
-      'shipping_country': shippingCountry.value.trim(),
-      'shipping_postal_code': shippingPostalCode.value.trim(),
-      'bank_name': bankName.value.trim(),
-      'bank_branch': bankBranch.value.trim(),
-      'bank_account_name': bankAccountName.value.trim(),
-      'bank_account_number': bankAccountNumber.value.trim(),
-      'ifsc_code': ifscCode.value.trim(),
-      'swift_code': swiftCode.value.trim(),
-      'payment_terms_days': _intOrNull(paymentTermsDays.value),
-      'credit_limit': _doubleOrNull(creditLimit.value),
-      'rating': _doubleOrNull(rating.value),
-      'is_preferred': isPreferred.value ? 1 : 0,
-      'status': status.value,
-      'notes': notes.value.trim(),
-      'products': supplierProducts.map((row) => row.toJson()).toList(),
-    };
-  }
-
-  int? _intOrNull(String value) {
-    if (value.trim().isEmpty) return null;
-    return int.tryParse(value.trim());
-  }
-
-  double? _doubleOrNull(String value) {
-    if (value.trim().isEmpty) return null;
-    return double.tryParse(value.trim());
-  }
-
-  Product? _findProductById(int productId) {
-    for (final product in products) {
-      if (product.id == productId) return product;
+  Product? _findProductById(int id) {
+    try {
+      return products.firstWhere((p) => p.id == id);
+    } catch (e) {
+      return null;
     }
-    return null;
+  }
+
+  void _showError(String message) {
+    Get.snackbar(
+      'Error',
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.red.shade100,
+      colorText: Colors.red.shade900,
+      duration: const Duration(seconds: 3),
+    );
+  }
+
+  void _showSuccess(String message) {
+    Get.snackbar(
+      'Success',
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: AppColors.primaryLight.withValues(alpha: 0.2),
+      colorText: AppColors.primaryDark,
+      duration: const Duration(seconds: 2),
+    );
   }
 }
 
 class SupplierProductRow {
-  final product = Rxn<Product>();
+  final product = Rx<Product?>(null);
   final supplierSku = ''.obs;
   final supplierProductName = ''.obs;
+  final description = ''.obs;
   final packSize = ''.obs;
   final packUnit = ''.obs;
   final minOrderQty = ''.obs;
@@ -404,6 +534,7 @@ class SupplierProductRow {
     final row = SupplierProductRow();
     row.supplierSku.value = sp.supplierSku ?? '';
     row.supplierProductName.value = sp.supplierProductName ?? '';
+    row.description.value = sp.description ?? '';
     row.packSize.value = sp.packSize?.toString() ?? '';
     row.packUnit.value = sp.packUnit ?? '';
     row.minOrderQty.value = sp.minOrderQty?.toString() ?? '';
@@ -416,56 +547,4 @@ class SupplierProductRow {
     row.isActive.value = sp.isActive;
     return row;
   }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'product_id': product.value?.id,
-      'supplier_sku': supplierSku.value.trim(),
-      'supplier_product_name': supplierProductName.value.trim(),
-      'pack_size': _doubleOrNull(packSize.value),
-      'pack_unit': packUnit.value.trim(),
-      'min_order_qty': _doubleOrNull(minOrderQty.value),
-      'price': _doubleOrNull(price.value),
-      'currency': currency.value.trim(),
-      'tax_percent': _doubleOrNull(taxPercent.value),
-      'discount_percent': _doubleOrNull(discountPercent.value),
-      'lead_time_days': _intOrNull(leadTimeDays.value),
-      'is_preferred': isPreferred.value ? 1 : 0,
-      'is_active': isActive.value ? 1 : 0,
-    };
-  }
-
-  int? _intOrNull(String value) {
-    if (value.trim().isEmpty) return null;
-    return int.tryParse(value.trim());
-  }
-
-  double? _doubleOrNull(String value) {
-    if (value.trim().isEmpty) return null;
-    return double.tryParse(value.trim());
-  }
-}
-
-void _showSuccess(String message) {
-  Get.snackbar(
-    'Success',
-    message,
-    snackPosition: SnackPosition.BOTTOM,
-    backgroundColor: AppColors.primary,
-    colorText: Colors.white,
-    margin: const EdgeInsets.all(12),
-    borderRadius: 8,
-  );
-}
-
-void _showError(String message) {
-  Get.snackbar(
-    'Error',
-    message,
-    snackPosition: SnackPosition.BOTTOM,
-    backgroundColor: Colors.redAccent,
-    colorText: Colors.white,
-    margin: const EdgeInsets.all(12),
-    borderRadius: 8,
-  );
 }
