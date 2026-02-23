@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../controllers/auth_controller.dart';
 import '../../router/app_router.dart';
 import '../../theme/app_colors.dart';
+import '../modules/supplier_form_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -183,11 +184,19 @@ class DashboardScreen extends StatelessWidget {
                   },
                 ),
                 _ModuleCard(
-                  title: 'Suppliers',
-                  subtitle: 'Manage supplier profiles & products',
-                  icon: Icons.local_shipping_outlined,
+                  title: 'Create Supplier',
+                  subtitle: 'Add new supplier profile',
+                  icon: Icons.person_add_outlined,
                   onTap: () {
-                    Get.toNamed(AppRoutes.suppliers);
+                    Get.to(() => const SupplierFormScreen());
+                  },
+                ),
+                _ModuleCard(
+                  title: 'Supplier Products',
+                  subtitle: 'Manage supplier product catalog',
+                  icon: Icons.shopping_bag_outlined,
+                  onTap: () {
+                    Get.toNamed(AppRoutes.supplierProducts);
                   },
                 ),
                 _ModuleCard(
