@@ -11,6 +11,12 @@ class SupplierProductListController extends GetxController {
   final isLoading = false.obs;
   final supplierProducts = <SupplierProductItem>[].obs;
 
+  /// When set, only products for this supplier are shown.
+  final int? supplierId;
+  final String? supplierName;
+
+  SupplierProductListController({this.supplierId, this.supplierName});
+
   @override
   void onInit() {
     super.onInit();
@@ -26,11 +32,12 @@ class SupplierProductListController extends GetxController {
   Future<void> loadSupplierProducts() async {
     try {
       isLoading.value = true;
+      final queryParams = <String, String>{'limit': '200'};
+      if (supplierId != null) queryParams['supplier_id'] = supplierId.toString();
+      final uri = Uri.parse('${ApiConfig.apiBaseUrl}/supplier-products')
+          .replace(queryParameters: queryParams);
       final response = await http
-          .get(
-            Uri.parse('${ApiConfig.apiBaseUrl}/supplier-products?limit=200'),
-            headers: {'Accept': 'application/json'},
-          )
+          .get(uri, headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
@@ -60,10 +67,15 @@ class SupplierProductListController extends GetxController {
 
     try {
       isLoading.value = true;
-      final url =
-          '${ApiConfig.apiBaseUrl}/supplier-products?search=${Uri.encodeComponent(query)}&limit=200';
+      final queryParams = <String, String>{
+        'search': query,
+        'limit': '200',
+      };
+      if (supplierId != null) queryParams['supplier_id'] = supplierId.toString();
+      final uri = Uri.parse('${ApiConfig.apiBaseUrl}/supplier-products')
+          .replace(queryParameters: queryParams);
       final response = await http
-          .get(Uri.parse(url), headers: {'Accept': 'application/json'})
+          .get(uri, headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
@@ -81,6 +93,37 @@ class SupplierProductListController extends GetxController {
       debugPrint('[SUPPLIER_PRODUCT_LIST] Search error: $e');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> deleteSupplierProduct(int id) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('${ApiConfig.apiBaseUrl}/supplier-products/$id'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        if (data['success'] == true) {
+          Get.snackbar(
+            'Success',
+            data['message'] as String? ?? 'Supplier product removed',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.green.shade100,
+            colorText: Colors.green.shade900,
+            duration: const Duration(seconds: 2),
+          );
+          await loadSupplierProducts();
+        } else {
+          _showError(data['message'] as String? ?? 'Failed to delete');
+        }
+      } else {
+        _showError('Failed to delete supplier product');
+      }
+    } catch (e) {
+      debugPrint('[SUPPLIER_PRODUCT_LIST] Delete error: $e');
+      _showError('Failed to delete supplier product');
     }
   }
 

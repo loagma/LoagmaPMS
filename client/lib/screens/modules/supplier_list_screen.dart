@@ -77,8 +77,10 @@ class SupplierListScreen extends StatelessWidget {
           ),
           Expanded(
             child: Obx(() {
+              Widget content;
+
               if (controller.isLoading.value && controller.suppliers.isEmpty) {
-                return const Center(
+                content = const Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -98,10 +100,8 @@ class SupplierListScreen extends StatelessWidget {
                     ],
                   ),
                 );
-              }
-
-              if (controller.suppliers.isEmpty) {
-                return RefreshIndicator(
+              } else if (controller.suppliers.isEmpty) {
+                content = RefreshIndicator(
                   onRefresh: controller.refreshSuppliers,
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
@@ -149,55 +149,75 @@ class SupplierListScreen extends StatelessWidget {
                     ),
                   ),
                 );
-              }
-
-              return RefreshIndicator(
-                onRefresh: controller.refreshSuppliers,
-                child: NotificationListener<ScrollNotification>(
-                  onNotification: (scrollInfo) {
-                    if (!controller.isLoading.value &&
-                        controller.hasMore.value &&
-                        scrollInfo.metrics.pixels >=
-                            scrollInfo.metrics.maxScrollExtent - 200) {
-                      controller.loadMoreSuppliers();
-                    }
-                    return false;
-                  },
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount:
-                        controller.suppliers.length +
-                        (controller.hasMore.value ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index == controller.suppliers.length) {
-                        return const Padding(
-                          padding: EdgeInsets.all(16),
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                AppColors.primary,
+              } else {
+                content = RefreshIndicator(
+                  onRefresh: controller.refreshSuppliers,
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (scrollInfo) {
+                      if (!controller.isLoading.value &&
+                          controller.hasMore.value &&
+                          scrollInfo.metrics.pixels >=
+                              scrollInfo.metrics.maxScrollExtent - 200) {
+                        controller.loadMoreSuppliers();
+                      }
+                      return false;
+                    },
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount:
+                          controller.suppliers.length +
+                          (controller.hasMore.value ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (index == controller.suppliers.length) {
+                          return const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppColors.primary,
+                                ),
                               ),
                             ),
-                          ),
-                        );
-                      }
-
-                      final supplier = controller.suppliers[index];
-                      return _SupplierCard(
-                        supplier: supplier,
-                        statusColor: controller.statusColor(supplier.status),
-                        onTap: () async {
-                          final result = await Get.to(
-                            () => SupplierFormScreen(supplierId: supplier.id),
                           );
-                          if (result == true) {
-                            controller.refreshSuppliers();
-                          }
-                        },
-                      );
-                    },
+                        }
+
+                        final supplier = controller.suppliers[index];
+                        return _SupplierCard(
+                          supplier: supplier,
+                          statusColor: controller.statusColor(supplier.status),
+                          onTap: () async {
+                            final result = await Get.to(
+                              () => SupplierFormScreen(supplierId: supplier.id),
+                            );
+                            if (result == true) {
+                              controller.refreshSuppliers();
+                            }
+                          },
+                        );
+                      },
+                    ),
                   ),
-                ),
+                );
+              }
+
+              return Stack(
+                children: [
+                  content,
+                  if (controller.isLoading.value &&
+                      controller.suppliers.isNotEmpty)
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               );
             }),
           ),

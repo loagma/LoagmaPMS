@@ -62,7 +62,7 @@ class SupplierProductController extends Controller
             $limit = $request->input('limit', 20);
             $page = $request->input('page', 1);
             
-            $total = $query->count();
+            $total = (clone $query)->count();
             $supplierProducts = $query->skip(($page - 1) * $limit)
                                      ->take($limit)
                                      ->get();
@@ -106,14 +106,47 @@ class SupplierProductController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $validated = $request->validate([
+            'supplier_id' => 'required|integer|exists:suppliers,id',
+            'product_id' => 'required|integer|exists:product,product_id',
+            'supplier_sku' => 'nullable|string|max:100',
+            'supplier_product_name' => 'nullable|string|max:255',
+            'description' => 'nullable|string',
+            'pack_size' => 'nullable|numeric|min:0',
+            'pack_unit' => 'nullable|string|max:20',
+            'min_order_qty' => 'nullable|numeric|min:0',
+            'price' => 'nullable|numeric|min:0',
+            'currency' => 'nullable|string|max:3',
+            'tax_percent' => 'nullable|numeric|min:0|max:100',
+            'discount_percent' => 'nullable|numeric|min:0|max:100',
+            'lead_time_days' => 'nullable|integer|min:0',
+            'last_purchase_price' => 'nullable|numeric|min:0',
+            'last_purchase_date' => 'nullable|date',
+            'is_preferred' => 'nullable|boolean',
+            'is_active' => 'nullable|boolean',
+            'notes' => 'nullable|string',
+        ]);
+
         try {
-            $supplierProduct = SupplierProduct::create($request->all());
+            $exists = SupplierProduct::where('supplier_id', $validated['supplier_id'])
+                ->where('product_id', $validated['product_id'])
+                ->exists();
+            if ($exists) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This product is already assigned to the selected supplier.',
+                ], 422);
+            }
+
+            $supplierProduct = SupplierProduct::create($validated);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Supplier product created successfully',
                 'data' => $supplierProduct->load(['supplier', 'product']),
             ], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             Log::error('Supplier product store error: ' . $e->getMessage());
             return response()->json([
@@ -125,15 +158,52 @@ class SupplierProductController extends Controller
 
     public function update(Request $request, int $id): JsonResponse
     {
+        $validated = $request->validate([
+            'supplier_id' => 'sometimes|integer|exists:suppliers,id',
+            'product_id' => 'sometimes|integer|exists:product,product_id',
+            'supplier_sku' => 'nullable|string|max:100',
+            'supplier_product_name' => 'nullable|string|max:255',
+            'description' => 'nullable|string',
+            'pack_size' => 'nullable|numeric|min:0',
+            'pack_unit' => 'nullable|string|max:20',
+            'min_order_qty' => 'nullable|numeric|min:0',
+            'price' => 'nullable|numeric|min:0',
+            'currency' => 'nullable|string|max:3',
+            'tax_percent' => 'nullable|numeric|min:0|max:100',
+            'discount_percent' => 'nullable|numeric|min:0|max:100',
+            'lead_time_days' => 'nullable|integer|min:0',
+            'last_purchase_price' => 'nullable|numeric|min:0',
+            'last_purchase_date' => 'nullable|date',
+            'is_preferred' => 'nullable|boolean',
+            'is_active' => 'nullable|boolean',
+            'notes' => 'nullable|string',
+        ]);
+
         try {
             $supplierProduct = SupplierProduct::findOrFail($id);
-            $supplierProduct->update($request->all());
+            $supplierId = $validated['supplier_id'] ?? $supplierProduct->supplier_id;
+            $productId = $validated['product_id'] ?? $supplierProduct->product_id;
+
+            $exists = SupplierProduct::where('supplier_id', $supplierId)
+                ->where('product_id', $productId)
+                ->where('id', '!=', $id)
+                ->exists();
+            if ($exists) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This product is already assigned to the selected supplier.',
+                ], 422);
+            }
+
+            $supplierProduct->update($validated);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Supplier product updated successfully',
                 'data' => $supplierProduct->load(['supplier', 'product']),
             ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             Log::error('Supplier product update error: ' . $e->getMessage());
             return response()->json([

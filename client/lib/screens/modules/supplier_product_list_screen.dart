@@ -10,13 +10,27 @@ class SupplierProductListScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(SupplierProductListController());
+    final args = Get.arguments as Map<String, dynamic>?;
+    final supplierId = args?['supplier_id'] as int?;
+    final supplierName = args?['supplier_name'] as String?;
+    final controller = Get.put(SupplierProductListController(
+      supplierId: supplierId,
+      supplierName: supplierName,
+    ));
+
+    final appBarTitle = supplierName != null && supplierName.isNotEmpty
+        ? 'Products for $supplierName'
+        : 'Edit supplier products';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Supplier Products'),
+        title: Text(appBarTitle),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Get.back(),
+        ),
       ),
       body: Column(
         children: [
@@ -26,7 +40,7 @@ class SupplierProductListScreen extends StatelessWidget {
             child: TextField(
               controller: controller.searchController,
               decoration: InputDecoration(
-                hintText: 'Search by product or supplier...',
+                hintText: 'Search products...',
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -57,8 +71,11 @@ class SupplierProductListScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'No supplier products found',
+                        supplierId != null
+                            ? 'No products assigned to this supplier'
+                            : 'No supplier products found',
                         style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
@@ -88,7 +105,8 @@ class SupplierProductListScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const SizedBox(height: 4),
-                            Text('Supplier: ${item.supplierName}'),
+                            if (controller.supplierId == null)
+                              Text('Supplier: ${item.supplierName}'),
                             Text('Product: ${item.productName}'),
                             if (item.supplierSku != null)
                               Text('SKU: ${item.supplierSku}'),
@@ -136,7 +154,7 @@ class SupplierProductListScreen extends StatelessWidget {
                             ),
                           ],
                         ),
-                        onTap: () => _showDetailsDialog(context, item),
+                        onTap: () => _showDetailsDialog(context, controller, item),
                       ),
                     );
                   },
@@ -148,22 +166,31 @@ class SupplierProductListScreen extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          final result = await Get.toNamed(AppRoutes.supplierProductForm);
+          final result = await Get.toNamed(
+            AppRoutes.supplierProductForm,
+            arguments: supplierId != null
+                ? {'supplier_id': supplierId}
+                : null,
+          );
           if (result == true) {
             controller.loadSupplierProducts();
           }
         },
         backgroundColor: AppColors.primary,
         icon: const Icon(Icons.add),
-        label: const Text('Add Product'),
+        label: const Text('Assign Product'),
       ),
     );
   }
 
-  void _showDetailsDialog(BuildContext context, dynamic item) {
+  void _showDetailsDialog(
+    BuildContext context,
+    SupplierProductListController controller,
+    dynamic item,
+  ) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: Text(item.supplierProductName ?? item.productName ?? 'Details'),
         content: SingleChildScrollView(
           child: Column(
@@ -201,8 +228,69 @@ class SupplierProductListScreen extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(ctx),
             child: const Text('Close'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _navigateToEdit(context, controller, item.id);
+            },
+            child: const Text('Edit'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _confirmDelete(context, controller, item);
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _navigateToEdit(
+    BuildContext context,
+    SupplierProductListController controller,
+    int id,
+  ) async {
+    final result = await Get.toNamed(
+      AppRoutes.supplierProductForm,
+      arguments: {'id': id},
+    );
+    if (result == true) {
+      controller.loadSupplierProducts();
+    }
+  }
+
+  void _confirmDelete(
+    BuildContext context,
+    SupplierProductListController controller,
+    dynamic item,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete supplier product?'),
+        content: Text(
+          'Remove "${item.supplierProductName ?? item.productName ?? 'this assignment'}" from supplier "${item.supplierName}"?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await controller.deleteSupplierProduct(item.id);
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
           ),
         ],
       ),

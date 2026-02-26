@@ -11,6 +11,8 @@ import '../theme/app_colors.dart';
 class SupplierProductFormController extends GetxController {
   final formKey = GlobalKey<FormState>();
   final int? supplierProductId;
+  /// Pre-select this supplier when opening the assign form (e.g. from supplier's product list).
+  final int? presetSupplierId;
 
   final isLoading = false.obs;
   final isSaving = false.obs;
@@ -35,7 +37,10 @@ class SupplierProductFormController extends GetxController {
   final isPreferred = false.obs;
   final isActive = true.obs;
 
-  SupplierProductFormController({this.supplierProductId});
+  SupplierProductFormController({
+    this.supplierProductId,
+    this.presetSupplierId,
+  });
 
   bool get isEditMode => supplierProductId != null;
 
@@ -48,6 +53,9 @@ class SupplierProductFormController extends GetxController {
   Future<void> _init() async {
     await _loadSuppliers();
     await _loadProducts();
+    if (presetSupplierId != null) {
+      selectedSupplierId.value = presetSupplierId;
+    }
     if (isEditMode) {
       await _loadSupplierProduct();
     }
@@ -92,10 +100,15 @@ class SupplierProductFormController extends GetxController {
           products.value = items
               .map((e) => Product.fromJson(e as Map<String, dynamic>))
               .toList();
+        } else {
+          _showError(data['message'] as String? ?? 'Failed to load products');
         }
+      } else {
+        _showError('Failed to load products: ${response.statusCode}');
       }
     } catch (e) {
       debugPrint('[SUPPLIER_PRODUCT_FORM] Products error: $e');
+      _showError('Failed to load products');
     }
   }
 
@@ -149,43 +162,9 @@ class SupplierProductFormController extends GetxController {
     try {
       isSaving.value = true;
 
-      final payload = {
+      final payload = <String, dynamic>{
         'supplier_id': selectedSupplierId.value,
         'product_id': selectedProductId.value,
-        'supplier_sku': supplierSku.value.trim().isEmpty
-            ? null
-            : supplierSku.value.trim(),
-        'supplier_product_name': supplierProductName.value.trim().isEmpty
-            ? null
-            : supplierProductName.value.trim(),
-        'description': description.value.trim().isEmpty
-            ? null
-            : description.value.trim(),
-        'pack_size': packSize.value.trim().isEmpty
-            ? null
-            : double.tryParse(packSize.value.trim()),
-        'pack_unit': packUnit.value.trim().isEmpty
-            ? null
-            : packUnit.value.trim(),
-        'min_order_qty': minOrderQty.value.trim().isEmpty
-            ? null
-            : double.tryParse(minOrderQty.value.trim()),
-        'price': price.value.trim().isEmpty
-            ? null
-            : double.tryParse(price.value.trim()),
-        'currency': currency.value,
-        'tax_percent': taxPercent.value.trim().isEmpty
-            ? null
-            : double.tryParse(taxPercent.value.trim()),
-        'discount_percent': discountPercent.value.trim().isEmpty
-            ? null
-            : double.tryParse(discountPercent.value.trim()),
-        'lead_time_days': leadTimeDays.value.trim().isEmpty
-            ? null
-            : int.tryParse(leadTimeDays.value.trim()),
-        'notes': notes.value.trim().isEmpty ? null : notes.value.trim(),
-        'is_preferred': isPreferred.value ? 1 : 0,
-        'is_active': isActive.value ? 1 : 0,
       };
 
       final url = isEditMode
@@ -210,8 +189,8 @@ class SupplierProductFormController extends GetxController {
               body: jsonEncode(payload),
             );
 
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
         if (data['success'] == true) {
           _showSuccess(
             isEditMode
@@ -220,10 +199,12 @@ class SupplierProductFormController extends GetxController {
           );
           Get.back(result: true);
         } else {
-          _showError(data['message'] ?? 'Failed to save supplier product');
+          _showError(data['message'] as String? ?? 'Failed to save supplier product');
         }
+      } else if (response.statusCode == 422) {
+        _showError(data['message'] as String? ?? 'Validation failed.');
       } else {
-        _showError('Server error: ${response.statusCode}');
+        _showError(data['message'] as String? ?? 'Server error: ${response.statusCode}');
       }
     } catch (e) {
       debugPrint('[SUPPLIER_PRODUCT_FORM] Save error: $e');

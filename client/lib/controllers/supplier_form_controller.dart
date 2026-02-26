@@ -294,18 +294,7 @@ class SupplierFormController extends GetxController {
   }
 
   bool _validateForm() {
-    if (!formKey.currentState!.validate()) return false;
-    if (supplierProducts.isEmpty) {
-      _showError('Please add at least one supplier product');
-      return false;
-    }
-    for (final row in supplierProducts) {
-      if (row.product.value == null) {
-        _showError('Please select a product for all supplier products');
-        return false;
-      }
-    }
-    return true;
+    return formKey.currentState!.validate();
   }
 
   Future<void> saveSupplier() async {

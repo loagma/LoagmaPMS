@@ -11,8 +11,9 @@ import '../screens/modules/inventory_list_screen.dart';
 import '../screens/modules/reports_screen.dart';
 import '../screens/modules/supplier_list_screen.dart';
 import '../screens/modules/supplier_form_screen.dart';
-import '../screens/modules/supplier_product_list_screen.dart';
 import '../screens/modules/supplier_product_form_screen.dart';
+import '../screens/modules/supplier_product_list_screen.dart';
+import '../screens/modules/supplier_list_for_products_screen.dart';
 
 /// Central route names. Use these instead of raw strings.
 abstract class AppRoutes {
@@ -31,6 +32,8 @@ abstract class AppRoutes {
   static const String supplierForm = '/supplier-form';
   static const String supplierProducts = '/supplier-products';
   static const String supplierProductForm = '/supplier-product-form';
+  static const String supplierProductList = '/supplier-product-list';
+  static const String supplierProductListForSupplier = '/supplier-product-list-for-supplier';
 }
 
 /// All app routes. Used by [GetMaterialApp] in [main.dart].
@@ -54,10 +57,18 @@ final List<GetPage<dynamic>> appPages = [
   GetPage(name: AppRoutes.supplierForm, page: () => const SupplierFormScreen()),
   GetPage(
     name: AppRoutes.supplierProducts,
-    page: () => const SupplierProductListScreen(),
+    page: () => const SupplierProductFormScreen(),
   ),
   GetPage(
     name: AppRoutes.supplierProductForm,
     page: () => const SupplierProductFormScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.supplierProductList,
+    page: () => const SupplierListForProductsScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.supplierProductListForSupplier,
+    page: () => const SupplierProductListScreen(),
   ),
 ];

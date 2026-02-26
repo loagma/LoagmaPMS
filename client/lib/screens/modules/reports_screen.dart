@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../router/app_router.dart';
 import '../../theme/app_colors.dart';
 import 'bom_list_screen.dart';
 import 'issue_to_production_list_screen.dart';
@@ -95,6 +96,14 @@ class ReportsScreen extends StatelessWidget {
                 icon: Icons.local_shipping_outlined,
                 onTap: () {
                   Get.to(() => const SupplierListScreen());
+                },
+              ),
+              _ReportCard(
+                title: 'Supplier products',
+                subtitle: 'View and edit product listing by supplier',
+                icon: Icons.edit_note_rounded,
+                onTap: () {
+                  Get.toNamed(AppRoutes.supplierProductList);
                 },
               ),
             ];

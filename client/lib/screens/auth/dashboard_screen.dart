@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../controllers/auth_controller.dart';
 import '../../router/app_router.dart';
+import '../modules/supplier_product_form_screen.dart';
 import '../../theme/app_colors.dart';
 import '../modules/supplier_form_screen.dart';
 
@@ -192,11 +193,11 @@ class DashboardScreen extends StatelessWidget {
                   },
                 ),
                 _ModuleCard(
-                  title: 'Supplier Products',
-                  subtitle: 'Manage supplier product catalog',
+                  title: 'Assign Product',
+                  subtitle: 'Link products to suppliers',
                   icon: Icons.shopping_bag_outlined,
                   onTap: () {
-                    Get.toNamed(AppRoutes.supplierProducts);
+                    Get.to(() => const SupplierProductFormScreen());
                   },
                 ),
                 _ModuleCard(
