@@ -27,8 +27,10 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # Copy application source
 COPY . /var/www/html
 
-# Install PHP dependencies (no dev) for production
-RUN composer install \
+# Ensure Laravel cache directory exists and is writable, then install dependencies
+RUN mkdir -p /var/www/html/bootstrap/cache \
+ && chown -R www-data:www-data /var/www/html/bootstrap/cache \
+ && composer install \
     --no-dev \
     --optimize-autoloader \
     --no-interaction \
