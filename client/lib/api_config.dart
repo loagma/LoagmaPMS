@@ -11,7 +11,7 @@ class ApiConfig {
   ///   --dart-define=IS_PRODUCTION=true
   static const bool isProduction = bool.fromEnvironment(
     'IS_PRODUCTION',
-    defaultValue: false,
+    defaultValue: true,
   );
 
   /// Local base URL (emulator / device hitting your dev machine).
@@ -20,7 +20,7 @@ class ApiConfig {
   static const String _localBaseUrl = 'http://10.0.2.2:8000';
 
   /// Production base URL (change to your real domain).
-  static const String _productionBaseUrl = 'https://your-production-domain.com';
+  static const String _productionBaseUrl = 'https://loagmapms.onrender.com';
 
   /// Base URL for the backend (no trailing slash).
   ///
