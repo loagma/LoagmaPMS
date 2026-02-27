@@ -139,3 +139,64 @@ CREATE TABLE IF NOT EXISTS `supplier_products` (
     CONSTRAINT `supplier_products_supplier_id_foreign` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE CASCADE,
     CONSTRAINT `supplier_products_product_id_foreign` FOREIGN KEY (`product_id`) REFERENCES `product` (`product_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+-- 2026-02-27: Purchase Orders (quotation-style PO header)
+CREATE TABLE IF NOT EXISTS `purchase_orders` (
+    `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+
+    `po_number` varchar(50) NOT NULL,
+    `financial_year` varchar(10) NOT NULL,
+
+    `supplier_id` bigint unsigned NOT NULL,
+    `doc_date` date NOT NULL,
+    `expected_date` date DEFAULT NULL,
+
+    `status` enum('DRAFT','SENT','PARTIALLY_RECEIVED','CLOSED','CANCELLED') NOT NULL DEFAULT 'DRAFT',
+
+    `narration` text DEFAULT NULL,
+
+    `created_by` bigint unsigned DEFAULT NULL,
+    `updated_by` bigint unsigned DEFAULT NULL,
+
+    `total_amount` decimal(14,2) NOT NULL DEFAULT 0.00,
+
+    `created_at` timestamp NULL DEFAULT NULL,
+    `updated_at` timestamp NULL DEFAULT NULL,
+
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `purchase_orders_po_number_unique` (`po_number`),
+    KEY `purchase_orders_supplier_id_index` (`supplier_id`),
+    KEY `purchase_orders_status_index` (`status`),
+    KEY `purchase_orders_doc_date_index` (`doc_date`),
+    CONSTRAINT `purchase_orders_supplier_id_foreign`
+        FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 2026-02-27: Purchase Order line items
+CREATE TABLE IF NOT EXISTS `purchase_order_items` (
+    `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+
+    `purchase_order_id` bigint unsigned NOT NULL,
+    `product_id` bigint unsigned NOT NULL,
+    `line_no` int unsigned NOT NULL,
+
+    `unit` varchar(20) DEFAULT NULL,
+    `quantity` decimal(12,3) NOT NULL,
+    `price` decimal(12,2) NOT NULL,
+    `discount_percent` decimal(5,2) DEFAULT NULL,
+    `tax_percent` decimal(5,2) DEFAULT NULL,
+    `line_total` decimal(14,2) NOT NULL,
+
+    `description` text DEFAULT NULL,
+
+    `created_at` timestamp NULL DEFAULT NULL,
+    `updated_at` timestamp NULL DEFAULT NULL,
+
+    PRIMARY KEY (`id`),
+    KEY `purchase_order_items_po_product_index` (`purchase_order_id`,`product_id`),
+    CONSTRAINT `purchase_order_items_po_foreign`
+        FOREIGN KEY (`purchase_order_id`) REFERENCES `purchase_orders` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `purchase_order_items_product_foreign`
+        FOREIGN KEY (`product_id`) REFERENCES `product` (`product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

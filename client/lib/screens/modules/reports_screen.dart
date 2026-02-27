@@ -4,10 +4,11 @@ import 'package:get/get.dart';
 import '../../router/app_router.dart';
 import '../../theme/app_colors.dart';
 import 'bom_list_screen.dart';
+import 'inventory_list_screen.dart';
 import 'issue_to_production_list_screen.dart';
+import 'purchase_order_list_screen.dart';
 import 'receive_from_production_list_screen.dart';
 import 'stock_voucher_list_screen.dart';
-import 'inventory_list_screen.dart';
 import 'supplier_list_screen.dart';
 
 class ReportsScreen extends StatelessWidget {
@@ -72,6 +73,14 @@ class ReportsScreen extends StatelessWidget {
                 icon: Icons.list_alt_rounded,
                 onTap: () {
                   Get.to(() => const BomListScreen());
+                },
+              ),
+              _ReportCard(
+                title: 'Purchase Orders',
+                subtitle: 'View all purchase orders',
+                icon: Icons.description_outlined,
+                onTap: () {
+                  Get.to(() => const PurchaseOrderListScreen());
                 },
               ),
               _ReportCard(
