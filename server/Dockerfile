@@ -40,11 +40,6 @@ RUN mkdir -p \
     --no-interaction \
     --no-progress
 
-# Clear and rebuild config/routes cache
-RUN php artisan config:clear \
- && php artisan route:clear \
- && php artisan view:clear
-
 # Expose HTTP port (Render will map this)
 EXPOSE 80
 
