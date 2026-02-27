@@ -41,8 +41,7 @@ role base access control important  discusion in next meet .
 
 
 sales invoice , 
-purchase voucher,
- purchase order, 
+purchase order, 
 
 
 
