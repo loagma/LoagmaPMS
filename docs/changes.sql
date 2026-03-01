@@ -135,11 +135,11 @@ CREATE TABLE IF NOT EXISTS `supplier_products` (
     `updated_at` timestamp NULL DEFAULT NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `supplier_products_supplier_id_supplier_sku_unique` (`supplier_id`, `supplier_sku`),
-    KEY `supplier_products_supplier_id_product_id_index` (`supplier_id`, `product_id`),
+    UNIQUE KEY `supplier_products_supplier_id_product_id_unique` (`supplier_id`, `product_id`),
     CONSTRAINT `supplier_products_supplier_id_foreign` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE CASCADE,
     CONSTRAINT `supplier_products_product_id_foreign` FOREIGN KEY (`product_id`) REFERENCES `product` (`product_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
+-- 2026-03-01: One supplier can have multiple products; unique(supplier_id, product_id) prevents same product twice per supplier.
 
 -- 2026-02-27: Purchase Orders (quotation-style PO header)
 CREATE TABLE IF NOT EXISTS `purchase_orders` (

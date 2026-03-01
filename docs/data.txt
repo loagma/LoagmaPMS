@@ -49,3 +49,14 @@ purchase order,
 
 vendor wise products, 
 supplier name, supplier product
+
+
+
+price with tax and price without taxx - purchsee order
+unit master 
+
+
+multiple products while assigning product to supplier
+remove last two fields , also sku will be generated automatically 
+
+
