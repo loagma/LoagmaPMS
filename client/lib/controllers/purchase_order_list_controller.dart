@@ -145,4 +145,38 @@ class PurchaseOrderListController extends GetxController {
         return AppColors.textMuted;
     }
   }
+
+  Future<void> deleteOrCancelPurchaseOrder(PurchaseOrder po) async {
+    if (po.id == null) return;
+    try {
+      final response = await http
+          .delete(
+            Uri.parse('${ApiConfig.purchaseOrders}/${po.id}'),
+            headers: {'Accept': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 15));
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200 && data['success'] == true) {
+        Get.snackbar(
+          'Success',
+          data['message']?.toString() ?? (po.status == 'DRAFT' ? 'Purchase order deleted' : 'Purchase order cancelled'),
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green.shade100,
+          colorText: Colors.green.shade900,
+        );
+        await refresh();
+      } else {
+        Get.snackbar(
+          'Error',
+          data['message']?.toString() ?? 'Failed',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade100,
+          colorText: Colors.red.shade900,
+        );
+      }
+    } catch (e) {
+      debugPrint('[PO LIST] Delete error: $e');
+      Get.snackbar('Error', 'Failed to delete/cancel', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent, colorText: Colors.white);
+    }
+  }
 }

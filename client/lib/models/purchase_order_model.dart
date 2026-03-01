@@ -47,7 +47,7 @@ class PurchaseOrder {
     }
 
     final supplier = json['supplier'] is Map ? json['supplier'] as Map<String, dynamic> : null;
-    final supplierName = supplier?['supplier_name']?.toString() ?? json['supplier_name']?.toString();
+    final supplierName = supplier?['supplier_name']?.toString() ?? supplier?['name']?.toString() ?? json['supplier_name']?.toString();
 
     return PurchaseOrder(
       id: id,

@@ -111,6 +111,7 @@ class PurchaseOrderListScreen extends StatelessWidget {
                                 ?.then((_) => controller.refresh());
                           }
                         },
+                        onDeleteOrCancel: (ctx) => _showDeleteCancelDialog(ctx, controller, po),
                       ),
                     );
                   },
@@ -133,15 +134,43 @@ class PurchaseOrderListScreen extends StatelessWidget {
   }
 }
 
+void _showDeleteCancelDialog(BuildContext context, PurchaseOrderListController controller, PurchaseOrder po) {
+  final isDraft = po.status.toUpperCase() == 'DRAFT';
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(isDraft ? 'Delete purchase order?' : 'Cancel purchase order?'),
+      content: Text(
+        isDraft
+            ? 'Delete ${po.poNumber}? This cannot be undone.'
+            : 'Cancel ${po.poNumber}? The order will be marked as CANCELLED.',
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('No')),
+        TextButton(
+          onPressed: () async {
+            Navigator.pop(ctx);
+            await controller.deleteOrCancelPurchaseOrder(po);
+          },
+          style: TextButton.styleFrom(foregroundColor: Colors.red),
+          child: Text(isDraft ? 'Delete' : 'Cancel'),
+        ),
+      ],
+    ),
+  );
+}
+
 class _POCard extends StatelessWidget {
   final PurchaseOrder po;
   final Color statusColor;
   final VoidCallback onTap;
+  final void Function(BuildContext)? onDeleteOrCancel;
 
   const _POCard({
     required this.po,
     required this.statusColor,
     required this.onTap,
+    this.onDeleteOrCancel,
   });
 
   @override
@@ -224,6 +253,13 @@ class _POCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (onDeleteOrCancel != null)
+                    IconButton(
+                      icon: const Icon(Icons.more_vert),
+                      onPressed: () => onDeleteOrCancel!(context),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    ),
                 ],
               ),
               const SizedBox(height: 12),

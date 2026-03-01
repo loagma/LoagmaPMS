@@ -462,10 +462,7 @@ class _ProductPicker extends StatelessWidget {
                   : () async {
                       final product = await showDialog<Map<String, dynamic>>(
                         context: context,
-                        builder: (ctx) => _ProductSelectDialog(
-                          products: controller.products,
-                          currentProductId: row.productId.value,
-                        ),
+                        builder: (ctx) => _POProductSearchDialog(controller: controller),
                       );
                       if (product != null) {
                         row.productId.value = product['product_id'] as int;
@@ -476,14 +473,14 @@ class _ProductPicker extends StatelessWidget {
               child: InputDecorator(
                 decoration: AppInputDecoration.standard(
                   labelText: 'Product *',
-                  hintText: 'Tap to select product',
+                  hintText: 'Tap to search and select product',
                 ),
                 child: Row(
                   children: [
                     Expanded(
                       child: Obx(() => Text(
                             row.productName.value.isEmpty
-                                ? 'Tap to select...'
+                                ? 'Tap to search...'
                                 : row.productName.value,
                             style: TextStyle(
                               color: row.productId.value == null
@@ -494,7 +491,7 @@ class _ProductPicker extends StatelessWidget {
                           )),
                     ),
                     if (!readOnly)
-                      const Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
+                      const Icon(Icons.search, color: AppColors.textMuted),
                   ],
                 ),
               ),
@@ -514,100 +511,102 @@ class _ProductPicker extends StatelessWidget {
   }
 }
 
-class _ProductSelectDialog extends StatefulWidget {
-  final List<Map<String, dynamic>> products;
-  final int? currentProductId;
+class _POProductSearchDialog extends StatefulWidget {
+  final PurchaseOrderFormController controller;
 
-  const _ProductSelectDialog({
-    required this.products,
-    this.currentProductId,
-  });
+  const _POProductSearchDialog({required this.controller});
 
   @override
-  State<_ProductSelectDialog> createState() => _ProductSelectDialogState();
+  State<_POProductSearchDialog> createState() => _POProductSearchDialogState();
 }
 
-class _ProductSelectDialogState extends State<_ProductSelectDialog> {
-  final TextEditingController _search = TextEditingController();
-  List<Map<String, dynamic>> _filtered = [];
+class _POProductSearchDialogState extends State<_POProductSearchDialog> {
+  final TextEditingController _searchController = TextEditingController();
+  List<Map<String, dynamic>> _results = [];
+  bool _searching = false;
+  bool _searched = false;
 
   @override
   void initState() {
     super.initState();
-    _filtered = widget.products.take(100).toList();
+    _runSearch('');
   }
 
   @override
   void dispose() {
-    _search.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
-  void _filter(String q) {
-    if (q.trim().isEmpty) {
-      setState(() => _filtered = widget.products.take(100).toList());
-      return;
+  Future<void> _runSearch(String query) async {
+    setState(() {
+      _searching = true;
+      _searched = true;
+    });
+    final list = await widget.controller.searchProducts(query);
+    if (mounted) {
+      setState(() {
+        _results = list;
+        _searching = false;
+      });
     }
-    final lower = q.toLowerCase();
-    setState(() => _filtered = widget.products
-        .where((p) =>
-            (p['name']?.toString().toLowerCase().contains(lower) ?? false) ||
-            (p['product_id']?.toString().contains(q) ?? false))
-        .take(100)
-        .toList());
   }
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      child: Container(
-        width: 400,
-        height: 500,
-        padding: const EdgeInsets.all(16),
+    return AlertDialog(
+      title: const Text('Search product'),
+      content: SizedBox(
+        width: 360,
+        height: 400,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                const Expanded(
-                    child: Text('Select Product',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold))),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
             TextField(
-              controller: _search,
-              decoration: AppInputDecoration.standard(
-                labelText: 'Search',
-                hintText: 'Name or ID',
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Type name or ID to search...',
                 prefixIcon: const Icon(Icons.search),
+                border: const OutlineInputBorder(),
+                isDense: true,
+                suffixIcon: _searching
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : null,
               ),
-              onChanged: _filter,
+              onChanged: (value) {
+                Future.delayed(const Duration(milliseconds: 350), () {
+                  if (_searchController.text == value) _runSearch(value);
+                });
+              },
             ),
             const SizedBox(height: 12),
             Expanded(
-              child: _filtered.isEmpty
-                  ? const Center(
+              child: _results.isEmpty && !_searching
+                  ? Center(
                       child: Text(
-                        'No products match',
-                        style: TextStyle(color: AppColors.textMuted),
+                        _searched
+                            ? 'No products found. Try a different search.'
+                            : 'Type above to search products.',
+                        style: TextStyle(color: Colors.grey[600]),
+                        textAlign: TextAlign.center,
                       ),
                     )
                   : ListView.builder(
-                      itemCount: _filtered.length,
+                      itemCount: _results.length,
                       itemBuilder: (context, i) {
-                        final p = _filtered[i];
+                        final p = _results[i];
                         final pid = p['product_id'] as int?;
                         final name = p['name']?.toString() ?? 'ID $pid';
                         return ListTile(
-                          title: Text(name),
+                          title: Text(name, overflow: TextOverflow.ellipsis),
                           subtitle: pid != null ? Text('ID: $pid') : null,
-                          selected: pid == widget.currentProductId,
                           onTap: () => Navigator.pop(context, p),
                         );
                       },
@@ -616,6 +615,12 @@ class _ProductSelectDialogState extends State<_ProductSelectDialog> {
           ],
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+      ],
     );
   }
 }

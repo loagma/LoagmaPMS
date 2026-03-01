@@ -33,12 +33,39 @@ class PurchaseOrderFormController extends GetxController {
   void onInit() {
     super.onInit();
     _loadSuppliers();
-    _loadProducts();
     if (poId != null) {
       _loadPurchaseOrder();
     } else {
       _setDefaultDocDate();
       items.add(POLineRow());
+    }
+  }
+
+  /// Search products via API (used by product picker; no full list).
+  Future<List<Map<String, dynamic>>> searchProducts(String query) async {
+    try {
+      final uri = Uri.parse(ApiConfig.products).replace(
+        queryParameters: {
+          'limit': '50',
+          if (query.trim().isNotEmpty) 'search': query.trim(),
+        },
+      );
+      final response = await http
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return [];
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) return [];
+      final List list = data['data'] ?? [];
+      return list
+          .map((e) => {
+                'product_id': (e as Map)['product_id'] ?? (e)['id'],
+                'name': (e)['name']?.toString() ?? (e)['product_name']?.toString() ?? '',
+              })
+          .toList();
+    } catch (e) {
+      debugPrint('[PO FORM] Search products error: $e');
+      return [];
     }
   }
 
@@ -62,36 +89,13 @@ class PurchaseOrderFormController extends GetxController {
               .map((e) => {
                     'id': (e as Map)['id'],
                     'supplier_code': (e)['supplier_code']?.toString(),
-                    'supplier_name': (e)['supplier_name']?.toString(),
+                    'supplier_name': (e)['supplier_name']?.toString() ?? (e)['name']?.toString(),
                   })
               .toList();
         }
       }
     } catch (e) {
       debugPrint('[PO FORM] Load suppliers error: $e');
-    }
-  }
-
-  Future<void> _loadProducts() async {
-    try {
-      final response = await http.get(
-        Uri.parse('${ApiConfig.products}?limit=500'),
-        headers: {'Accept': 'application/json'},
-      );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        if (data['success'] == true) {
-          final List list = data['data'] ?? [];
-          products.value = list
-              .map((e) => {
-                    'product_id': (e as Map)['product_id'] ?? (e)['id'],
-                    'name': (e)['name']?.toString() ?? (e)['product_name']?.toString(),
-                  })
-              .toList();
-        }
-      }
-    } catch (e) {
-      debugPrint('[PO FORM] Load products error: $e');
     }
   }
 
