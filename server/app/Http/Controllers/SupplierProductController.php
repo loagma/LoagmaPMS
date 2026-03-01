@@ -109,25 +109,10 @@ class SupplierProductController extends Controller
         $validated = $request->validate([
             'supplier_id' => 'required|integer|exists:suppliers,id',
             'product_id' => 'required|integer|exists:product,product_id',
-            'supplier_sku' => 'nullable|string|max:100',
-            'supplier_product_name' => 'nullable|string|max:255',
-            'description' => 'nullable|string',
-            'pack_size' => 'nullable|numeric|min:0',
-            'pack_unit' => 'nullable|string|max:20',
-            'min_order_qty' => 'nullable|numeric|min:0',
-            'price' => 'nullable|numeric|min:0',
-            'currency' => 'nullable|string|max:3',
-            'tax_percent' => 'nullable|numeric|min:0|max:100',
-            'discount_percent' => 'nullable|numeric|min:0|max:100',
-            'lead_time_days' => 'nullable|integer|min:0',
-            'last_purchase_price' => 'nullable|numeric|min:0',
-            'last_purchase_date' => 'nullable|date',
-            'is_preferred' => 'nullable|boolean',
-            'is_active' => 'nullable|boolean',
-            'notes' => 'nullable|string',
         ]);
 
         try {
+            // One supplier can have multiple products; only reject duplicate (same supplier + same product)
             $exists = SupplierProduct::where('supplier_id', $validated['supplier_id'])
                 ->where('product_id', $validated['product_id'])
                 ->exists();
@@ -137,6 +122,9 @@ class SupplierProductController extends Controller
                     'message' => 'This product is already assigned to the selected supplier.',
                 ], 422);
             }
+
+            // Auto-generate supplier_sku: S{supplier_id}-P{product_id} (unique per supplier-product)
+            $validated['supplier_sku'] = 'S' . $validated['supplier_id'] . '-P' . $validated['product_id'];
 
             $supplierProduct = SupplierProduct::create($validated);
 
@@ -156,27 +144,64 @@ class SupplierProductController extends Controller
         }
     }
 
+    /**
+     * Assign multiple products to one supplier at once.
+     * Request: { "supplier_id": int, "product_ids": [int, ...] }
+     * Skips products already assigned to this supplier.
+     */
+    public function storeBulk(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'supplier_id' => 'required|integer|exists:suppliers,id',
+            'product_ids' => 'required|array|min:1',
+            'product_ids.*' => 'required|integer|exists:product,product_id',
+        ]);
+
+        $supplierId = (int) $validated['supplier_id'];
+        $productIds = array_values(array_unique(array_map('intval', $validated['product_ids'])));
+
+        try {
+            $existing = SupplierProduct::where('supplier_id', $supplierId)
+                ->whereIn('product_id', $productIds)
+                ->pluck('product_id')
+                ->all();
+
+            $toCreate = array_values(array_diff($productIds, $existing));
+            $created = 0;
+
+            foreach ($toCreate as $productId) {
+                SupplierProduct::create([
+                    'supplier_id' => $supplierId,
+                    'product_id' => $productId,
+                    'supplier_sku' => 'S' . $supplierId . '-P' . $productId,
+                ]);
+                $created++;
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $created > 0
+                    ? "{$created} product(s) assigned. " . (count($existing) > 0 ? count($existing) . " already assigned." : '')
+                    : 'All selected products are already assigned to this supplier.',
+                'data' => [
+                    'created' => $created,
+                    'skipped_already_assigned' => count($existing),
+                ],
+            ], 201);
+        } catch (\Exception $e) {
+            Log::error('Supplier product storeBulk error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to assign products: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function update(Request $request, int $id): JsonResponse
     {
         $validated = $request->validate([
             'supplier_id' => 'sometimes|integer|exists:suppliers,id',
             'product_id' => 'sometimes|integer|exists:product,product_id',
-            'supplier_sku' => 'nullable|string|max:100',
-            'supplier_product_name' => 'nullable|string|max:255',
-            'description' => 'nullable|string',
-            'pack_size' => 'nullable|numeric|min:0',
-            'pack_unit' => 'nullable|string|max:20',
-            'min_order_qty' => 'nullable|numeric|min:0',
-            'price' => 'nullable|numeric|min:0',
-            'currency' => 'nullable|string|max:3',
-            'tax_percent' => 'nullable|numeric|min:0|max:100',
-            'discount_percent' => 'nullable|numeric|min:0|max:100',
-            'lead_time_days' => 'nullable|integer|min:0',
-            'last_purchase_price' => 'nullable|numeric|min:0',
-            'last_purchase_date' => 'nullable|date',
-            'is_preferred' => 'nullable|boolean',
-            'is_active' => 'nullable|boolean',
-            'notes' => 'nullable|string',
         ]);
 
         try {
@@ -194,6 +219,9 @@ class SupplierProductController extends Controller
                     'message' => 'This product is already assigned to the selected supplier.',
                 ], 422);
             }
+
+            // Regenerate supplier_sku when supplier or product changes
+            $validated['supplier_sku'] = 'S' . $supplierId . '-P' . $productId;
 
             $supplierProduct->update($validated);
 

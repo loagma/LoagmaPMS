@@ -11,6 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('suppliers')) {
+            if (! Schema::hasTable('supplier_products')) {
+                Schema::create('supplier_products', function (Blueprint $table) {
+                    $this->supplierProductsTable($table);
+                });
+            }
+            return;
+        }
+
         Schema::create('suppliers', function (Blueprint $table) {
             $table->id();
             $table->string('supplier_code', 50)->unique();
@@ -72,48 +81,55 @@ return new class extends Migration
             $table->softDeletes();
         });
 
-        Schema::create('supplier_products', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('supplier_id');
-            $table->unsignedBigInteger('product_id');
+        if (! Schema::hasTable('supplier_products')) {
+            Schema::create('supplier_products', function (Blueprint $table) {
+                $this->supplierProductsTable($table);
+            });
+        }
+    }
 
-            $table->string('supplier_sku', 100)->nullable();
-            $table->string('supplier_product_name', 255)->nullable();
-            $table->text('description')->nullable();
+    private function supplierProductsTable(Blueprint $table): void
+    {
+        $table->id();
+        $table->unsignedBigInteger('supplier_id');
+        $table->unsignedBigInteger('product_id');
 
-            $table->decimal('pack_size', 10, 3)->nullable();
-            $table->string('pack_unit', 20)->nullable();
-            $table->decimal('min_order_qty', 12, 3)->nullable();
+        $table->string('supplier_sku', 100)->nullable();
+        $table->string('supplier_product_name', 255)->nullable();
+        $table->text('description')->nullable();
 
-            $table->decimal('price', 12, 2)->nullable();
-            $table->string('currency', 3)->nullable();
-            $table->decimal('tax_percent', 5, 2)->nullable();
-            $table->decimal('discount_percent', 5, 2)->nullable();
-            $table->unsignedSmallInteger('lead_time_days')->nullable();
+        $table->decimal('pack_size', 10, 3)->nullable();
+        $table->string('pack_unit', 20)->nullable();
+        $table->decimal('min_order_qty', 12, 3)->nullable();
 
-            $table->decimal('last_purchase_price', 12, 2)->nullable();
-            $table->date('last_purchase_date')->nullable();
+        $table->decimal('price', 12, 2)->nullable();
+        $table->string('currency', 3)->nullable();
+        $table->decimal('tax_percent', 5, 2)->nullable();
+        $table->decimal('discount_percent', 5, 2)->nullable();
+        $table->unsignedSmallInteger('lead_time_days')->nullable();
 
-            $table->boolean('is_preferred')->default(false);
-            $table->boolean('is_active')->default(true);
+        $table->decimal('last_purchase_price', 12, 2)->nullable();
+        $table->date('last_purchase_date')->nullable();
 
-            $table->text('notes')->nullable();
-            $table->json('metadata')->nullable();
+        $table->boolean('is_preferred')->default(false);
+        $table->boolean('is_active')->default(true);
 
-            $table->timestamps();
+        $table->text('notes')->nullable();
+        $table->json('metadata')->nullable();
 
-            $table->foreign('supplier_id')
-                ->references('id')
-                ->on('suppliers')
-                ->onDelete('cascade');
+        $table->timestamps();
 
-            $table->foreign('product_id')
-                ->references('product_id')
-                ->on('product');
+        $table->foreign('supplier_id')
+            ->references('id')
+            ->on('suppliers')
+            ->onDelete('cascade');
 
-            $table->unique(['supplier_id', 'supplier_sku']);
-            $table->index(['supplier_id', 'product_id']);
-        });
+        $table->foreign('product_id')
+            ->references('product_id')
+            ->on('product');
+
+        $table->unique(['supplier_id', 'supplier_sku']);
+        $table->index(['supplier_id', 'product_id']);
     }
 
     /**

@@ -11,6 +11,7 @@ use App\Http\Controllers\StockController;
 use App\Http\Controllers\VendorProductController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SupplierProductController;
+use App\Http\Controllers\PurchaseOrderController;
 
 Route::get('/health', [HealthController::class, 'index']);
 Route::get('/products', [ProductController::class, 'index']);
@@ -59,11 +60,18 @@ Route::get('/suppliers/{id}', [SupplierController::class, 'show']);
 Route::put('/suppliers/{id}', [SupplierController::class, 'update']);
 Route::get('/suppliers/{id}/products', [SupplierController::class, 'getSupplierProducts']);
 
-// Supplier Product routes
+// Supplier Product routes (specific 'bulk' must be before {id})
 Route::get('/supplier-products', [SupplierProductController::class, 'index']);
 Route::post('/supplier-products', [SupplierProductController::class, 'store']);
-Route::get('/supplier-products/{id}', [SupplierProductController::class, 'show']);
-Route::put('/supplier-products/{id}', [SupplierProductController::class, 'update']);
-Route::delete('/supplier-products/{id}', [SupplierProductController::class, 'destroy']);
+Route::post('/supplier-products/bulk', [SupplierProductController::class, 'storeBulk']);
+Route::get('/supplier-products/{id}', [SupplierProductController::class, 'show'])->where('id', '[0-9]+');
+Route::put('/supplier-products/{id}', [SupplierProductController::class, 'update'])->where('id', '[0-9]+');
+Route::delete('/supplier-products/{id}', [SupplierProductController::class, 'destroy'])->where('id', '[0-9]+');
 
+// Purchase Order routes
+Route::get('/purchase-orders', [PurchaseOrderController::class, 'index']);
+Route::post('/purchase-orders', [PurchaseOrderController::class, 'store']);
+Route::get('/purchase-orders/{id}', [PurchaseOrderController::class, 'show']);
+Route::put('/purchase-orders/{id}', [PurchaseOrderController::class, 'update']);
+Route::delete('/purchase-orders/{id}', [PurchaseOrderController::class, 'destroy']);
 
