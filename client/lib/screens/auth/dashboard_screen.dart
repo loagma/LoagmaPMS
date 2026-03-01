@@ -201,6 +201,14 @@ class DashboardScreen extends StatelessWidget {
                   },
                 ),
                 _ModuleCard(
+                  title: 'Purchase Orders',
+                  subtitle: 'Create and manage purchase orders',
+                  icon: Icons.receipt_long_outlined,
+                  onTap: () {
+                    Get.toNamed(AppRoutes.purchaseOrders);
+                  },
+                ),
+                _ModuleCard(
                   title: 'Reports',
                   subtitle: 'View all module reports',
                   icon: Icons.assessment_rounded,
@@ -367,6 +375,14 @@ class _DashboardDrawer extends StatelessWidget {
                     onTap: () {
                       Navigator.of(context).pop();
                       Get.toNamed(AppRoutes.suppliers);
+                    },
+                  ),
+                  _DrawerItem(
+                    icon: Icons.receipt_long_outlined,
+                    label: 'Purchase Orders',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      Get.toNamed(AppRoutes.purchaseOrders);
                     },
                   ),
                   const Divider(height: 1, indent: 16, endIndent: 16),
