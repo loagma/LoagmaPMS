@@ -46,12 +46,15 @@ class PurchaseOrder {
       rawItems = const [];
     }
 
+    final supplier = json['supplier'] is Map ? json['supplier'] as Map<String, dynamic> : null;
+    final supplierName = supplier?['supplier_name']?.toString() ?? json['supplier_name']?.toString();
+
     return PurchaseOrder(
       id: id,
       poNumber: json['po_number']?.toString() ?? '',
       financialYear: json['financial_year']?.toString(),
-      supplierId: int.tryParse(json['supplier_id']?.toString() ?? '') ?? 0,
-      supplierName: json['supplier_name']?.toString(),
+      supplierId: int.tryParse(json['supplier_id']?.toString() ?? supplier?['id']?.toString() ?? '') ?? 0,
+      supplierName: supplierName,
       docDate: json['doc_date']?.toString() ?? '',
       expectedDate: json['expected_date']?.toString(),
       status: json['status']?.toString() ?? 'DRAFT',
@@ -80,6 +83,15 @@ class PurchaseOrder {
   }
 }
 
+String? _productNameFromJson(Map<String, dynamic> json) {
+  final nested = json['product'];
+  if (nested is Map) {
+    final name = (nested as Map<String, dynamic>)['name']?.toString();
+    if (name != null && name.isNotEmpty) return name;
+  }
+  return json['product_name']?.toString() ?? json['name']?.toString();
+}
+
 class PurchaseOrderItem {
   final int? id;
   final int? purchaseOrderId;
@@ -88,10 +100,15 @@ class PurchaseOrderItem {
   final int? lineNo;
   final String? unit;
   final double quantity;
+  /// Unit price excluding tax.
   final double price;
   final double? discountPercent;
   final double? taxPercent;
   final double? lineTotal;
+  /// Unit price including tax (from API or computed as price * (1 + taxPercent/100)).
+  final double? priceInclTax;
+  /// Line total excluding tax (from API or computed).
+  final double? lineTotalExclTax;
   final String? description;
 
   PurchaseOrderItem({
@@ -106,6 +123,8 @@ class PurchaseOrderItem {
     this.discountPercent,
     this.taxPercent,
     this.lineTotal,
+    this.priceInclTax,
+    this.lineTotalExclTax,
     this.description,
   });
 
@@ -126,19 +145,33 @@ class PurchaseOrderItem {
         ? null
         : (poIdValue is int ? poIdValue : int.tryParse(poIdValue.toString()));
 
+    final price = parseDouble(json['price']);
+    final taxPct = parseDouble(json['tax_percent'], defaultValue: 0);
+    final qty = parseDouble(json['quantity']);
+    final discountPct = parseDouble(json['discount_percent'], defaultValue: 0);
+    final lineTotalVal = parseDouble(json['line_total']);
+    double round2(double v) => (v * 100).round() / 100;
+    final lineTotalExclTaxVal = json['line_total_excl_tax'] != null
+        ? parseDouble(json['line_total_excl_tax'])
+        : round2(qty * price * (1 - discountPct / 100));
+    final priceInclTaxVal = json['price_incl_tax'] != null
+        ? parseDouble(json['price_incl_tax'])
+        : round2(price * (1 + taxPct / 100));
+
     return PurchaseOrderItem(
       id: id,
       purchaseOrderId: poId,
       productId: int.tryParse(json['product_id']?.toString() ?? '') ?? 0,
-      productName:
-          json['product_name']?.toString() ?? json['name']?.toString(),
+      productName: _productNameFromJson(json),
       lineNo: int.tryParse(json['line_no']?.toString() ?? ''),
       unit: json['unit']?.toString(),
-      quantity: parseDouble(json['quantity']),
-      price: parseDouble(json['price']),
-      discountPercent: parseDouble(json['discount_percent'], defaultValue: 0),
-      taxPercent: parseDouble(json['tax_percent'], defaultValue: 0),
-      lineTotal: parseDouble(json['line_total']),
+      quantity: qty,
+      price: price,
+      discountPercent: discountPct,
+      taxPercent: taxPct,
+      lineTotal: lineTotalVal,
+      priceInclTax: priceInclTaxVal,
+      lineTotalExclTax: lineTotalExclTaxVal,
       description: json['description']?.toString(),
     );
   }

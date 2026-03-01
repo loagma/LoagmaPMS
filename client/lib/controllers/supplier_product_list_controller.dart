@@ -96,6 +96,49 @@ class SupplierProductListController extends GetxController {
     }
   }
 
+  /// Assign multiple products to this supplier at once. Call when supplierId is set.
+  Future<bool> assignBulk(List<int> productIds) async {
+    if (supplierId == null || productIds.isEmpty) return false;
+    try {
+      final response = await http
+          .post(
+            Uri.parse('${ApiConfig.apiBaseUrl}/supplier-products/bulk'),
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({
+              'supplier_id': supplierId,
+              'product_ids': productIds,
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (data['success'] == true) {
+          final created = data['data']?['created'] as int? ?? 0;
+          Get.snackbar(
+            'Success',
+            data['message'] as String? ?? '$created product(s) assigned.',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.green.shade100,
+            colorText: Colors.green.shade900,
+            duration: const Duration(seconds: 2),
+          );
+          await loadSupplierProducts();
+          return true;
+        }
+      }
+      _showError(data['message'] as String? ?? 'Failed to assign products');
+      return false;
+    } catch (e) {
+      debugPrint('[SUPPLIER_PRODUCT_LIST] Bulk assign error: $e');
+      _showError('Failed to assign products');
+      return false;
+    }
+  }
+
   Future<void> deleteSupplierProduct(int id) async {
     try {
       final response = await http.delete(
