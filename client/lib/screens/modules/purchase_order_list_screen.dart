@@ -24,12 +24,12 @@ class PurchaseOrderListScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),
             tooltip: 'Refresh',
-            onPressed: () => controller.fetchOrders(),
+            onPressed: () => controller.refresh(),
           ),
         ],
       ),
       body: Obx(() {
-        if (controller.isLoading.value && controller.orders.isEmpty) {
+        if (controller.isLoading.value && controller.purchaseOrders.isEmpty) {
           return const Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -47,129 +47,105 @@ class PurchaseOrderListScreen extends StatelessWidget {
           );
         }
 
-        if (controller.orders.isEmpty) {
-          return RefreshIndicator(
-            onRefresh: controller.fetchOrders,
-            color: AppColors.primary,
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: SizedBox(
-                height: MediaQuery.of(context).size.height - 200,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: ContentCard(
-                    child: EmptyState(
-                      icon: Icons.description_outlined,
-                      message: 'No purchase orders created yet.',
-                      actionLabel: 'Create Purchase Order',
-                      onAction: () async {
-                        final result = await Get.to(
-                          () => const PurchaseOrderFormScreen(),
-                        );
-                        if (result == true) {
-                          controller.fetchOrders();
-                        }
-                      },
-                    ),
-                  ),
+        if (controller.purchaseOrders.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: ContentCard(
+                child: EmptyState(
+                  icon: Icons.shopping_cart_outlined,
+                  message: 'No purchase orders yet.',
+                  actionLabel: 'Create Purchase Order',
+                  onAction: () => Get.to(() => const PurchaseOrderFormScreen())?.then((_) {
+                    controller.refresh();
+                  }),
                 ),
               ),
             ),
           );
         }
 
-        return RefreshIndicator(
-          onRefresh: controller.fetchOrders,
-          color: AppColors.primary,
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: controller.orders.length,
-            itemBuilder: (context, index) {
-              final order = controller.orders[index];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _PurchaseOrderCard(
-                  order: order,
-                  onTap: () async {
-                    if (order.id == null) return;
-                    final result = await Get.to(
-                      () => PurchaseOrderFormScreen(
-                        purchaseOrderId: order.id,
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: TextField(
+                controller: controller.searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search by PO number...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: controller.searchQuery.value.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: controller.clearSearch,
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                ),
+                onSubmitted: controller.onSearch,
+              ),
+            ),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: controller.refresh,
+                color: AppColors.primary,
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: controller.purchaseOrders.length,
+                  itemBuilder: (context, index) {
+                    final po = controller.purchaseOrders[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _POCard(
+                        po: po,
+                        statusColor: controller.statusColor(po.status),
+                        onTap: () {
+                          if (po.id != null) {
+                            Get.to(() => PurchaseOrderFormScreen(poId: po.id))
+                                ?.then((_) => controller.refresh());
+                          }
+                        },
                       ),
                     );
-                    if (result == true) {
-                      controller.fetchOrders();
-                    }
                   },
                 ),
-              );
-            },
-          ),
+              ),
+            ),
+          ],
         );
       }),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final result = await Get.to(
-            () => const PurchaseOrderFormScreen(),
-          );
-          if (result == true) {
-            controller.fetchOrders();
-          }
-        },
+        onPressed: () => Get.to(() => const PurchaseOrderFormScreen())?.then((_) {
+          controller.refresh();
+        }),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_rounded),
-        label: const Text('Create PO'),
+        label: const Text('New PO'),
       ),
     );
   }
 }
 
-class _PurchaseOrderCard extends StatelessWidget {
-  final PurchaseOrder order;
+class _POCard extends StatelessWidget {
+  final PurchaseOrder po;
+  final Color statusColor;
   final VoidCallback onTap;
 
-  const _PurchaseOrderCard({
-    required this.order,
+  const _POCard({
+    required this.po,
+    required this.statusColor,
     required this.onTap,
   });
 
-  Color _statusColor(String status) {
-    switch (status.toUpperCase()) {
-      case 'SENT':
-        return Colors.blue;
-      case 'PARTIALLY_RECEIVED':
-        return Colors.orange;
-      case 'CLOSED':
-        return Colors.green;
-      case 'CANCELLED':
-        return Colors.redAccent;
-      case 'DRAFT':
-      default:
-        return Colors.grey;
-    }
-  }
-
-  IconData _statusIcon(String status) {
-    switch (status.toUpperCase()) {
-      case 'SENT':
-        return Icons.send_rounded;
-      case 'PARTIALLY_RECEIVED':
-        return Icons.local_shipping_outlined;
-      case 'CLOSED':
-        return Icons.check_circle_outline;
-      case 'CANCELLED':
-        return Icons.cancel_outlined;
-      case 'DRAFT':
-      default:
-        return Icons.edit_note_rounded;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final statusColor = _statusColor(order.status);
-
     return Card(
       elevation: 2,
       shadowColor: AppColors.primary.withValues(alpha: 0.1),
@@ -197,7 +173,7 @@ class _PurchaseOrderCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(
-                      Icons.description_rounded,
+                      Icons.receipt_long_outlined,
                       color: AppColors.primary,
                       size: 24,
                     ),
@@ -208,11 +184,7 @@ class _PurchaseOrderCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          order.poNumber.isNotEmpty
-                              ? order.poNumber
-                              : (order.id != null
-                                  ? 'PO-${order.id}'
-                                  : 'Purchase Order'),
+                          po.poNumber,
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -220,15 +192,13 @@ class _PurchaseOrderCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 2),
-                        if (order.supplierName != null &&
-                            order.supplierName!.isNotEmpty)
-                          Text(
-                            order.supplierName!,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: AppColors.textMuted,
-                            ),
+                        Text(
+                          po.supplierName ?? 'Supplier #${po.supplierId}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textMuted,
                           ),
+                        ),
                       ],
                     ),
                   ),
@@ -245,24 +215,13 @@ class _PurchaseOrderCard extends StatelessWidget {
                         width: 1,
                       ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _statusIcon(order.status),
-                          size: 14,
-                          color: statusColor,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          order.status,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: statusColor,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      po.status,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: statusColor,
+                      ),
                     ),
                   ),
                 ],
@@ -273,38 +232,28 @@ class _PurchaseOrderCard extends StatelessWidget {
               Row(
                 children: [
                   const Icon(
-                    Icons.calendar_today_rounded,
+                    Icons.calendar_today_outlined,
                     size: 16,
                     color: AppColors.textMuted,
                   ),
                   const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      order.docDate,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                  ),
-                  if (order.totalAmount != null) ...[
-                    const SizedBox(width: 12),
-                    const Icon(
-                      Icons.currency_rupee_rounded,
-                      size: 16,
+                  Text(
+                    po.docDate,
+                    style: const TextStyle(
+                      fontSize: 13,
                       color: AppColors.textMuted,
                     ),
-                    const SizedBox(width: 4),
+                  ),
+                  const Spacer(),
+                  if (po.totalAmount != null)
                     Text(
-                      order.totalAmount!.toStringAsFixed(2),
+                      '₹ ${po.totalAmount!.toStringAsFixed(2)}',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textDark,
+                        color: AppColors.primaryDark,
                       ),
                     ),
-                  ],
-                  const SizedBox(width: 8),
                   const Icon(
                     Icons.chevron_right_rounded,
                     color: AppColors.primary,
@@ -319,4 +268,3 @@ class _PurchaseOrderCard extends StatelessWidget {
     );
   }
 }
-
