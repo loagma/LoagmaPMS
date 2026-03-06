@@ -78,6 +78,14 @@ class SupplierProductFormController extends GetxController {
     if (index >= 0 && index < productRows.length) productRows.removeAt(index);
   }
 
+  /// Reset assign-mode form after successful bulk assign: clear supplier and product rows.
+  void _resetAssignFormFields() {
+    selectedSupplierId.value = null;
+    productRows.clear();
+    productRows.add(SupplierProductRow());
+    formKey.currentState?.reset();
+  }
+
   /// Search products via API (no full list). Used by product picker.
   Future<List<Map<String, dynamic>>> searchProducts(String query) async {
     try {
@@ -237,7 +245,7 @@ class SupplierProductFormController extends GetxController {
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (data['success'] == true) {
           _showSuccess(data['message'] as String? ?? 'Products assigned successfully');
-          Get.back(result: true);
+          _resetAssignFormFields();
         } else {
           _showError(data['message'] as String? ?? 'Failed to assign products');
         }
@@ -302,7 +310,8 @@ class SupplierProductFormController extends GetxController {
       snackPosition: SnackPosition.BOTTOM,
       backgroundColor: AppColors.primaryLight.withValues(alpha: 0.2),
       colorText: AppColors.primaryDark,
-      duration: const Duration(seconds: 2),
+      duration: const Duration(seconds: 3),
+      margin: const EdgeInsets.all(12),
     );
   }
 }

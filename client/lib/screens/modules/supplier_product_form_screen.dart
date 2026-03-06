@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -268,6 +270,8 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
   List<Map<String, dynamic>> _results = [];
   bool _searching = false;
   bool _searched = false;
+  Timer? _debounce;
+  static const _debounceDuration = Duration(milliseconds: 400);
 
   @override
   void initState() {
@@ -277,8 +281,18 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(_debounceDuration, () {
+      if (mounted && _searchController.text == value) {
+        _runSearch(value);
+      }
+    });
   }
 
   Future<void> _runSearch(String query) async {
@@ -287,11 +301,14 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
       _searched = true;
     });
     final list = await widget.controller.searchProducts(query);
-    if (mounted) {
+    // Only apply results if this response still matches current search (avoid race condition).
+    if (mounted && _searchController.text == query) {
       setState(() {
         _results = list;
         _searching = false;
       });
+    } else if (mounted) {
+      setState(() => _searching = false);
     }
   }
 
@@ -323,11 +340,7 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
                       )
                     : null,
               ),
-              onChanged: (value) {
-                Future.delayed(const Duration(milliseconds: 350), () {
-                  if (_searchController.text == value) _runSearch(value);
-                });
-              },
+              onChanged: _onSearchChanged,
             ),
             const SizedBox(height: 12),
             Expanded(

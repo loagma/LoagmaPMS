@@ -218,6 +218,52 @@ class SupplierFormController extends GetxController {
     }
   }
 
+  void _resetAddFormFields() {
+    supplierCode.value = '';
+    supplierName.value = '';
+    shortName.value = '';
+    businessType.value = '';
+    department.value = '';
+    gstNo.value = '';
+    panNo.value = '';
+    tanNo.value = '';
+    cinNo.value = '';
+    vatNo.value = '';
+    registrationNo.value = '';
+    fssaiNo.value = '';
+    website.value = '';
+    email.value = '';
+    phone.value = '';
+    alternatePhone.value = '';
+    contactPerson.value = '';
+    contactPersonEmail.value = '';
+    contactPersonPhone.value = '';
+    contactPersonDesignation.value = '';
+    addressLine1.value = '';
+    area.value = '';
+    city.value = '';
+    state.value = '';
+    country.value = '';
+    pincode.value = '';
+    pincodeController.clear();
+    areas.clear();
+    bankName.value = '';
+    bankBranch.value = '';
+    bankAccountName.value = '';
+    bankAccountNumber.value = '';
+    ifscCode.value = '';
+    swiftCode.value = '';
+    paymentTermsDays.value = '';
+    creditLimit.value = '';
+    rating.value = '';
+    isPreferred.value = false;
+    status.value = 'ACTIVE';
+    notes.value = '';
+    supplierProducts.clear();
+    supplierProducts.add(SupplierProductRow());
+    formKey.currentState?.reset();
+  }
+
   Future<void> lookupPincode(String pin) async {
     if (pin.length != 6) return;
 
@@ -453,8 +499,9 @@ class SupplierFormController extends GetxController {
           _showSuccess(
             isEditMode
                 ? 'Supplier updated successfully'
-                : 'Supplier created successfully',
+                : (data['message'] as String? ?? 'Supplier created successfully'),
           );
+          if (!isEditMode) _resetAddFormFields();
           Get.back(result: true);
         } else {
           _showError(data['message'] ?? 'Failed to save supplier');
@@ -496,7 +543,8 @@ class SupplierFormController extends GetxController {
       snackPosition: SnackPosition.BOTTOM,
       backgroundColor: AppColors.primaryLight.withValues(alpha: 0.2),
       colorText: AppColors.primaryDark,
-      duration: const Duration(seconds: 2),
+      duration: const Duration(seconds: 3),
+      margin: const EdgeInsets.all(12),
     );
   }
 }

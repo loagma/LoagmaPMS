@@ -272,6 +272,7 @@ class _SupplierContactCard extends StatelessWidget {
                     initialValue: controller.phone.value,
                     decoration: AppInputDecoration.standard(labelText: 'Phone'),
                     keyboardType: TextInputType.phone,
+                    maxLength: 10,
                     onChanged: (value) => controller.phone.value = value,
                   ),
                 ),
@@ -288,6 +289,7 @@ class _SupplierContactCard extends StatelessWidget {
                     decoration: AppInputDecoration.standard(
                       labelText: 'Alternate Phone',
                     ),
+                    maxLength: 10,
                     keyboardType: TextInputType.phone,
                     onChanged: (value) =>
                         controller.alternatePhone.value = value,
