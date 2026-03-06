@@ -107,8 +107,12 @@ class PurchaseOrderListScreen extends StatelessWidget {
                         statusColor: controller.statusColor(po.status),
                         onTap: () {
                           if (po.id != null) {
-                            Get.to(() => PurchaseOrderFormScreen(poId: po.id))
-                                ?.then((_) => controller.refresh());
+                            Get.to(
+                              () => PurchaseOrderFormScreen(
+                                poId: po.id,
+                                startInViewOnly: true,
+                              ),
+                            )?.then((_) => controller.refresh());
                           }
                         },
                         onDeleteOrCancel: (ctx) => _showDeleteCancelDialog(ctx, controller, po),
@@ -175,6 +179,20 @@ class _POCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    String _formatDocDate(String raw) {
+      if (raw.isEmpty) return '-';
+      try {
+        final dt = DateTime.tryParse(raw);
+        if (dt == null) return raw;
+        final y = dt.year.toString().padLeft(4, '0');
+        final m = dt.month.toString().padLeft(2, '0');
+        final d = dt.day.toString().padLeft(2, '0');
+        return '$y-$m-$d';
+      } catch (_) {
+        return raw;
+      }
+    }
+
     return Card(
       elevation: 2,
       shadowColor: AppColors.primary.withValues(alpha: 0.1),
@@ -274,7 +292,7 @@ class _POCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    po.docDate,
+                    _formatDocDate(po.docDate),
                     style: const TextStyle(
                       fontSize: 13,
                       color: AppColors.textMuted,

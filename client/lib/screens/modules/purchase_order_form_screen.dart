@@ -5,15 +5,26 @@ import 'package:get/get.dart';
 import '../../controllers/purchase_order_form_controller.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
+import 'purchase_order_list_screen.dart';
 
 class PurchaseOrderFormScreen extends StatelessWidget {
   final int? poId;
+  final bool startInViewOnly;
 
-  const PurchaseOrderFormScreen({super.key, this.poId});
+  const PurchaseOrderFormScreen({
+    super.key,
+    this.poId,
+    this.startInViewOnly = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(PurchaseOrderFormController(poId: poId));
+    final controller = Get.put(
+      PurchaseOrderFormController(
+        poId: poId,
+        startInViewOnly: startInViewOnly,
+      ),
+    );
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -22,6 +33,20 @@ class PurchaseOrderFormScreen extends StatelessWidget {
         subtitle: 'Loagma',
         onBackPressed: () => Get.back(),
         actions: [
+          Obx(() {
+            final canEdit = controller.viewOnly.value && controller.status.value == 'DRAFT';
+            if (!canEdit) return const SizedBox.shrink();
+            return IconButton(
+              icon: const Icon(Icons.edit_rounded, color: Colors.white),
+              tooltip: 'Edit',
+              onPressed: () => controller.viewOnly.value = false,
+            );
+          }),
+          IconButton(
+            icon: const Icon(Icons.list_alt_rounded, color: Colors.white),
+            tooltip: 'View all purchase orders',
+            onPressed: () => Get.to(() => const PurchaseOrderListScreen()),
+          ),
           IconButton(
             icon: const Icon(Icons.help_outline_rounded, color: Colors.white),
             tooltip: 'Help',
@@ -310,7 +335,7 @@ class _ItemRow extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                flex: 2,
+                flex: 3,
                 child: Obx(() => TextFormField(
                       enabled: !controller.isReadOnly,
                       initialValue: row.quantity.value,
@@ -333,15 +358,54 @@ class _ItemRow extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Obx(() => TextFormField(
-                      enabled: !controller.isReadOnly,
-                      initialValue: row.unit.value,
-                      decoration: AppInputDecoration.standard(
-                        labelText: 'Unit',
-                        hintText: 'PCS',
-                      ),
-                      onChanged: (v) => row.unit.value = v,
-                    )),
+                flex: 2,
+                child: Obx(
+                  () {
+                    final units = controller.unitTypes.isEmpty
+                        ? ['KG', 'PCS', 'LTR', 'MTR', 'GM', 'ML']
+                        : controller.unitTypes;
+                    final current = row.unit.value;
+                    final value = units.contains(current)
+                        ? current
+                        : units.first;
+                    if (value != current && !controller.isReadOnly) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        row.unit.value = value;
+                      });
+                    }
+                    return DropdownButtonFormField<String>(
+                      value: value,
+                      decoration: AppInputDecoration.standard(labelText: 'Unit')
+                          .copyWith(
+                            // Reduce horizontal padding so the dropdown can't overflow on small widths.
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 12,
+                            ),
+                          ),
+                      isDense: true,
+                      isExpanded: true,
+                      iconSize: 18,
+                      items: units
+                          .map(
+                            (u) => DropdownMenuItem(
+                              value: u,
+                              child: Text(
+                                u,
+                                style: const TextStyle(fontSize: 13),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: controller.isReadOnly
+                          ? null
+                          : (v) {
+                              if (v != null) row.unit.value = v;
+                            },
+                    );
+                  },
+                ),
               ),
             ],
           ),
@@ -465,9 +529,15 @@ class _ProductPicker extends StatelessWidget {
                         builder: (ctx) => _POProductSearchDialog(controller: controller),
                       );
                       if (product != null) {
-                        row.productId.value = product['product_id'] as int;
-                        row.productName.value =
-                            product['name']?.toString() ?? '';
+                        final rawId = product['product_id'] ?? product['id'];
+                        final pid = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
+                        if (pid != null) {
+                          row.productId.value = pid;
+                          row.productName.value = product['name']?.toString() ?? '';
+                          // Keep FormField state in sync so validation error clears immediately.
+                          state.didChange(pid);
+                          state.validate();
+                        }
                       }
                     },
               child: InputDecorator(

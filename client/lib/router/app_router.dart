@@ -14,7 +14,6 @@ import '../screens/modules/supplier_form_screen.dart';
 import '../screens/modules/supplier_product_form_screen.dart';
 import '../screens/modules/supplier_product_list_screen.dart';
 import '../screens/modules/supplier_list_for_products_screen.dart';
-import '../screens/modules/purchase_order_list_screen.dart';
 import '../screens/modules/purchase_order_form_screen.dart';
 
 /// Central route names. Use these instead of raw strings.
@@ -77,7 +76,7 @@ final List<GetPage<dynamic>> appPages = [
   ),
   GetPage(
     name: AppRoutes.purchaseOrders,
-    page: () => const PurchaseOrderListScreen(),
+    page: () => const PurchaseOrderFormScreen(),
   ),
   GetPage(
     name: AppRoutes.purchaseOrderForm,

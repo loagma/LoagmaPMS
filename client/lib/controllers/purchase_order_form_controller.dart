@@ -11,9 +11,12 @@ import '../theme/app_colors.dart';
 class PurchaseOrderFormController extends GetxController {
   final formKey = GlobalKey<FormState>();
   final int? poId;
+  final bool startInViewOnly;
 
   final suppliers = <Map<String, dynamic>>[].obs;
   final products = <Map<String, dynamic>>[].obs;
+  final unitTypes = <String>[].obs;
+  final viewOnly = false.obs;
 
   final financialYear = '25-26'.obs;
   final supplierId = Rxn<int>();
@@ -27,17 +30,19 @@ class PurchaseOrderFormController extends GetxController {
   final isLoading = false.obs;
   final isSaving = false.obs;
 
-  PurchaseOrderFormController({this.poId});
+  PurchaseOrderFormController({this.poId, this.startInViewOnly = false});
 
   @override
   void onInit() {
     super.onInit();
+    viewOnly.value = startInViewOnly;
     _loadSuppliers();
+    _loadUnitTypes();
     if (poId != null) {
       _loadPurchaseOrder();
     } else {
       _setDefaultDocDate();
-      items.add(POLineRow());
+      addItem();
     }
   }
 
@@ -99,6 +104,24 @@ class PurchaseOrderFormController extends GetxController {
     }
   }
 
+  Future<void> _loadUnitTypes() async {
+    try {
+      final response = await http.get(
+        Uri.parse(ApiConfig.unitTypes),
+        headers: {'Accept': 'application/json'},
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        if (data['success'] == true) {
+          final List types = data['data'] ?? [];
+          unitTypes.value = types.cast<String>();
+        }
+      }
+    } catch (e) {
+      unitTypes.value = ['KG', 'PCS', 'LTR', 'MTR', 'GM', 'ML'];
+    }
+  }
+
   Future<void> _loadPurchaseOrder() async {
     if (poId == null) return;
     try {
@@ -150,7 +173,11 @@ class PurchaseOrderFormController extends GetxController {
   void setNarration(String v) => narration.value = v;
 
   void addItem() {
-    items.add(POLineRow());
+    final row = POLineRow();
+    if (unitTypes.isNotEmpty && row.unit.value.isEmpty) {
+      row.unit.value = unitTypes.first;
+    }
+    items.add(row);
   }
 
   void removeItem(int index) {
@@ -160,7 +187,7 @@ class PurchaseOrderFormController extends GetxController {
   }
 
   bool get isEditMode => poId != null;
-  bool get isReadOnly => status.value != 'DRAFT';
+  bool get isReadOnly => viewOnly.value || status.value != 'DRAFT';
 
   bool validateForm() {
     if (!formKey.currentState!.validate()) return false;
@@ -301,7 +328,7 @@ class POLineRow {
   final price = '0'.obs;
   final discountPercent = ''.obs;
   final taxPercent = ''.obs;
-  final unit = ''.obs;
+  final unit = 'PCS'.obs;
   final description = ''.obs;
 
   POLineRow({
