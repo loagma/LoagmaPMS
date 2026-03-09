@@ -47,6 +47,10 @@ class PurchaseVoucherController extends GetxController {
   final linkedPurchaseOrderId = Rxn<int>();
   final linkedPoNumber = ''.obs;
 
+  /// Controls whether product searches show only vendor-assigned products
+  /// (via /supplier-products) or the full product catalogue.
+  final showAllProducts = false.obs;
+
   final isLoading = false.obs;
   final isSaving = false.obs;
 
@@ -245,16 +249,77 @@ class PurchaseVoucherController extends GetxController {
     }
   }
 
-  Future<void> searchProducts(String query) async {
-    if (query.length < 2) {
-      await _loadProducts();
-      return;
+  /// Load products for the current vendor.
+  /// If [includeAll] is false and a vendor is selected, we hit /supplier-products
+  /// so that only products assigned to that vendor are returned. Otherwise we
+  /// fall back to the generic /products list.
+  Future<void> loadProductsForVendor({
+    String? search,
+    bool? includeAll,
+  }) async {
+    final useAll = includeAll ?? showAllProducts.value;
+    final vendor = vendorId.value;
+
+    if (!useAll && vendor != null) {
+      try {
+        final uri = Uri.parse(ApiConfig.supplierProducts).replace(
+          queryParameters: {
+            'limit': '50',
+            'supplier_id': vendor.toString(),
+            if (search != null && search.trim().isNotEmpty)
+              'search': search.trim(),
+          },
+        );
+        final response = await http
+            .get(uri, headers: {'Accept': 'application/json'})
+            .timeout(const Duration(seconds: 30));
+        if (response.statusCode != 200) {
+          debugPrint(
+              '[PURCHASE_VOUCHER] Vendor products status ${response.statusCode}');
+          return;
+        }
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        if (decoded['success'] != true) return;
+        final List data = decoded['data'] ?? [];
+        products.value = data.map((e) {
+          final map = e as Map<String, dynamic>;
+          final product = map['product'] as Map<String, dynamic>?;
+          final rawId =
+              map['product_id'] ?? product?['product_id'] ?? product?['id'];
+          final id = rawId is int ? rawId : int.parse(rawId.toString());
+          final name = product?['name']?.toString() ??
+              map['product_name']?.toString() ??
+              map['supplier_product_name']?.toString() ??
+              'Product $id';
+          return Product(
+            id: id,
+            name: name,
+            code: product?['product_code']?.toString(),
+            productType:
+                (product?['product_type'] ?? 'SINGLE').toString().toUpperCase(),
+            defaultUnit: product?['default_unit']?.toString(),
+          );
+        }).toList();
+        return;
+      } catch (e) {
+        debugPrint('[PURCHASE_VOUCHER] Vendor products error: $e');
+        // fall through to all-products load
+      }
     }
+
+    // Fallback: generic products list (optionally filtered by search).
     try {
-      final url =
-          '${ApiConfig.products}?search=${Uri.encodeComponent(query)}&limit=100';
+      final base = ApiConfig.products;
+      final uri = search != null && search.trim().isNotEmpty
+          ? Uri.parse(base).replace(
+              queryParameters: {
+                'limit': '50',
+                'search': search.trim(),
+              },
+            )
+          : Uri.parse('$base?limit=50');
       final response = await http
-          .get(Uri.parse(url), headers: {'Accept': 'application/json'})
+          .get(uri, headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: 30));
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body) as Map<String, dynamic>;
@@ -266,9 +331,12 @@ class PurchaseVoucherController extends GetxController {
         }
       }
     } catch (e) {
-      debugPrint('[PURCHASE_VOUCHER] Search error: $e');
+      debugPrint('[PURCHASE_VOUCHER] Products error: $e');
     }
   }
+
+  Future<void> searchProducts(String query) =>
+      loadProductsForVendor(search: query);
 
   void setDocNoPrefix(String v) => docNoPrefix.value = v;
   void setDocNoNumber(String v) => docNoNumber.value = v;

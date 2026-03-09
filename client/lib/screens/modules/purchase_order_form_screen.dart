@@ -417,12 +417,17 @@ class _ItemRow extends StatelessWidget {
                       enabled: !controller.isReadOnly,
                       initialValue: row.price.value,
                       decoration: AppInputDecoration.standard(
-                        labelText: 'Price (excl. tax) *',
+                        labelText: row.isInclusiveTax.value
+                            ? 'Unit Price (with tax) *'
+                            : 'Unit Price (without tax) *',
                         hintText: '0.00',
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                        FilteringTextInputFormatter.allow(
+                          RegExp(r'^\d+\.?\d{0,2}'),
+                        ),
                       ],
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return 'Required';
@@ -435,30 +440,80 @@ class _ItemRow extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Obx(() => TextFormField(
-                      enabled: !controller.isReadOnly,
-                      initialValue: row.discountPercent.value,
-                      decoration: AppInputDecoration.standard(
-                        labelText: 'Disc %',
-                        hintText: '0',
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      onChanged: (v) => row.discountPercent.value = v,
-                    )),
+                child: Obx(
+                  () => TextFormField(
+                    enabled: false,
+                    initialValue: row.lineTotalExclTax.toStringAsFixed(2),
+                    decoration: AppInputDecoration.standard(
+                      labelText: 'Taxable',
+                    ),
+                    readOnly: true,
+                  ),
+                ),
               ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Obx(
+            () => Row(
+              children: [
+                Expanded(
+                  child: RadioListTile<bool>(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text(
+                      'Without tax',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    value: false,
+                    groupValue: row.isInclusiveTax.value,
+                    onChanged: controller.isReadOnly
+                        ? null
+                        : (v) {
+                            if (v != null) {
+                              row.isInclusiveTax.value = v;
+                            }
+                          },
+                  ),
+                ),
+                Expanded(
+                  child: RadioListTile<bool>(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text(
+                      'With tax',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    value: true,
+                    groupValue: row.isInclusiveTax.value,
+                    onChanged: controller.isReadOnly
+                        ? null
+                        : (v) {
+                            if (v != null) {
+                              row.isInclusiveTax.value = v;
+                            }
+                          },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _taxField(row.sgst, 'SGST'),
               const SizedBox(width: 8),
-              Expanded(
-                child: Obx(() => TextFormField(
-                      enabled: !controller.isReadOnly,
-                      initialValue: row.taxPercent.value,
-                      decoration: AppInputDecoration.standard(
-                        labelText: 'Tax %',
-                        hintText: '0',
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      onChanged: (v) => row.taxPercent.value = v,
-                    )),
-              ),
+              _taxField(row.cgst, 'CGST'),
+              const SizedBox(width: 8),
+              _taxField(row.igst, 'IGST'),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              _taxField(row.cess, 'Cess'),
+              const SizedBox(width: 8),
+              _taxField(row.roff, 'Roff'),
             ],
           ),
           const SizedBox(height: 6),
@@ -495,6 +550,32 @@ class _ItemRow extends StatelessWidget {
                 ),
               )),
         ],
+      ),
+    );
+  }
+
+  Widget _taxField(RxString value, String label) {
+    return Expanded(
+      child: Obx(
+        () => TextFormField(
+          enabled: !controller.isReadOnly,
+          initialValue: value.value,
+          decoration: InputDecoration(
+            labelText: label,
+            isDense: true,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.primaryLight),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 8,
+            ),
+          ),
+          keyboardType:
+              const TextInputType.numberWithOptions(decimal: true),
+          onChanged: (v) => value.value = v,
+        ),
       ),
     );
   }
@@ -595,10 +676,12 @@ class _POProductSearchDialogState extends State<_POProductSearchDialog> {
   List<Map<String, dynamic>> _results = [];
   bool _searching = false;
   bool _searched = false;
+  bool _showAllProducts = false;
 
   @override
   void initState() {
     super.initState();
+    _showAllProducts = widget.controller.supplierId.value == null;
     _runSearch('');
   }
 
@@ -613,7 +696,10 @@ class _POProductSearchDialogState extends State<_POProductSearchDialog> {
       _searching = true;
       _searched = true;
     });
-    final list = await widget.controller.searchProducts(query);
+    final list = await widget.controller.searchProductsForSupplier(
+      query,
+      includeAll: _showAllProducts,
+    );
     if (mounted) {
       setState(() {
         _results = list;
@@ -681,6 +767,44 @@ class _POProductSearchDialogState extends State<_POProductSearchDialog> {
                         );
                       },
                     ),
+            ),
+            const SizedBox(height: 8),
+            Builder(
+              builder: (context) {
+                final hasSupplier =
+                    widget.controller.supplierId.value != null;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (!hasSupplier)
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          'Select supplier to filter by assigned products.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ),
+                    TextButton(
+                      onPressed: hasSupplier
+                          ? () {
+                              setState(() {
+                                _showAllProducts = !_showAllProducts;
+                              });
+                              _runSearch(_searchController.text);
+                            }
+                          : null,
+                      child: Text(
+                        _showAllProducts
+                            ? 'Show only products assigned to this supplier'
+                            : 'View all products',
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ],
         ),

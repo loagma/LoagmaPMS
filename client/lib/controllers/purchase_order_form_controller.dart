@@ -46,8 +46,8 @@ class PurchaseOrderFormController extends GetxController {
     }
   }
 
-  /// Search products via API (used by product picker; no full list).
-  Future<List<Map<String, dynamic>>> searchProducts(String query) async {
+  /// Search all products via /products (no supplier filter).
+  Future<List<Map<String, dynamic>>> _searchAllProducts(String query) async {
     try {
       final uri = Uri.parse(ApiConfig.products).replace(
         queryParameters: {
@@ -65,7 +65,9 @@ class PurchaseOrderFormController extends GetxController {
       return list
           .map((e) => {
                 'product_id': (e as Map)['product_id'] ?? (e)['id'],
-                'name': (e)['name']?.toString() ?? (e)['product_name']?.toString() ?? '',
+                'name': (e)['name']?.toString() ??
+                    (e)['product_name']?.toString() ??
+                    '',
               })
           .toList();
     } catch (e) {
@@ -73,6 +75,57 @@ class PurchaseOrderFormController extends GetxController {
       return [];
     }
   }
+
+  /// Supplier-aware product search.
+  /// If a supplier is selected and [includeAll] is false, we hit /supplier-products
+  /// so that only products assigned to that supplier are returned.
+  /// Otherwise we fall back to the generic /products search.
+  Future<List<Map<String, dynamic>>> searchProductsForSupplier(
+    String query, {
+    bool includeAll = false,
+  }) async {
+    final supplier = supplierId.value;
+    if (!includeAll && supplier != null) {
+      try {
+        final uri = Uri.parse(ApiConfig.supplierProducts).replace(
+          queryParameters: {
+            'limit': '50',
+            'supplier_id': supplier.toString(),
+            if (query.trim().isNotEmpty) 'search': query.trim(),
+          },
+        );
+        final response = await http
+            .get(uri, headers: {'Accept': 'application/json'})
+            .timeout(const Duration(seconds: 15));
+        if (response.statusCode != 200) return [];
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        if (data['success'] != true) return [];
+        final List list = data['data'] ?? [];
+        return list.map((e) {
+          final map = e as Map<String, dynamic>;
+          final product = map['product'] as Map<String, dynamic>?;
+          final rawId =
+              map['product_id'] ?? product?['product_id'] ?? product?['id'];
+          final name = product?['name']?.toString() ??
+              map['product_name']?.toString() ??
+              map['supplier_product_name']?.toString() ??
+              'Product ${rawId ?? ''}';
+          return {
+            'product_id': rawId,
+            'name': name,
+          };
+        }).toList();
+      } catch (e) {
+        debugPrint('[PO FORM] Supplier search error: $e');
+        // fall through to all-products search
+      }
+    }
+    return _searchAllProducts(query);
+  }
+
+  /// Backwards-compatible wrapper for existing callers that always want all products.
+  Future<List<Map<String, dynamic>>> searchProducts(String query) =>
+      _searchAllProducts(query);
 
   void _setDefaultDocDate() {
     final now = DateTime.now();
@@ -328,6 +381,14 @@ class POLineRow {
   final price = '0'.obs;
   final discountPercent = ''.obs;
   final taxPercent = ''.obs;
+  // Whether the entered unit price is inclusive of tax (true) or exclusive (false).
+  final isInclusiveTax = false.obs;
+  // Detailed tax breakdown (frontend only for now, default 0).
+  final sgst = '0'.obs;
+  final cgst = '0'.obs;
+  final igst = '0'.obs;
+  final cess = '0'.obs;
+  final roff = '0'.obs;
   final unit = 'PCS'.obs;
   final description = ''.obs;
 
@@ -356,15 +417,21 @@ class POLineRow {
 
   /// Price including tax (computed).
   double get priceInclTax {
-    final p = priceExclTax;
+    final raw = double.tryParse(price.value) ?? 0;
     final t = double.tryParse(taxPercent.value) ?? 0;
-    return p * (1 + t / 100);
+    if (isInclusiveTax.value) {
+      // User entered price already includes tax.
+      return raw;
+    }
+    return raw * (1 + t / 100);
   }
 
   /// Line total excluding tax.
   double get lineTotalExclTax {
     final qty = double.tryParse(quantity.value) ?? 0;
-    final p = priceExclTax;
+    final p = isInclusiveTax.value
+        ? _priceExclFromInclusive()
+        : (double.tryParse(price.value) ?? 0);
     final d = double.tryParse(discountPercent.value) ?? 0;
     return qty * p * (1 - d / 100);
   }
@@ -372,9 +439,23 @@ class POLineRow {
   /// Line total including tax.
   double get lineTotal {
     final qty = double.tryParse(quantity.value) ?? 0;
-    final p = priceExclTax;
+    final pExcl = isInclusiveTax.value
+        ? _priceExclFromInclusive()
+        : (double.tryParse(price.value) ?? 0);
     final d = double.tryParse(discountPercent.value) ?? 0;
     final t = double.tryParse(taxPercent.value) ?? 0;
-    return qty * p * (1 - d / 100) * (1 + t / 100);
+    if (isInclusiveTax.value) {
+      // When price already includes tax, apply discount then multiply by qty.
+      final pIncl = double.tryParse(price.value) ?? 0;
+      return qty * pIncl * (1 - d / 100);
+    }
+    return qty * pExcl * (1 - d / 100) * (1 + t / 100);
+  }
+
+  double _priceExclFromInclusive() {
+    final pIncl = double.tryParse(price.value) ?? 0;
+    final t = double.tryParse(taxPercent.value) ?? 0;
+    if (t <= 0) return pIncl;
+    return pIncl / (1 + t / 100);
   }
 }

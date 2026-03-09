@@ -875,7 +875,11 @@ class _ItemRow extends StatelessWidget {
               _smallNumField(row.cgst, 'CGST'),
               const SizedBox(width: 8),
               _smallNumField(row.igst, 'IGST'),
-              const SizedBox(width: 8),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
               _smallNumField(row.cess, 'Cess'),
               const SizedBox(width: 8),
               _smallNumField(row.roff, 'Roff'),
@@ -1035,14 +1039,14 @@ class _PVProductSearchDialog extends StatefulWidget {
 class _PVProductSearchDialogState extends State<_PVProductSearchDialog> {
   final TextEditingController _searchController = TextEditingController();
   List<Product> _filtered = [];
+  bool _showAllProducts = false;
 
   @override
   void initState() {
     super.initState();
-    _filtered = widget.controller.products
-        .where((p) => !widget.excludeIds.contains(p.id))
-        .take(50)
-        .toList();
+    _showAllProducts = widget.controller.vendorId.value == null;
+    widget.controller.showAllProducts.value = _showAllProducts;
+    _initialLoad();
   }
 
   @override
@@ -1051,8 +1055,43 @@ class _PVProductSearchDialogState extends State<_PVProductSearchDialog> {
     super.dispose();
   }
 
-  void _onSearch(String query) async {
-    await widget.controller.searchProducts(query.isEmpty ? ' ' : query);
+  Future<void> _refreshFromController() async {
+    _filtered = widget.controller.products
+        .where((p) => !widget.excludeIds.contains(p.id))
+        .take(50)
+        .toList();
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _initialLoad() async {
+    await widget.controller.loadProductsForVendor(
+      search: null,
+      includeAll: _showAllProducts,
+    );
+    await _refreshFromController();
+  }
+
+  Future<void> _onSearch(String query) async {
+    await widget.controller.loadProductsForVendor(
+      search: query.isEmpty ? null : query,
+      includeAll: _showAllProducts,
+    );
+    await _refreshFromController();
+  }
+
+  Future<void> _toggleViewMode() async {
+    setState(() {
+      _showAllProducts = !_showAllProducts;
+      widget.controller.showAllProducts.value = _showAllProducts;
+    });
+    await widget.controller.loadProductsForVendor(
+      search: _searchController.text.trim().isEmpty
+          ? null
+          : _searchController.text.trim(),
+      includeAll: _showAllProducts,
+    );
     setState(() {
       _filtered = widget.controller.products
           .where((p) => !widget.excludeIds.contains(p.id))
@@ -1114,6 +1153,37 @@ class _PVProductSearchDialogState extends State<_PVProductSearchDialog> {
                         );
                       },
                     ),
+            ),
+            const SizedBox(height: 8),
+            Builder(
+              builder: (context) {
+                final hasVendor =
+                    widget.controller.vendorId.value != null;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (!hasVendor)
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          'Select vendor to filter by assigned products.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ),
+                    TextButton(
+                      onPressed: hasVendor ? _toggleViewMode : null,
+                      child: Text(
+                        _showAllProducts
+                            ? 'Show only products assigned to this vendor'
+                            : 'View all products',
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ],
         ),

@@ -11,7 +11,7 @@ class ApiConfig {
   ///   --dart-define=IS_PRODUCTION=true
   static const bool isProduction = bool.fromEnvironment(
     'IS_PRODUCTION',
-    defaultValue: false,
+    defaultValue: true,
   );
 
   /// Local base URL (emulator / device hitting your dev machine).
