@@ -17,8 +17,8 @@ class InventoryListScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: ModuleAppBar(
-        title: 'Inventory Management',
-        subtitle: 'Loagma',
+        title: 'List of Products',
+        subtitle: 'View all products',
         onBackPressed: () => Get.back(),
         actions: [
           IconButton(

@@ -60,3 +60,11 @@ multiple products while assigning product to supplier
 remove last two fields , also sku will be generated automatically 
 
 
+
+
+stock general voucher -> stock in or out
+inventory managmaent -> list of products 
+
+purchase order -> salesman dropdown field , department -> dropdown
+add ons 
+

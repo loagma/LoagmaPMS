@@ -15,6 +15,8 @@ import '../screens/modules/supplier_product_form_screen.dart';
 import '../screens/modules/supplier_product_list_screen.dart';
 import '../screens/modules/supplier_list_for_products_screen.dart';
 import '../screens/modules/purchase_order_form_screen.dart';
+import '../screens/modules/purchase_voucher_list_screen.dart';
+import '../screens/modules/purchase_voucher_screen.dart';
 
 /// Central route names. Use these instead of raw strings.
 abstract class AppRoutes {
@@ -37,6 +39,8 @@ abstract class AppRoutes {
   static const String supplierProductListForSupplier = '/supplier-product-list-for-supplier';
   static const String purchaseOrders = '/purchase-orders';
   static const String purchaseOrderForm = '/purchase-order-form';
+  static const String purchaseVoucherList = '/purchase-vouchers';
+  static const String purchaseVoucher = '/purchase-voucher';
 }
 
 /// All app routes. Used by [GetMaterialApp] in [main.dart].
@@ -81,5 +85,15 @@ final List<GetPage<dynamic>> appPages = [
   GetPage(
     name: AppRoutes.purchaseOrderForm,
     page: () => const PurchaseOrderFormScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.purchaseVoucherList,
+    page: () => const PurchaseVoucherListScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.purchaseVoucher,
+    page: () => PurchaseVoucherScreen(
+      voucherId: Get.arguments is int ? Get.arguments as int? : null,
+    ),
   ),
 ];

@@ -18,8 +18,8 @@ class StockVoucherScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: ModuleAppBar(
-        title: controller.isEditMode ? 'Edit Voucher' : 'Stock Voucher Add',
-        subtitle: 'Loagma',
+        title: controller.isEditMode ? 'Edit Voucher' : 'Stock General Voucher ',
+        subtitle: 'Record stock IN or OUT',
         onBackPressed: () => Get.back(),
         actions: [
           IconButton(
@@ -324,7 +324,7 @@ class _VoucherItemRow extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
-                flex: 1,
+                flex: 2,
                 child: Obx(
                   () => DropdownButtonFormField<String>(
                     value: controller.unitTypes.contains(row.unitType.value)
@@ -334,8 +334,15 @@ class _VoucherItemRow extends StatelessWidget {
                               : 'KG'),
                     decoration: AppInputDecoration.standard(
                       labelText: 'Unit *',
+                    ).copyWith(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 12,
+                      ),
                     ),
                     isDense: true,
+                    isExpanded: true,
+                    iconSize: 18,
                     items: controller.unitTypes
                         .map(
                           (unit) => DropdownMenuItem(
@@ -343,6 +350,7 @@ class _VoucherItemRow extends StatelessWidget {
                             child: Text(
                               unit,
                               style: const TextStyle(fontSize: 13),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         )

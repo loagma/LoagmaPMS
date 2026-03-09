@@ -169,7 +169,7 @@ class DashboardScreen extends StatelessWidget {
                   },
                 ),
                 _ModuleCard(
-                  title: 'Stock Voucher',
+                  title: 'Stock General Voucher',
                   subtitle: 'Record stock IN or OUT',
                   icon: Icons.receipt_long_outlined,
                   onTap: () {
@@ -177,8 +177,8 @@ class DashboardScreen extends StatelessWidget {
                   },
                 ),
                 _ModuleCard(
-                  title: 'Inventory',
-                  subtitle: 'Manage vendor product inventory',
+                  title: 'List of Products',
+                  subtitle: 'View all products',
                   icon: Icons.inventory_2_outlined,
                   onTap: () {
                     Get.toNamed(AppRoutes.inventory);
@@ -206,6 +206,14 @@ class DashboardScreen extends StatelessWidget {
                   icon: Icons.receipt_long_outlined,
                   onTap: () {
                     Get.toNamed(AppRoutes.purchaseOrders);
+                  },
+                ),
+                _ModuleCard(
+                  title: 'Purchase Voucher',
+                  subtitle: 'Record purchase invoices',
+                  icon: Icons.description_outlined,
+                  onTap: () {
+                    Get.toNamed(AppRoutes.purchaseVoucherList);
                   },
                 ),
                 _ModuleCard(
@@ -383,6 +391,14 @@ class _DashboardDrawer extends StatelessWidget {
                     onTap: () {
                       Navigator.of(context).pop();
                       Get.toNamed(AppRoutes.purchaseOrders);
+                    },
+                  ),
+                  _DrawerItem(
+                    icon: Icons.description_outlined,
+                    label: 'Purchase Voucher',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      Get.toNamed(AppRoutes.purchaseVoucherList);
                     },
                   ),
                   const Divider(height: 1, indent: 16, endIndent: 16),

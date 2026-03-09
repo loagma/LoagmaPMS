@@ -11,7 +11,7 @@ class ApiConfig {
   ///   --dart-define=IS_PRODUCTION=true
   static const bool isProduction = bool.fromEnvironment(
     'IS_PRODUCTION',
-    defaultValue: true,
+    defaultValue: false,
   );
 
   /// Local base URL (emulator / device hitting your dev machine).
@@ -81,4 +81,10 @@ class ApiConfig {
 
   /// GET/POST ${ApiConfig.apiBaseUrl}/purchase-orders
   static String get purchaseOrders => '$apiBaseUrl/purchase-orders';
+
+  /// GET ${ApiConfig.apiBaseUrl}/purchase-vouchers
+  static String get purchaseVouchers => '$apiBaseUrl/purchase-vouchers';
+
+  /// POST ${ApiConfig.apiBaseUrl}/purchase-vouchers
+  static String get createPurchaseVoucher => '$apiBaseUrl/purchase-vouchers';
 }
