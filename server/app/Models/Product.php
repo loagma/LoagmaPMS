@@ -30,5 +30,17 @@ class Product extends Model
      * Legacy table does not have Laravel timestamps.
      */
     public $timestamps = false;
+
+    public function taxes()
+    {
+        return $this->belongsToMany(Tax::class, 'product_taxes')
+            ->withPivot('tax_percent')
+            ->withTimestamps();
+    }
+
+    public function productTaxes()
+    {
+        return $this->hasMany(ProductTax::class, 'product_id', 'product_id');
+    }
 }
 

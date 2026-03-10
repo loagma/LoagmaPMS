@@ -12,6 +12,8 @@ use App\Http\Controllers\VendorProductController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SupplierProductController;
 use App\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\TaxController;
+use App\Http\Controllers\ProductTaxController;
 
 Route::get('/health', [HealthController::class, 'index']);
 Route::get('/products', [ProductController::class, 'index']);
@@ -74,4 +76,16 @@ Route::post('/purchase-orders', [PurchaseOrderController::class, 'store']);
 Route::get('/purchase-orders/{id}', [PurchaseOrderController::class, 'show']);
 Route::put('/purchase-orders/{id}', [PurchaseOrderController::class, 'update']);
 Route::delete('/purchase-orders/{id}', [PurchaseOrderController::class, 'destroy']);
+
+// Tax routes
+Route::get('/taxes', [TaxController::class, 'index']);
+Route::post('/taxes', [TaxController::class, 'store']);
+Route::get('/taxes/{id}', [TaxController::class, 'show'])->where('id', '[0-9]+');
+Route::put('/taxes/{id}', [TaxController::class, 'update'])->where('id', '[0-9]+');
+Route::delete('/taxes/{id}', [TaxController::class, 'destroy'])->where('id', '[0-9]+');
+
+// Product Tax routes
+Route::get('/product-taxes', [ProductTaxController::class, 'index']);
+Route::post('/product-taxes', [ProductTaxController::class, 'store']);
+Route::delete('/product-taxes/{id}', [ProductTaxController::class, 'destroy'])->where('id', '[0-9]+');
 
