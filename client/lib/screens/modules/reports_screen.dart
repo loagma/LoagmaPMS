@@ -7,9 +7,11 @@ import 'bom_list_screen.dart';
 import 'inventory_list_screen.dart';
 import 'issue_to_production_list_screen.dart';
 import 'purchase_order_list_screen.dart';
+import 'purchase_voucher_list_screen.dart';
 import 'receive_from_production_list_screen.dart';
 import 'stock_voucher_list_screen.dart';
 import 'supplier_list_screen.dart';
+import 'tax_list_screen.dart';
 
 class ReportsScreen extends StatelessWidget {
   const ReportsScreen({super.key});
@@ -84,6 +86,14 @@ class ReportsScreen extends StatelessWidget {
                 },
               ),
               _ReportCard(
+                title: 'Purchase Vouchers',
+                subtitle: 'View all purchase invoices',
+                icon: Icons.receipt_long_outlined,
+                onTap: () {
+                  Get.to(() => const PurchaseVoucherListScreen());
+                },
+              ),
+              _ReportCard(
                 title: 'Stock Voucher',
                 subtitle: 'View all stock vouchers',
                 icon: Icons.receipt_long_outlined,
@@ -113,6 +123,14 @@ class ReportsScreen extends StatelessWidget {
                 icon: Icons.edit_note_rounded,
                 onTap: () {
                   Get.toNamed(AppRoutes.supplierProductList);
+                },
+              ),
+              _ReportCard(
+                title: 'Taxes',
+                subtitle: 'View all tax definitions',
+                icon: Icons.account_balance_outlined,
+                onTap: () {
+                  Get.to(() => const TaxListScreen());
                 },
               ),
             ];

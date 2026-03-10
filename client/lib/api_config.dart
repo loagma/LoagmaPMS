@@ -87,4 +87,10 @@ class ApiConfig {
 
   /// POST ${ApiConfig.apiBaseUrl}/purchase-vouchers
   static String get createPurchaseVoucher => '$apiBaseUrl/purchase-vouchers';
+
+  /// GET/POST ${ApiConfig.apiBaseUrl}/taxes
+  static String get taxes => '$apiBaseUrl/taxes';
+
+  /// GET/POST ${ApiConfig.apiBaseUrl}/product-taxes
+  static String get productTaxes => '$apiBaseUrl/product-taxes';
 }

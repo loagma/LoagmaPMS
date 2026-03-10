@@ -17,6 +17,9 @@ import '../screens/modules/supplier_list_for_products_screen.dart';
 import '../screens/modules/purchase_order_form_screen.dart';
 import '../screens/modules/purchase_voucher_list_screen.dart';
 import '../screens/modules/purchase_voucher_screen.dart';
+import '../screens/modules/tax_list_screen.dart';
+import '../screens/modules/tax_form_screen.dart';
+import '../screens/modules/product_tax_form_screen.dart';
 
 /// Central route names. Use these instead of raw strings.
 abstract class AppRoutes {
@@ -41,6 +44,9 @@ abstract class AppRoutes {
   static const String purchaseOrderForm = '/purchase-order-form';
   static const String purchaseVoucherList = '/purchase-vouchers';
   static const String purchaseVoucher = '/purchase-voucher';
+  static const String taxList = '/taxes';
+  static const String taxForm = '/tax-form';
+  static const String productTaxForm = '/product-tax-form';
 }
 
 /// All app routes. Used by [GetMaterialApp] in [main.dart].
@@ -95,5 +101,17 @@ final List<GetPage<dynamic>> appPages = [
     page: () => PurchaseVoucherScreen(
       voucherId: Get.arguments is int ? Get.arguments as int? : null,
     ),
+  ),
+  GetPage(
+    name: AppRoutes.taxList,
+    page: () => const TaxListScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.taxForm,
+    page: () => TaxFormScreen(taxId: Get.arguments is int ? Get.arguments as int? : null),
+  ),
+  GetPage(
+    name: AppRoutes.productTaxForm,
+    page: () => const ProductTaxFormScreen(),
   ),
 ];

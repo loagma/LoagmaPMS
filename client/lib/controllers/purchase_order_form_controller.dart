@@ -127,6 +127,60 @@ class PurchaseOrderFormController extends GetxController {
   Future<List<Map<String, dynamic>>> searchProducts(String query) =>
       _searchAllProducts(query);
 
+  /// Fetches product taxes for a product and applies them to the given row.
+  /// Maps tax_name/tax_sub_category to sgst, cgst, igst, cess, roff.
+  /// Sets taxPercent to the sum of all tax percentages for API compatibility.
+  Future<void> applyProductTaxesToRow(POLineRow row, int productId) async {
+    try {
+      final uri = Uri.parse(ApiConfig.productTaxes).replace(
+        queryParameters: {'product_id': productId.toString(), 'limit': '50'},
+      );
+      final response = await http
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) return;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) return;
+      final List list = data['data'] ?? [];
+      double totalPercent = 0;
+      for (final e in list) {
+        final map = e as Map<String, dynamic>;
+        final tax = map['tax'] as Map<String, dynamic>?;
+        final taxName = (tax?['tax_name'] ?? tax?['tax_sub_category'] ?? '')
+            .toString()
+            .toUpperCase();
+        final taxSub = (tax?['tax_sub_category'] ?? '')
+            .toString()
+            .toUpperCase();
+        final percent = (map['tax_percent'] ?? 0) is num
+            ? (map['tax_percent'] as num).toDouble()
+            : double.tryParse(map['tax_percent']?.toString() ?? '') ?? 0;
+        totalPercent += percent;
+        if (_matchesTax(taxName, taxSub, 'SGST')) {
+          row.sgst.value = percent.toStringAsFixed(2);
+        } else if (_matchesTax(taxName, taxSub, 'CGST')) {
+          row.cgst.value = percent.toStringAsFixed(2);
+        } else if (_matchesTax(taxName, taxSub, 'IGST')) {
+          row.igst.value = percent.toStringAsFixed(2);
+        } else if (_matchesTax(taxName, taxSub, 'CESS')) {
+          row.cess.value = percent.toStringAsFixed(2);
+        } else if (_matchesTax(taxName, taxSub, 'ROFF') ||
+            taxName.contains('ROUND')) {
+          row.roff.value = percent.toStringAsFixed(2);
+        }
+      }
+      if (totalPercent > 0) {
+        row.taxPercent.value = totalPercent.toStringAsFixed(2);
+      }
+    } catch (e) {
+      debugPrint('[PO FORM] Fetch product taxes error: $e');
+    }
+  }
+
+  bool _matchesTax(String taxName, String taxSub, String key) {
+    return taxName.contains(key) || taxSub.contains(key);
+  }
+
   void _setDefaultDocDate() {
     final now = DateTime.now();
     docDate.value =
@@ -299,7 +353,15 @@ class PurchaseOrderFormController extends GetxController {
           final qty = double.tryParse(r.quantity.value) ?? 0;
           final price = double.tryParse(r.price.value) ?? 0;
           final discount = double.tryParse(r.discountPercent.value);
-          final tax = double.tryParse(r.taxPercent.value);
+          final sgst = double.tryParse(r.sgst.value) ?? 0;
+          final cgst = double.tryParse(r.cgst.value) ?? 0;
+          final igst = double.tryParse(r.igst.value) ?? 0;
+          final cess = double.tryParse(r.cess.value) ?? 0;
+          final roff = double.tryParse(r.roff.value) ?? 0;
+          final taxFromBreakdown = sgst + cgst + igst + cess + roff;
+          final tax = taxFromBreakdown > 0
+              ? taxFromBreakdown
+              : (double.tryParse(r.taxPercent.value));
           return {
             'product_id': productId,
             'line_no': e.key + 1,
@@ -415,12 +477,23 @@ class POLineRow {
   /// Price excluding tax (stored).
   double get priceExclTax => double.tryParse(price.value) ?? 0;
 
+  /// Total tax percent from breakdown (sgst+cgst+igst+cess+roff) or taxPercent.
+  double get _effectiveTaxPercent {
+    final sgst = double.tryParse(this.sgst.value) ?? 0;
+    final cgst = double.tryParse(this.cgst.value) ?? 0;
+    final igst = double.tryParse(this.igst.value) ?? 0;
+    final cess = double.tryParse(this.cess.value) ?? 0;
+    final roff = double.tryParse(this.roff.value) ?? 0;
+    final fromBreakdown = sgst + cgst + igst + cess + roff;
+    if (fromBreakdown > 0) return fromBreakdown;
+    return double.tryParse(taxPercent.value) ?? 0;
+  }
+
   /// Price including tax (computed).
   double get priceInclTax {
     final raw = double.tryParse(price.value) ?? 0;
-    final t = double.tryParse(taxPercent.value) ?? 0;
+    final t = _effectiveTaxPercent;
     if (isInclusiveTax.value) {
-      // User entered price already includes tax.
       return raw;
     }
     return raw * (1 + t / 100);
@@ -443,9 +516,8 @@ class POLineRow {
         ? _priceExclFromInclusive()
         : (double.tryParse(price.value) ?? 0);
     final d = double.tryParse(discountPercent.value) ?? 0;
-    final t = double.tryParse(taxPercent.value) ?? 0;
+    final t = _effectiveTaxPercent;
     if (isInclusiveTax.value) {
-      // When price already includes tax, apply discount then multiply by qty.
       final pIncl = double.tryParse(price.value) ?? 0;
       return qty * pIncl * (1 - d / 100);
     }
@@ -454,7 +526,7 @@ class POLineRow {
 
   double _priceExclFromInclusive() {
     final pIncl = double.tryParse(price.value) ?? 0;
-    final t = double.tryParse(taxPercent.value) ?? 0;
+    final t = _effectiveTaxPercent;
     if (t <= 0) return pIncl;
     return pIncl / (1 + t / 100);
   }

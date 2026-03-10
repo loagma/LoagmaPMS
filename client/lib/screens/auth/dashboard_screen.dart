@@ -210,10 +210,18 @@ class DashboardScreen extends StatelessWidget {
                 ),
                 _ModuleCard(
                   title: 'Purchase Voucher',
-                  subtitle: 'Record purchase invoices',
+                  subtitle: 'Create purchase invoice',
                   icon: Icons.description_outlined,
                   onTap: () {
-                    Get.toNamed(AppRoutes.purchaseVoucherList);
+                    Get.toNamed(AppRoutes.purchaseVoucher);
+                  },
+                ),
+                _ModuleCard(
+                  title: 'Taxes',
+                  subtitle: 'Create tax definition',
+                  icon: Icons.account_balance_outlined,
+                  onTap: () {
+                    Get.toNamed(AppRoutes.taxForm);
                   },
                 ),
                 _ModuleCard(
@@ -398,7 +406,15 @@ class _DashboardDrawer extends StatelessWidget {
                     label: 'Purchase Voucher',
                     onTap: () {
                       Navigator.of(context).pop();
-                      Get.toNamed(AppRoutes.purchaseVoucherList);
+                      Get.toNamed(AppRoutes.purchaseVoucher);
+                    },
+                  ),
+                  _DrawerItem(
+                    icon: Icons.account_balance_outlined,
+                    label: 'Taxes',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      Get.toNamed(AppRoutes.taxForm);
                     },
                   ),
                   const Divider(height: 1, indent: 16, endIndent: 16),

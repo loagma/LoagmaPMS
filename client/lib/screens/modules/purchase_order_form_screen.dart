@@ -615,7 +615,7 @@ class _ProductPicker extends StatelessWidget {
                         if (pid != null) {
                           row.productId.value = pid;
                           row.productName.value = product['name']?.toString() ?? '';
-                          // Keep FormField state in sync so validation error clears immediately.
+                          await controller.applyProductTaxesToRow(row, pid);
                           state.didChange(pid);
                           state.validate();
                         }
