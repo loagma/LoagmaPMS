@@ -200,3 +200,35 @@ CREATE TABLE IF NOT EXISTS `purchase_order_items` (
     CONSTRAINT `purchase_order_items_product_foreign`
         FOREIGN KEY (`product_id`) REFERENCES `product` (`product_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+-- 2026-03-09: Taxes master and product-tax assignments
+CREATE TABLE IF NOT EXISTS `taxes` (
+    `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+    `tax_category` varchar(100) NOT NULL,
+    `tax_sub_category` varchar(100) NOT NULL,
+    `tax_name` varchar(150) NOT NULL,
+    `is_active` tinyint(1) NOT NULL DEFAULT 1,
+    `created_at` timestamp NULL DEFAULT NULL,
+    `updated_at` timestamp NULL DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    KEY `taxes_category_sub_index` (`tax_category`, `tax_sub_category`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `product_taxes` (
+    `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+    `product_id` bigint unsigned NOT NULL,
+    `tax_id` bigint unsigned NOT NULL,
+    `tax_percent` decimal(5,2) NOT NULL,
+    `created_at` timestamp NULL DEFAULT NULL,
+    `updated_at` timestamp NULL DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `product_taxes_product_id_tax_id_unique` (`product_id`, `tax_id`),
+    KEY `product_taxes_product_id_index` (`product_id`),
+    KEY `product_taxes_tax_id_index` (`tax_id`),
+    CONSTRAINT `product_taxes_product_id_foreign`
+        FOREIGN KEY (`product_id`) REFERENCES `product` (`product_id`) ON DELETE CASCADE,
+    CONSTRAINT `product_taxes_tax_id_foreign`
+        FOREIGN KEY (`tax_id`) REFERENCES `taxes` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
