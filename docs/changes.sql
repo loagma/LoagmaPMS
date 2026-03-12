@@ -232,3 +232,18 @@ CREATE TABLE IF NOT EXISTS `product_taxes` (
     CONSTRAINT `product_taxes_tax_id_foreign`
         FOREIGN KEY (`tax_id`) REFERENCES `taxes` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+-- 2026-03-12: HSN codes master and per-product order/buffer limits
+CREATE TABLE IF NOT EXISTS `hsn_codes` (
+    `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+    `hsn_code` varchar(50) NOT NULL,
+    `is_active` tinyint(1) NOT NULL DEFAULT 1,
+    `created_at` timestamp NULL DEFAULT NULL,
+    `updated_at` timestamp NULL DEFAULT NULL,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE `product`
+    ADD COLUMN `order_limit` int unsigned NOT NULL DEFAULT 0,
+    ADD COLUMN `buffer_limit` int unsigned NOT NULL DEFAULT 0;

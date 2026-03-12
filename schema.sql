@@ -629,6 +629,8 @@ CREATE TABLE `product` (
   `img_last_updated` int unsigned NOT NULL DEFAULT '0',
   `stock` decimal(10,3) DEFAULT NULL,
   `stock_ut_id` varchar(100) DEFAULT NULL,
+  `order_limit` int unsigned NOT NULL DEFAULT '0',
+  `buffer_limit` int unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`product_id`),
   FULLTEXT KEY `prodNameFullText` (`name`,`keywords`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
@@ -667,6 +669,63 @@ CREATE TABLE `product_purchase` (
   `post_date` int unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`item_id`),
   UNIQUE KEY `day_id` (`day_id`,`product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `hsn_codes`
+--
+
+DROP TABLE IF EXISTS `hsn_codes`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `hsn_codes` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `hsn_code` varchar(50) NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `taxes`
+--
+
+DROP TABLE IF EXISTS `taxes`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `taxes` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `tax_category` varchar(100) NOT NULL,
+  `tax_sub_category` varchar(100) NOT NULL,
+  `tax_name` varchar(150) NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `product_taxes`
+--
+
+DROP TABLE IF EXISTS `product_taxes`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `product_taxes` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `product_id` bigint unsigned NOT NULL,
+  `tax_id` int unsigned NOT NULL,
+  `tax_percent` decimal(5,2) NOT NULL,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_product_taxes_product_id` (`product_id`),
+  KEY `idx_product_taxes_tax_id` (`tax_id`),
+  CONSTRAINT `fk_product_taxes_product` FOREIGN KEY (`product_id`) REFERENCES `product` (`product_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_product_taxes_tax` FOREIGN KEY (`tax_id`) REFERENCES `taxes` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
