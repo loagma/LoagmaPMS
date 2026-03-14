@@ -21,8 +21,13 @@ class CategoryController extends Controller
             }
 
             if ($request->filled('search')) {
-                $search = $request->input('search');
-                $query->where('name', 'like', "%{$search}%");
+                $search = trim((string) $request->input('search'));
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', '%' . $search . '%');
+                    if (is_numeric($search)) {
+                        $q->orWhere('cat_id', (int) $search);
+                    }
+                });
             }
 
             if ($request->has('only_active')) {

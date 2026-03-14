@@ -2,14 +2,139 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/product_form_controller.dart';
+import '../../models/category_model.dart';
 import '../../router/app_router.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
+
+Category? _firstWhereOrNull(List<Category> list, bool Function(Category) test) {
+  for (final item in list) {
+    if (test(item)) return item;
+  }
+  return null;
+}
 
 class ProductFormScreen extends StatelessWidget {
   final int? productId;
 
   const ProductFormScreen({super.key, this.productId});
+
+  Future<Category?> _pickCategory(
+    BuildContext context, {
+    required String title,
+    required List<Category> items,
+    bool allowNone = false,
+  }) async {
+    return showModalBottomSheet<Category?>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        String query = '';
+
+        List<Category> filtered() {
+          final q = query.trim().toLowerCase();
+          if (q.isEmpty) return items;
+          final isNumeric = int.tryParse(q) != null;
+          return items.where((c) {
+            final nameMatch = c.name.toLowerCase().contains(q);
+            if (isNumeric) {
+              final idStr = c.catId.toString();
+              return nameMatch || idStr.contains(q);
+            }
+            return nameMatch;
+          }).toList();
+        }
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final list = filtered();
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 8,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 12,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(context).pop(null),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
+                    ),
+                    TextField(
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        hintText: 'Search by name or ID...',
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onChanged: (v) => setState(() => query = v),
+                    ),
+                    const SizedBox(height: 12),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.height * 0.55,
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: list.length + (allowNone ? 1 : 0),
+                          separatorBuilder: (_, __) =>
+                              const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            if (allowNone && index == 0) {
+                              return ListTile(
+                                leading: const Icon(Icons.block_rounded),
+                                title: const Text('None (category only)'),
+                                onTap: () => Navigator.of(context).pop(null),
+                              );
+                            }
+                            final item = list[index - (allowNone ? 1 : 0)];
+                            return ListTile(
+                              title: Text(
+                                item.name,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text('ID: ${item.catId}'),
+                              trailing: const Icon(
+                                Icons.chevron_right_rounded,
+                                color: AppColors.textMuted,
+                              ),
+                              onTap: () => Navigator.of(context).pop(item),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -256,20 +381,166 @@ class _ProductStepOne extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            Obx(
-              () => TextFormField(
-                initialValue: controller.ctypeId.value,
-                decoration: AppInputDecoration.standard(
-                  labelText: 'Cart Type *',
-                  hintText: 'e.g. Vegetables & Fruits',
+            const Text(
+              'Category',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textDark,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Obx(() {
+              if (controller.categories.isEmpty) {
+                return const SizedBox(
+                  height: 48,
+                  child: Center(
+                    child: Text(
+                      'Loading categories...',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ),
+                );
+              }
+              final selected = _firstWhereOrNull(
+                controller.categories,
+                (c) => c.catId == controller.selectedCategoryId.value,
+              );
+
+              return TextFormField(
+                readOnly: true,
+                controller: TextEditingController(
+                  text: selected == null
+                      ? ''
+                      : '${selected.name} (ID: ${selected.catId})',
                 ),
-                onChanged: (v) => controller.ctypeId.value = v,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return 'Required';
+                decoration: AppInputDecoration.standard(
+                  labelText: 'Category *',
+                  hintText: 'Tap to select category',
+                  suffixIcon: const Icon(Icons.arrow_drop_down_rounded),
+                ),
+                onTap: () async {
+                  final picked = await (context
+                          .findAncestorWidgetOfExactType<ProductFormScreen>()
+                      as ProductFormScreen)
+                      ._pickCategory(
+                    context,
+                    title: 'Select Category',
+                    items: controller.categories,
+                  );
+                  if (picked != null) {
+                    controller.onCategoryChanged(picked.catId);
+                  }
+                },
+                validator: (_) {
+                  if (controller.selectedCategoryId.value == 0) {
+                    return 'Please select a category';
                   }
                   return null;
                 },
+              );
+            }),
+            const SizedBox(height: 16),
+            Obx(() {
+              if (controller.selectedCategoryId.value == 0) {
+                return const SizedBox.shrink();
+              }
+              if (controller.subcategories.isEmpty) {
+                return const SizedBox.shrink();
+              }
+              final selectedSub = _firstWhereOrNull(
+                controller.subcategories,
+                (c) => c.catId == controller.selectedSubcategoryId.value,
+              );
+
+              return TextFormField(
+                readOnly: true,
+                controller: TextEditingController(
+                  text: selectedSub == null
+                      ? ''
+                      : '${selectedSub.name} (ID: ${selectedSub.catId})',
+                ),
+                decoration: AppInputDecoration.standard(
+                  labelText: 'Subcategory',
+                  hintText: 'Optional – tap to select subcategory',
+                  suffixIcon: const Icon(Icons.arrow_drop_down_rounded),
+                ),
+                onTap: () async {
+                  final picked = await (context
+                          .findAncestorWidgetOfExactType<ProductFormScreen>()
+                      as ProductFormScreen)
+                      ._pickCategory(
+                    context,
+                    title: 'Select Subcategory',
+                    items: controller.subcategories,
+                    allowNone: true,
+                  );
+                  // allowNone=true: null means "none"
+                  controller.selectedSubcategoryId.value = picked?.catId ?? 0;
+                },
+              );
+            }),
+            const SizedBox(height: 16),
+            Obx(
+              () => DropdownButtonFormField<String>(
+                value: controller.ctypeId.value.isEmpty
+                    ? 'vegetables_fruits'
+                    : controller.ctypeId.value,
+                isExpanded: true,
+                decoration: AppInputDecoration.standard(
+                  labelText: 'Cart Type *',
+                  hintText: 'Select cart type',
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'vegetables_fruits',
+                    child: Text('Vegetables & Fruits'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'grocery',
+                    child: Text('Grocery'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'dairy',
+                    child: Text('Dairy'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'meat_seafood',
+                    child: Text('Meat & Seafood'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'bakery',
+                    child: Text('Bakery'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'beverages',
+                    child: Text('Beverages'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'snacks',
+                    child: Text('Snacks'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'household',
+                    child: Text('Household'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'personal_care',
+                    child: Text('Personal Care'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'other',
+                    child: Text('Other'),
+                  ),
+                ],
+                onChanged: (v) {
+                  if (v != null) controller.ctypeId.value = v;
+                },
+                validator: (v) =>
+                    v == null || v.isEmpty ? 'Required' : null,
               ),
             ),
             const SizedBox(height: 16),
@@ -319,13 +590,30 @@ class _ProductStepOne extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Obx(
-              () => TextFormField(
-                initialValue: controller.defaultUnit.value,
+              () => DropdownButtonFormField<String>(
+                value: controller.defaultUnit.value.isEmpty
+                    ? 'WEIGHT'
+                    : controller.defaultUnit.value,
+                isExpanded: true,
                 decoration: AppInputDecoration.standard(
-                  labelText: 'Unit Type',
-                  hintText: 'WEIGHT, QUANTITY, LITRE, METER',
+                  labelText: 'Unit Type (Input Type)',
+                  hintText: 'Select unit type',
                 ),
-                onChanged: (v) => controller.defaultUnit.value = v,
+                items: const [
+                  DropdownMenuItem(value: 'WEIGHT', child: Text('WEIGHT')),
+                  DropdownMenuItem(value: 'QUANTITY', child: Text('QUANTITY')),
+                  DropdownMenuItem(value: 'LITRE', child: Text('LITRE')),
+                  DropdownMenuItem(value: 'METER', child: Text('METER')),
+                  DropdownMenuItem(value: 'GM', child: Text('GM')),
+                  DropdownMenuItem(value: 'KG', child: Text('KG')),
+                  DropdownMenuItem(value: 'ML', child: Text('ML')),
+                  DropdownMenuItem(value: 'PIECE', child: Text('PIECE')),
+                  DropdownMenuItem(value: 'BOX', child: Text('BOX')),
+                  DropdownMenuItem(value: 'PACK', child: Text('PACK')),
+                ],
+                onChanged: (v) {
+                  if (v != null) controller.defaultUnit.value = v;
+                },
               ),
             ),
             const SizedBox(height: 24),

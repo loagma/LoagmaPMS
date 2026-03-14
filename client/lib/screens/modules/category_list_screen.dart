@@ -93,7 +93,7 @@ class CategoryListScreen extends StatelessWidget {
               onChanged: controller.onSearchChanged,
               onSubmitted: controller.onSearchSubmit,
               decoration: InputDecoration(
-                hintText: 'Search by name...',
+                hintText: 'Search by name or ID...',
                 prefixIcon: const Icon(
                   Icons.search,
                   color: AppColors.textMuted,
@@ -181,12 +181,15 @@ class CategoryListScreen extends StatelessWidget {
                 );
               }
 
-              return RefreshIndicator(
-                onRefresh: controller.refreshCategories,
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: controller.categories.length,
-                  itemBuilder: (context, index) {
+              return Column(
+                children: [
+                  Expanded(
+                    child: RefreshIndicator(
+                      onRefresh: controller.refreshCategories,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: controller.categories.length,
+                        itemBuilder: (context, index) {
                     final category = controller.categories[index];
                     return _CategoryCard(
                       category: category,
@@ -242,6 +245,60 @@ class CategoryListScreen extends StatelessWidget {
                     );
                   },
                 ),
+              ),
+            ),
+            Obx(() {
+              final total = controller.totalCount.value;
+              final pages = controller.totalPages.value;
+              if (pages <= 1 && total <= CategoryListController.pageLimit) {
+                return const SizedBox.shrink();
+              }
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border(
+                    top: BorderSide(color: AppColors.border),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left_rounded),
+                      onPressed: controller.currentPage.value > 1
+                          ? () => controller.goToPage(
+                                controller.currentPage.value - 1,
+                              )
+                          : null,
+                      tooltip: 'Previous page',
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'Page ${controller.currentPage.value} of ${controller.totalPages.value} (${controller.totalCount.value} total)',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textDark,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right_rounded),
+                      onPressed: controller.currentPage.value <
+                              controller.totalPages.value
+                          ? () => controller.goToPage(
+                                controller.currentPage.value + 1,
+                              )
+                          : null,
+                      tooltip: 'Next page',
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
               );
             }),
           ),

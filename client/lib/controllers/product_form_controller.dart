@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 
 import '../api_config.dart';
+import '../models/category_model.dart';
 import '../models/product_model.dart';
 
 /// UI model for a single package row in the wizard.
@@ -85,8 +86,14 @@ class ProductFormController extends GetxController {
   final ctypeId = 'vegetables_fruits'.obs;
   final seqNo = ''.obs;
 
+  // Category (parent_cat_id=0) and Subcategory (parent_cat_id=category.cat_id)
+  final categories = <Category>[].obs;
+  final subcategories = <Category>[].obs;
+  final selectedCategoryId = 0.obs;
+  final selectedSubcategoryId = 0.obs;
+
   final productType = 'SINGLE'.obs;
-  final defaultUnit = ''.obs;
+  final defaultUnit = 'WEIGHT'.obs;
   final orderLimit = ''.obs;
   final bufferLimit = ''.obs;
 
@@ -105,8 +112,76 @@ class ProductFormController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    _init();
+  }
+
+  Future<void> _init() async {
+    await _loadCategories();
     if (productId != null) {
-      _loadProduct();
+      await _loadProduct();
+    }
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final response = await http.get(
+        Uri.parse(ApiConfig.categories).replace(
+          queryParameters: {'parent_cat_id': '0'},
+        ),
+        headers: {'Accept': 'application/json'},
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        if (data['success'] == true) {
+          final List list = data['data'] ?? [];
+          categories.value = list
+              .map((e) => Category.fromJson(e as Map<String, dynamic>))
+              .toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('[PRODUCT_FORM] Load categories error: $e');
+    }
+  }
+
+  Future<void> loadSubcategoriesForCategory(int parentCatId) async {
+    if (parentCatId == 0) {
+      subcategories.clear();
+      return;
+    }
+    try {
+      final response = await http.get(
+        Uri.parse(ApiConfig.categories).replace(
+          queryParameters: {'parent_cat_id': parentCatId.toString()},
+        ),
+        headers: {'Accept': 'application/json'},
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        if (data['success'] == true) {
+          final List list = data['data'] ?? [];
+          subcategories.value = list
+              .map((e) => Category.fromJson(e as Map<String, dynamic>))
+              .toList();
+        } else {
+          subcategories.clear();
+        }
+      } else {
+        subcategories.clear();
+      }
+    } catch (e) {
+      debugPrint('[PRODUCT_FORM] Load subcategories error: $e');
+      subcategories.clear();
+    }
+  }
+
+  void onCategoryChanged(int? catId) {
+    selectedCategoryId.value = catId ?? 0;
+    selectedSubcategoryId.value = 0;
+    if (catId != null && catId != 0) {
+      loadSubcategoriesForCategory(catId);
+    } else {
+      subcategories.clear();
     }
   }
 
@@ -119,6 +194,13 @@ class ProductFormController extends GetxController {
     // Rely on form validators for now; they run on overall form submit.
     // Here we just check essential fields from controller state.
     return name.value.trim().isNotEmpty;
+  }
+
+  static int _intFromJson(dynamic v) {
+    if (v == null) return 0;
+    if (v is int) return v;
+    if (v is String) return int.tryParse(v) ?? 0;
+    return 0;
   }
 
   bool validateStep2() {
@@ -161,6 +243,19 @@ class ProductFormController extends GetxController {
           brand.value = productJson['brand']?.toString() ?? '';
           ctypeId.value = productJson['ctype_id']?.toString() ?? 'vegetables_fruits';
           seqNo.value = productJson['seq_no']?.toString() ?? '';
+
+          // Category & subcategory (product has cat_id, parent_cat_id)
+          final int catId = _intFromJson(productJson['cat_id']);
+          final int parentCatId = _intFromJson(productJson['parent_cat_id']);
+          if (parentCatId != 0) {
+            selectedCategoryId.value = parentCatId;
+            selectedSubcategoryId.value = catId;
+            loadSubcategoriesForCategory(parentCatId);
+          } else {
+            selectedCategoryId.value = catId;
+            selectedSubcategoryId.value = 0;
+            if (catId != 0) loadSubcategoriesForCategory(catId);
+          }
 
           // Inventory
           productType.value =
@@ -241,6 +336,13 @@ class ProductFormController extends GetxController {
 
     isSaving.value = true;
     try {
+      final int catId = selectedSubcategoryId.value != 0
+          ? selectedSubcategoryId.value
+          : selectedCategoryId.value;
+      final int parentCatId = selectedSubcategoryId.value != 0
+          ? selectedCategoryId.value
+          : 0;
+
       final payload = <String, dynamic>{
         // Basic info
         'product_name': name.value.trim(),
@@ -250,6 +352,9 @@ class ProductFormController extends GetxController {
         'brand': brand.value.trim(),
         'ctype_id': ctypeId.value.trim(),
         'seq_no': int.tryParse(seqNo.value.trim()) ?? 0,
+
+        'cat_id': catId,
+        'parent_cat_id': parentCatId,
 
         // Inventory
         'inventory_type': productType.value,

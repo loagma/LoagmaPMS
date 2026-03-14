@@ -17,6 +17,11 @@ class CategoryListController extends GetxController {
   final searchQuery = ''.obs;
   final showOnlyActive = true.obs;
 
+  final currentPage = 1.obs;
+  final totalPages = 1.obs;
+  final totalCount = 0.obs;
+  static const int pageLimit = 20;
+
   final searchController = TextEditingController();
   Timer? _searchDebounce;
 
@@ -44,6 +49,7 @@ class CategoryListController extends GetxController {
     if (query == searchQuery.value) return;
     _searchDebounce = Timer(const Duration(milliseconds: 400), () {
       searchQuery.value = query;
+      currentPage.value = 1;
       fetchCategories();
     });
   }
@@ -52,18 +58,22 @@ class CategoryListController extends GetxController {
   void onSearchSubmit(String value) {
     _searchDebounce?.cancel();
     searchQuery.value = value.trim();
+    currentPage.value = 1;
     fetchCategories();
   }
 
-  Future<void> fetchCategories() async {
+  Future<void> fetchCategories({int? page}) async {
     if (isLoading.value) return;
     try {
       isLoading.value = true;
+      final pageToFetch = page ?? currentPage.value;
       final uri = Uri.parse(ApiConfig.categories).replace(
         queryParameters: {
           'parent_cat_id': parentCatId.toString(),
           if (searchQuery.value.isNotEmpty) 'search': searchQuery.value,
           if (showOnlyActive.value) 'only_active': '1',
+          'page': pageToFetch.toString(),
+          'limit': pageLimit.toString(),
         },
       );
       final response = await http
@@ -77,6 +87,12 @@ class CategoryListController extends GetxController {
           categories.value = list
               .map((e) => Category.fromJson(e as Map<String, dynamic>))
               .toList();
+          final pagination = data['pagination'] as Map<String, dynamic>?;
+          if (pagination != null) {
+            currentPage.value = (pagination['page'] as num?)?.toInt() ?? 1;
+            totalPages.value = (pagination['pages'] as num?)?.toInt() ?? 1;
+            totalCount.value = (pagination['total'] as num?)?.toInt() ?? 0;
+          }
         } else {
           throw Exception(data['message'] ?? 'Failed to load categories');
         }
@@ -97,15 +113,23 @@ class CategoryListController extends GetxController {
     }
   }
 
+  void goToPage(int page) {
+    if (page < 1 || page > totalPages.value) return;
+    currentPage.value = page;
+    fetchCategories(page: page);
+  }
+
   void clearSearch() {
     _searchDebounce?.cancel();
     searchController.clear();
     searchQuery.value = '';
+    currentPage.value = 1;
     fetchCategories();
   }
 
   Future<void> toggleActiveFilter(bool onlyActive) async {
     showOnlyActive.value = onlyActive;
+    currentPage.value = 1;
     await fetchCategories();
   }
 
