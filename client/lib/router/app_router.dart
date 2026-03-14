@@ -27,6 +27,8 @@ import '../screens/modules/hsn_code_list_screen.dart';
 import '../screens/modules/hsn_code_form_screen.dart';
 import '../screens/modules/product_package_list_screen.dart';
 import '../screens/modules/product_package_form_screen.dart';
+import '../screens/modules/category_list_screen.dart';
+import '../screens/modules/category_form_screen.dart';
 
 /// Central route names. Use these instead of raw strings.
 abstract class AppRoutes {
@@ -61,6 +63,8 @@ abstract class AppRoutes {
   static const String hsnCodeForm = '/hsn-code-form';
   static const String productPackageList = '/product-packages';
   static const String productPackageForm = '/product-package-form';
+  static const String categoryList = '/categories';
+  static const String categoryForm = '/category-form';
 }
 
 /// All app routes. Used by [GetMaterialApp] in [main.dart].
@@ -164,5 +168,13 @@ final List<GetPage<dynamic>> appPages = [
           ? (Get.arguments as Map)['packageId'] as int?
           : null,
     ),
+  ),
+  GetPage(
+    name: AppRoutes.categoryList,
+    page: () => const CategoryListScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.categoryForm,
+    page: () => const CategoryFormScreen(),
   ),
 ];

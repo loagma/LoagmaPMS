@@ -100,6 +100,12 @@ List<_ProductsTile> get _productsTiles => [
         onTap: () => Get.toNamed(AppRoutes.productTaxForm),
       ),
       _ProductsTile(
+        title: 'Categories',
+        subtitle: 'Manage categories and subcategories',
+        icon: Icons.category_rounded,
+        onTap: () => Get.toNamed(AppRoutes.categoryList),
+      ),
+      _ProductsTile(
         title: 'HSN Codes',
         subtitle: 'Manage HSN code master',
         icon: Icons.qr_code_rounded,

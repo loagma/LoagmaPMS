@@ -99,4 +99,7 @@ class ApiConfig {
 
   /// GET/POST ${ApiConfig.apiBaseUrl}/product-packages
   static String get productPackages => '$apiBaseUrl/product-packages';
+
+  /// GET/POST ${ApiConfig.apiBaseUrl}/categories
+  static String get categories => '$apiBaseUrl/categories';
 }

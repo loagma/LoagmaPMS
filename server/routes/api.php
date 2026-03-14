@@ -14,6 +14,7 @@ use App\Http\Controllers\SupplierProductController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\TaxController;
 use App\Http\Controllers\ProductTaxController;
+use App\Http\Controllers\CategoryController;
 
 Route::get('/health', [HealthController::class, 'index']);
 Route::get('/products', [ProductController::class, 'index']);
@@ -89,3 +90,9 @@ Route::get('/product-taxes', [ProductTaxController::class, 'index']);
 Route::post('/product-taxes', [ProductTaxController::class, 'store']);
 Route::delete('/product-taxes/{id}', [ProductTaxController::class, 'destroy'])->where('id', '[0-9]+');
 
+// Category routes (parent_cat_id=0: category, parent_cat_id>0: subcategory)
+Route::get('/categories', [CategoryController::class, 'index']);
+Route::post('/categories', [CategoryController::class, 'store']);
+Route::get('/categories/{id}', [CategoryController::class, 'show'])->where('id', '[0-9]+');
+Route::put('/categories/{id}', [CategoryController::class, 'update'])->where('id', '[0-9]+');
+Route::delete('/categories/{id}', [CategoryController::class, 'destroy'])->where('id', '[0-9]+');
