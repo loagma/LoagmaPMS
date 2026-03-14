@@ -8,19 +8,34 @@ import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 
 class CategoryListScreen extends StatelessWidget {
-  const CategoryListScreen({super.key});
+  const CategoryListScreen({
+    super.key,
+    this.initialParentCatId,
+    this.initialParentName,
+  });
+
+  /// When opening subcategories from the main list, pass these so navigation is reliable.
+  final int? initialParentCatId;
+  final String? initialParentName;
 
   @override
   Widget build(BuildContext context) {
-    final args = Get.arguments;
     int parentCatId = 0;
     String? parentName;
-    if (args is Map) {
-      parentCatId = args['parentCatId'] is int
-          ? args['parentCatId'] as int
-          : int.tryParse(args['parentCatId']?.toString() ?? '0') ?? 0;
-      parentName = args['parentName']?.toString();
+
+    if (initialParentCatId != null) {
+      parentCatId = initialParentCatId!;
+      parentName = initialParentName;
+    } else {
+      final args = Get.arguments;
+      if (args is Map) {
+        parentCatId = args['parentCatId'] is int
+            ? args['parentCatId'] as int
+            : int.tryParse(args['parentCatId']?.toString() ?? '0') ?? 0;
+        parentName = args['parentName']?.toString();
+      }
     }
+
     // Use a tag so subcategories screen has its own controller and doesn't replace the root list.
     final String tag = parentCatId != 0
         ? 'category_list_parent_$parentCatId'
@@ -75,6 +90,8 @@ class CategoryListScreen extends StatelessWidget {
             color: Colors.white,
             child: TextField(
               controller: controller.searchController,
+              onChanged: controller.onSearchChanged,
+              onSubmitted: controller.onSearchSubmit,
               decoration: InputDecoration(
                 hintText: 'Search by name...',
                 prefixIcon: const Icon(
@@ -112,7 +129,6 @@ class CategoryListScreen extends StatelessWidget {
                   vertical: 12,
                 ),
               ),
-              onSubmitted: controller.onSearch,
             ),
           ),
           Expanded(
@@ -182,12 +198,11 @@ class CategoryListScreen extends StatelessWidget {
                           );
                           if (result == true) controller.refreshCategories();
                         } else {
-                          Get.toNamed(
-                            AppRoutes.categoryList,
-                            arguments: {
-                              'parentCatId': category.catId,
-                              'parentName': category.name,
-                            },
+                          Get.to(
+                            () => CategoryListScreen(
+                              initialParentCatId: category.catId,
+                              initialParentName: category.name,
+                            ),
                           );
                         }
                       },
@@ -268,66 +283,80 @@ class _CategoryCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 4,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: category.isActive
-                      ? AppColors.primary
-                      : AppColors.textMuted.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(2),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: category.isActive
+                        ? AppColors.primary
+                        : AppColors.textMuted.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      category.name,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primaryDark,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        category.name,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primaryDark,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      category.isActive ? 'Active' : 'Inactive',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: category.isActive
-                            ? Colors.green
-                            : AppColors.textMuted,
-                        fontWeight: FontWeight.w500,
+                      const SizedBox(height: 4),
+                      Text(
+                        category.isTopLevel
+                            ? 'ID: ${category.catId}'
+                            : 'ID: ${category.catId}  •  Parent ID: ${category.parentCatId}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textMuted,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 2),
+                      Text(
+                        category.isActive ? 'Active' : 'Inactive',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: category.isActive
+                              ? Colors.green
+                              : AppColors.textMuted,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.edit_outlined),
-                onPressed: onEdit,
-                tooltip: 'Edit',
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline_rounded),
-                onPressed: onDelete,
-                tooltip: 'Delete',
-              ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.primaryDark,
-              ),
-            ],
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined),
+                  onPressed: onEdit,
+                  tooltip: 'Edit',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  onPressed: onDelete,
+                  tooltip: 'Delete',
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.primaryDark,
+                ),
+              ],
+            ),
           ),
         ),
       ),

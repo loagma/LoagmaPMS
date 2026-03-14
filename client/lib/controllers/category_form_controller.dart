@@ -18,7 +18,6 @@ class CategoryFormController extends GetxController {
   final name = ''.obs;
   final selectedParentCatId = 0.obs;
   final isActive = true.obs;
-  final type = 0.obs;
 
   final parentCategories = <Category>[].obs;
 
@@ -59,7 +58,6 @@ class CategoryFormController extends GetxController {
           name.value = _currentCategory!.name;
           selectedParentCatId.value = _currentCategory!.parentCatId;
           isActive.value = _currentCategory!.isActive;
-          type.value = _currentCategory!.type;
           if (!_currentCategory!.isTopLevel) {
             await _loadParentCategories();
           }
@@ -111,7 +109,6 @@ class CategoryFormController extends GetxController {
         'name': name.value.trim(),
         'parent_cat_id': parentId,
         'is_active': isActive.value,
-        'type': type.value,
       };
 
       final url = isEditMode

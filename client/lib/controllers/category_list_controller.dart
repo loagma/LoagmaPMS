@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -17,6 +18,7 @@ class CategoryListController extends GetxController {
   final showOnlyActive = true.obs;
 
   final searchController = TextEditingController();
+  Timer? _searchDebounce;
 
   CategoryListController({this.parentCatId = 0, this.parentName});
 
@@ -30,8 +32,27 @@ class CategoryListController extends GetxController {
 
   @override
   void onClose() {
+    _searchDebounce?.cancel();
     searchController.dispose();
     super.onClose();
+  }
+
+  /// Called on every keystroke; debounces and fetches after user stops typing.
+  void onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    final query = value.trim();
+    if (query == searchQuery.value) return;
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () {
+      searchQuery.value = query;
+      fetchCategories();
+    });
+  }
+
+  /// Called when user presses enter; search immediately.
+  void onSearchSubmit(String value) {
+    _searchDebounce?.cancel();
+    searchQuery.value = value.trim();
+    fetchCategories();
   }
 
   Future<void> fetchCategories() async {
@@ -76,12 +97,8 @@ class CategoryListController extends GetxController {
     }
   }
 
-  void onSearch(String query) {
-    searchQuery.value = query.trim();
-    fetchCategories();
-  }
-
   void clearSearch() {
+    _searchDebounce?.cancel();
     searchController.clear();
     searchQuery.value = '';
     fetchCategories();

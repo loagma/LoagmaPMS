@@ -142,30 +142,6 @@ class CategoryFormScreen extends StatelessWidget {
                             controlAffinity: ListTileControlAffinity.leading,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Obx(
-                          () => DropdownButtonFormField<int>(
-                            value: controller.type.value,
-                            isExpanded: true,
-                            decoration: AppInputDecoration.standard(
-                              labelText: 'Type',
-                              hintText: '0: Has subcategories, 1: Has products',
-                            ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 0,
-                                child: Text('Has subcategories'),
-                              ),
-                              DropdownMenuItem(
-                                value: 1,
-                                child: Text('Has products'),
-                              ),
-                            ],
-                            onChanged: (v) {
-                              if (v != null) controller.type.value = v;
-                            },
-                          ),
-                        ),
                       ],
                     ),
                   ),
