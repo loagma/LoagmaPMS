@@ -20,6 +20,13 @@ import '../screens/modules/purchase_voucher_screen.dart';
 import '../screens/modules/tax_list_screen.dart';
 import '../screens/modules/tax_form_screen.dart';
 import '../screens/modules/product_tax_form_screen.dart';
+import '../screens/modules/products_home_screen.dart';
+import '../screens/modules/product_list_screen.dart';
+import '../screens/modules/product_form_screen.dart';
+import '../screens/modules/hsn_code_list_screen.dart';
+import '../screens/modules/hsn_code_form_screen.dart';
+import '../screens/modules/product_package_list_screen.dart';
+import '../screens/modules/product_package_form_screen.dart';
 
 /// Central route names. Use these instead of raw strings.
 abstract class AppRoutes {
@@ -47,6 +54,13 @@ abstract class AppRoutes {
   static const String taxList = '/taxes';
   static const String taxForm = '/tax-form';
   static const String productTaxForm = '/product-tax-form';
+  static const String products = '/products';
+  static const String productList = '/product-list';
+  static const String productForm = '/product-form';
+  static const String hsnCodeList = '/hsn-codes';
+  static const String hsnCodeForm = '/hsn-code-form';
+  static const String productPackageList = '/product-packages';
+  static const String productPackageForm = '/product-package-form';
 }
 
 /// All app routes. Used by [GetMaterialApp] in [main.dart].
@@ -113,5 +127,42 @@ final List<GetPage<dynamic>> appPages = [
   GetPage(
     name: AppRoutes.productTaxForm,
     page: () => const ProductTaxFormScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.products,
+    page: () => const ProductsHomeScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.productList,
+    page: () => const ProductListScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.productForm,
+    page: () => ProductFormScreen(
+      productId: Get.arguments is int ? Get.arguments as int? : null,
+    ),
+  ),
+  GetPage(
+    name: AppRoutes.hsnCodeList,
+    page: () => const HsnCodeListScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.hsnCodeForm,
+    page: () => HsnCodeFormScreen(
+      hsnId: Get.arguments is int ? Get.arguments as int? : null,
+    ),
+  ),
+  GetPage(
+    name: AppRoutes.productPackageList,
+    page: () => const ProductPackageListScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.productPackageForm,
+    page: () => ProductPackageFormScreen(
+      productId: Get.arguments is int ? Get.arguments as int : 0,
+      packageId: Get.arguments is Map
+          ? (Get.arguments as Map)['packageId'] as int?
+          : null,
+    ),
   ),
 ];

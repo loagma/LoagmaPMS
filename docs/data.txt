@@ -68,3 +68,27 @@ inventory managmaent -> list of products
 purchase order -> salesman dropdown field , department -> dropdown
 add ons 
 
+
+inp urchase order voucehr no should be shown in form and it should movble 
+roff total of all product
+
+
+purchase order me bhi add on fields qwqd
+
+
+in create product make cart type dropdown also create a db field if needed for carttype
+ Vegetables & Fruits
+Grocery
+Dalry
+Meat & Seafood
+Bakery
+Beverages
+Snacks
+Household
+Personal Care
+Other
+also for input type put dropdown 
+also add category dropdown and fetch it from db show in 1st step only
+
+
+

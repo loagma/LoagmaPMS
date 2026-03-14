@@ -177,11 +177,11 @@ class DashboardScreen extends StatelessWidget {
                   },
                 ),
                 _ModuleCard(
-                  title: 'List of Products',
-                  subtitle: 'View all products',
+                  title: 'Products',
+                  subtitle: 'Configure products & taxes',
                   icon: Icons.inventory_2_outlined,
                   onTap: () {
-                    Get.toNamed(AppRoutes.inventory);
+                    Get.toNamed(AppRoutes.products);
                   },
                 ),
                 _ModuleCard(
@@ -375,6 +375,14 @@ class _DashboardDrawer extends StatelessWidget {
                     onTap: () {
                       Navigator.of(context).pop();
                       Get.toNamed(AppRoutes.stockVoucher);
+                    },
+                  ),
+                  _DrawerItem(
+                    icon: Icons.inventory_2_outlined,
+                    label: 'Products',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      Get.toNamed(AppRoutes.products);
                     },
                   ),
                   _DrawerItem(
