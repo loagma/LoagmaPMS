@@ -18,6 +18,11 @@ class PurchaseOrderFormController extends GetxController {
   final unitTypes = <String>[].obs;
   final viewOnly = false.obs;
 
+  /// Current purchase order number label for navigation/display (e.g. PO-1001 or just 1001).
+  final currentPoNumber = ''.obs;
+  /// Parsed numeric sequence used for previous/next navigation.
+  final RxnInt currentPoSeq = RxnInt();
+
   final financialYear = '25-26'.obs;
   final supplierId = Rxn<int>();
   final docDate = ''.obs;
@@ -42,6 +47,7 @@ class PurchaseOrderFormController extends GetxController {
       _loadPurchaseOrder();
     } else {
       _setDefaultDocDate();
+      _loadNextPoNumberForNew();
       addItem();
     }
   }
@@ -229,6 +235,157 @@ class PurchaseOrderFormController extends GetxController {
     }
   }
 
+  /// For a brand new PO, fetch the latest existing PO and
+  /// set [currentPoNumber] to the next consecutive number.
+  Future<void> _loadNextPoNumberForNew() async {
+    try {
+      final uri = Uri.parse(ApiConfig.purchaseOrders).replace(
+        queryParameters: {
+          'limit': '1',
+        },
+      );
+      final response = await http
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) return;
+      final List list = data['data'] ?? [];
+      if (list.isEmpty) {
+        currentPoSeq.value = 1;
+        currentPoNumber.value = '1';
+        return;
+      }
+      final last = list.first as Map<String, dynamic>;
+      final next = _nextSequenceFromRaw(
+        last['po_number']?.toString(),
+        last['id'],
+      );
+      currentPoSeq.value = next;
+      currentPoNumber.value = next.toString();
+    } catch (e) {
+      debugPrint('[PO FORM] Next PO number error: $e');
+    }
+  }
+
+  /// Compute the next integer sequence from a raw po_number or id.
+  int _nextSequenceFromRaw(String? poNumber, dynamic id) {
+    int? base;
+    if (poNumber != null && poNumber.isNotEmpty) {
+      final match = RegExp(r'(\d+)$').firstMatch(poNumber);
+      if (match != null) {
+        base = int.tryParse(match.group(1)!);
+      }
+    }
+    base ??= (id is int) ? id : int.tryParse(id?.toString() ?? '');
+    return (base ?? 0) + 1;
+  }
+
+  void _applyPurchaseOrderToState(PurchaseOrder po) {
+    financialYear.value = po.financialYear ?? '25-26';
+    supplierId.value = po.supplierId;
+    docDate.value = po.docDate;
+    expectedDate.value = po.expectedDate ?? '';
+    status.value = po.status;
+    narration.value = po.narration ?? '';
+    currentPoNumber.value = po.poNumber;
+    // Update numeric sequence from poNumber if possible.
+    if (po.poNumber.isNotEmpty) {
+      final match = RegExp(r'(\d+)$').firstMatch(po.poNumber);
+      if (match != null) {
+        currentPoSeq.value = int.tryParse(match.group(1)!);
+      }
+    }
+    items.clear();
+    for (final item in po.items) {
+      items.add(POLineRow(
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity.toString(),
+        price: item.price.toString(),
+        discountPercent: item.discountPercent?.toString() ?? '',
+        taxPercent: item.taxPercent?.toString() ?? '',
+        unit: item.unit ?? '',
+        description: item.description ?? '',
+      ));
+    }
+    if (items.isEmpty) items.add(POLineRow());
+  }
+
+  /// Load a purchase order by a numeric sequence (voucher number).
+  Future<void> loadBySequence(int seq) async {
+    try {
+      isLoading.value = true;
+      final uri = Uri.parse(ApiConfig.purchaseOrders).replace(
+        queryParameters: {
+          'limit': '1',
+          'search': seq.toString(),
+        },
+      );
+      final response = await http
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) {
+        _showError('Voucher $seq not found');
+        return;
+      }
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) {
+        _showError('Voucher $seq not found');
+        return;
+      }
+      final List list = data['data'] ?? [];
+      if (list.isEmpty) {
+        _showError('Voucher $seq not found');
+        return;
+      }
+      final summary = list.first as Map<String, dynamic>;
+      final idVal = summary['id'];
+      final id = idVal is int ? idVal : int.tryParse(idVal?.toString() ?? '');
+      if (id == null) {
+        _showError('Voucher $seq not found');
+        return;
+      }
+
+      // Fetch full details for that purchase order.
+      final detailResp = await http.get(
+        Uri.parse('${ApiConfig.purchaseOrders}/$id'),
+        headers: {'Accept': 'application/json'},
+      );
+      if (detailResp.statusCode != 200) {
+        _showError('Voucher $seq not found');
+        return;
+      }
+      final detailData = jsonDecode(detailResp.body) as Map<String, dynamic>;
+      if (detailData['success'] != true) {
+        _showError('Voucher $seq not found');
+        return;
+      }
+      final poData = detailData['data'] as Map<String, dynamic>;
+      final po = PurchaseOrder.fromJson(poData);
+      _applyPurchaseOrderToState(po);
+      // Navigated vouchers should start in view-only mode.
+      viewOnly.value = true;
+    } catch (e) {
+      debugPrint('[PO FORM] Load by sequence error: $e');
+      _showError('Failed to load voucher');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> goToPreviousVoucher() async {
+    final current = currentPoSeq.value;
+    if (current == null || current <= 1) return;
+    await loadBySequence(current - 1);
+  }
+
+  Future<void> goToNextVoucher() async {
+    final current = currentPoSeq.value;
+    if (current == null) return;
+    await loadBySequence(current + 1);
+  }
+
   Future<void> _loadPurchaseOrder() async {
     if (poId == null) return;
     try {
@@ -248,6 +405,7 @@ class PurchaseOrderFormController extends GetxController {
           expectedDate.value = po.expectedDate ?? '';
           status.value = po.status;
           narration.value = po.narration ?? '';
+          currentPoNumber.value = po.poNumber;
           items.clear();
           for (final item in po.items) {
             items.add(POLineRow(

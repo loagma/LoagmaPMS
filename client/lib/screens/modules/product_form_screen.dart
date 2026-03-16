@@ -695,8 +695,10 @@ class _ProductStepTwo extends StatelessWidget {
                       suffixIcon: const Icon(Icons.arrow_drop_down),
                     ),
                     onTap: () async {
-                      final selected =
-                          await Get.toNamed(AppRoutes.hsnCodeList);
+                      final selected = await Get.toNamed(
+                        AppRoutes.hsnCodeList,
+                        arguments: {'pick': true},
+                      );
                       if (selected is String && selected.isNotEmpty) {
                         controller.hsnCode.value = selected;
                       }

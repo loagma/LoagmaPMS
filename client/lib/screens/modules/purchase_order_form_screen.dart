@@ -29,7 +29,7 @@ class PurchaseOrderFormScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: ModuleAppBar(
-        title: controller.isEditMode ? 'Edit Purchase Order' : 'Create Purchase Order',
+        title: controller.isEditMode ? 'Purchase Order' : 'Create Purchase Order',
         subtitle: 'Loagma',
         onBackPressed: () => Get.back(),
         actions: [
@@ -136,6 +136,55 @@ class _HeaderCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Voucher number row – visible in both create and edit modes.
+          Obx(() {
+            final poNumber = controller.currentPoNumber.value;
+            final labelText = controller.isEditMode
+                ? (poNumber.isEmpty ? 'Existing (no number)' : poNumber)
+                : (poNumber.isEmpty ? 'New (number after save)' : poNumber);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  const Text(
+                    'Voucher No:',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      labelText,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textDark,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    icon: const Icon(Icons.keyboard_arrow_up_rounded, size: 20),
+                    tooltip: 'Previous Voucher',
+                    onPressed: controller.isLoading.value
+                        ? null
+                        : () => controller.goToPreviousVoucher(),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+                    tooltip: 'Next Voucher',
+                    onPressed: controller.isLoading.value
+                        ? null
+                        : () => controller.goToNextVoucher(),
+                  ),
+                ],
+              ),
+            );
+          }),
           Obx(() {
             final list = controller.suppliers;
             return DropdownButtonFormField<int>(

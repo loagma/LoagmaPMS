@@ -21,7 +21,7 @@ class PurchaseVoucherScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: ModuleAppBar(
-        title: controller.isEditMode ? 'Edit Purchase Voucher' : 'Purchase Voucher',
+        title: controller.isEditMode ? 'Purchase Voucher' : 'Purchase Voucher',
         subtitle: 'Record purchase invoice',
         onBackPressed: () => Get.back(),
         actions: [
@@ -220,6 +220,7 @@ class _LinkToPODialogState extends State<_LinkToPODialog> {
   }
 
   Future<void> _onSelectPo(BuildContext context, int poId) async {
+    final nav = Navigator.of(context);
     setState(() => _loading = true);
     final po = await widget.controller.fetchPurchaseOrderById(poId);
     if (!mounted) return;
@@ -235,7 +236,7 @@ class _LinkToPODialogState extends State<_LinkToPODialog> {
       return;
     }
     widget.controller.loadFromPurchaseOrder(po);
-    Navigator.of(context).pop();
+    nav.pop();
   }
 
   @override
@@ -349,32 +350,73 @@ class _HeaderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return ContentCard(
       title: 'Document',
-      titleAction: Obx(() {
-        if (controller.linkedPurchaseOrderId.value == null) return const SizedBox.shrink();
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: AppColors.primaryLight.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.primary),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.link_rounded, size: 16, color: AppColors.primaryDark),
-              const SizedBox(width: 6),
-              Text(
-                'Linked to PO: ${controller.linkedPoNumber.value}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primaryDark,
-                ),
+      titleAction: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Obx(() {
+            if (controller.linkedPurchaseOrderId.value == null) {
+              return const SizedBox.shrink();
+            }
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.primary),
               ),
-            ],
-          ),
-        );
-      }),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.link_rounded, size: 16, color: AppColors.primaryDark),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Linked to PO: ${controller.linkedPoNumber.value}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryDark,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          const SizedBox(height: 4),
+          Obx(() {
+            final docNo = controller.docNoNumber.value.trim().isEmpty
+                ? ''
+                : '${controller.docNoPrefix.value}${controller.docNoNumber.value}';
+            if (docNo.isEmpty) return const SizedBox.shrink();
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Doc No: $docNo',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textDark,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.keyboard_arrow_up_rounded, size: 18),
+                  tooltip: 'Previous Voucher',
+                  onPressed: controller.isLoading.value
+                      ? null
+                      : () => controller.goToPreviousVoucher(),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
+                  tooltip: 'Next Voucher',
+                  onPressed: controller.isLoading.value
+                      ? null
+                      : () => controller.goToNextVoucher(),
+                ),
+              ],
+            );
+          }),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -409,10 +451,10 @@ class _HeaderCard extends StatelessWidget {
                       initialValue: controller.docNoNumber.value,
                       decoration: AppInputDecoration.standard(
                         labelText: 'Doc No *',
-                        hintText: 'e.g. 3055',
+                        hintText: 'Auto',
                       ),
-                      keyboardType: TextInputType.number,
-                      onChanged: controller.setDocNoNumber,
+                      readOnly: true,
+                      enabled: false,
                     )),
               ),
             ],

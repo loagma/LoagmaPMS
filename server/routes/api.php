@@ -15,6 +15,7 @@ use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\TaxController;
 use App\Http\Controllers\ProductTaxController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\HsnCodeController;
 
 Route::get('/health', [HealthController::class, 'index']);
 Route::get('/products', [ProductController::class, 'index']);
@@ -89,6 +90,10 @@ Route::delete('/taxes/{id}', [TaxController::class, 'destroy'])->where('id', '[0
 Route::get('/product-taxes', [ProductTaxController::class, 'index']);
 Route::post('/product-taxes', [ProductTaxController::class, 'store']);
 Route::delete('/product-taxes/{id}', [ProductTaxController::class, 'destroy'])->where('id', '[0-9]+');
+
+// HSN code routes
+Route::get('/hsn-codes', [HsnCodeController::class, 'index']);
+Route::post('/hsn-codes', [HsnCodeController::class, 'store']);
 
 // Category routes (parent_cat_id=0: category, parent_cat_id>0: subcategory)
 Route::get('/categories', [CategoryController::class, 'index']);

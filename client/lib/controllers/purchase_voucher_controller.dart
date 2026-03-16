@@ -54,6 +54,9 @@ class PurchaseVoucherController extends GetxController {
   final isLoading = false.obs;
   final isSaving = false.obs;
 
+  /// Parsed numeric sequence from docNoNumber/docNo used for navigation.
+  final RxnInt currentSeq = RxnInt();
+
   PurchaseVoucherController({this.voucherId});
 
   @override
@@ -64,6 +67,7 @@ class PurchaseVoucherController extends GetxController {
     _loadProducts();
     if (voucherId == null) {
       docDate.value = _formatDate(DateTime.now());
+      _loadNextDocNoNumberForNew();
       addItemRow();
       addChargeRow();
     } else {
@@ -121,57 +125,7 @@ class PurchaseVoucherController extends GetxController {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         if (data['success'] == true) {
           final vData = data['data'] as Map<String, dynamic>?;
-          final v = vData?['voucher'] as Map<String, dynamic>?;
-          if (v != null) {
-            docNoPrefix.value = v['doc_no_prefix']?.toString() ?? '25-26/';
-            docNoNumber.value = v['doc_no_number']?.toString() ?? '';
-            vendorId.value = int.tryParse(v['vendor_id']?.toString() ?? v['supplier_id']?.toString() ?? '');
-            vendorName.value = v['vendor_name']?.toString() ?? v['supplier_name']?.toString() ?? '';
-            docDate.value = v['doc_date']?.toString().split(' ').first ?? _formatDate(DateTime.now());
-            billNo.value = v['bill_no']?.toString() ?? '';
-            narration.value = v['narration']?.toString() ?? '';
-            doNotUpdateInventory.value = v['do_not_update_inventory'] == true;
-            purchaseType.value = v['purchase_type']?.toString() ?? 'Regular';
-            gstReverseCharge.value = v['gst_reverse_charge']?.toString() ?? 'N';
-            billDate.value = v['bill_date']?.toString() ?? '';
-            purchaseAgentId.value = v['purchase_agent_id']?.toString() ?? '';
-          }
-          final itemsData = (vData?['items'] as List?) ?? [];
-          items.clear();
-          for (var item in itemsData) {
-            final map = item as Map<String, dynamic>;
-            final row = PVItemRow();
-            final pid = int.tryParse(map['product_id']?.toString() ?? '');
-            if (pid != null) row.product.value = Product(id: pid, name: map['product_name']?.toString() ?? '', productType: 'SINGLE');
-            row.productCode.value = map['product_code']?.toString() ?? '';
-            row.productName.value = map['product_name']?.toString() ?? '';
-            row.alias.value = map['alias']?.toString() ?? '';
-            row.quantity.value = map['quantity']?.toString() ?? '';
-            row.unitType.value = map['unit']?.toString() ?? 'Nos';
-            row.unitPrice.value = map['unit_price']?.toString() ?? '0';
-            row.taxableAmount.value = map['taxable_amount']?.toString() ?? '0';
-            row.sgst.value = map['sgst']?.toString() ?? '0';
-            row.cgst.value = map['cgst']?.toString() ?? '0';
-            row.igst.value = map['igst']?.toString() ?? '0';
-            row.cess.value = map['cess']?.toString() ?? '0';
-            row.roff.value = map['roff']?.toString() ?? '0';
-            row.value.value = map['value']?.toString() ?? '0';
-            row.purchaseAccount.value = map['purchase_account']?.toString() ?? 'Def Purchase Accounts';
-            row.gstItcEligibility.value = map['gst_itc_eligibility']?.toString() ?? '';
-            items.add(row);
-          }
-          final chargesData = (vData?['charges'] as List?) ?? [];
-          charges.clear();
-          for (var ch in chargesData) {
-            final map = ch as Map<String, dynamic>;
-            final row = PVChargeRow();
-            row.name.value = map['name']?.toString() ?? 'Others';
-            row.amount.value = map['amount']?.toString() ?? '0';
-            row.remarks.value = map['remarks']?.toString() ?? '';
-            charges.add(row);
-          }
-          if (items.isEmpty) addItemRow();
-          if (charges.isEmpty) addChargeRow();
+          _applyVoucherData(vData);
         }
       }
     } catch (e) {
@@ -246,6 +200,48 @@ class PurchaseVoucherController extends GetxController {
       }
     } catch (e) {
       debugPrint('[PURCHASE_VOUCHER] Products error: $e');
+    }
+  }
+
+  /// For a brand new purchase voucher, fetch the latest existing voucher and
+  /// set [docNoNumber] to the next consecutive number.
+  Future<void> _loadNextDocNoNumberForNew() async {
+    try {
+      final uri = Uri.parse(ApiConfig.purchaseVouchers).replace(
+        queryParameters: {
+          'limit': '1',
+        },
+      );
+      final response = await http
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) return;
+      final List list = data['data'] ?? [];
+      if (list.isEmpty) {
+        docNoNumber.value = '1';
+        return;
+      }
+      final last = list.first as Map<String, dynamic>;
+      // Prefer explicit doc_no_number, then numeric suffix of doc_no, then id.
+      int? base = int.tryParse(last['doc_no_number']?.toString() ?? '');
+      if (base == null) {
+        final rawDoc = last['doc_no']?.toString();
+        if (rawDoc != null && rawDoc.isNotEmpty) {
+          final match = RegExp(r'(\d+)$').firstMatch(rawDoc);
+          if (match != null) {
+            base = int.tryParse(match.group(1)!);
+          }
+        }
+      }
+      base ??= (last['id'] is int)
+          ? last['id'] as int
+          : int.tryParse(last['id']?.toString() ?? '');
+      final next = (base ?? 0) + 1;
+      docNoNumber.value = next.toString();
+    } catch (e) {
+      debugPrint('[PURCHASE_VOUCHER] Next doc no error: $e');
     }
   }
 
@@ -333,6 +329,153 @@ class PurchaseVoucherController extends GetxController {
     } catch (e) {
       debugPrint('[PURCHASE_VOUCHER] Products error: $e');
     }
+  }
+
+  void _applyVoucherData(Map<String, dynamic>? vData) {
+    if (vData == null) return;
+    final v = vData['voucher'] as Map<String, dynamic>?;
+    if (v != null) {
+      docNoPrefix.value = v['doc_no_prefix']?.toString() ?? '25-26/';
+      docNoNumber.value = v['doc_no_number']?.toString() ?? '';
+      // update numeric sequence from docNoNumber or doc_no
+      int? base = int.tryParse(docNoNumber.value);
+      if (base == null) {
+        final raw = v['doc_no']?.toString();
+        if (raw != null && raw.isNotEmpty) {
+          final match = RegExp(r'(\d+)$').firstMatch(raw);
+          if (match != null) {
+            base = int.tryParse(match.group(1)!);
+          }
+        }
+      }
+      currentSeq.value = base;
+
+      vendorId.value = int.tryParse(v['vendor_id']?.toString() ?? v['supplier_id']?.toString() ?? '');
+      vendorName.value = v['vendor_name']?.toString() ?? v['supplier_name']?.toString() ?? '';
+      docDate.value = v['doc_date']?.toString().split(' ').first ?? _formatDate(DateTime.now());
+      billNo.value = v['bill_no']?.toString() ?? '';
+      narration.value = v['narration']?.toString() ?? '';
+      doNotUpdateInventory.value = v['do_not_update_inventory'] == true;
+      purchaseType.value = v['purchase_type']?.toString() ?? 'Regular';
+      gstReverseCharge.value = v['gst_reverse_charge']?.toString() ?? 'N';
+      billDate.value = v['bill_date']?.toString() ?? '';
+      purchaseAgentId.value = v['purchase_agent_id']?.toString() ?? '';
+    }
+
+    final itemsData = (vData['items'] as List?) ?? [];
+    items.clear();
+    for (var item in itemsData) {
+      final map = item as Map<String, dynamic>;
+      final row = PVItemRow();
+      final pid = int.tryParse(map['product_id']?.toString() ?? '');
+      if (pid != null) {
+        row.product.value = Product(
+          id: pid,
+          name: map['product_name']?.toString() ?? '',
+          productType: 'SINGLE',
+        );
+      }
+      row.productCode.value = map['product_code']?.toString() ?? '';
+      row.productName.value = map['product_name']?.toString() ?? '';
+      row.alias.value = map['alias']?.toString() ?? '';
+      row.quantity.value = map['quantity']?.toString() ?? '';
+      row.unitType.value = map['unit']?.toString() ?? 'Nos';
+      row.unitPrice.value = map['unit_price']?.toString() ?? '0';
+      row.taxableAmount.value = map['taxable_amount']?.toString() ?? '0';
+      row.sgst.value = map['sgst']?.toString() ?? '0';
+      row.cgst.value = map['cgst']?.toString() ?? '0';
+      row.igst.value = map['igst']?.toString() ?? '0';
+      row.cess.value = map['cess']?.toString() ?? '0';
+      row.roff.value = map['roff']?.toString() ?? '0';
+      row.value.value = map['value']?.toString() ?? '0';
+      row.purchaseAccount.value = map['purchase_account']?.toString() ?? 'Def Purchase Accounts';
+      row.gstItcEligibility.value = map['gst_itc_eligibility']?.toString() ?? '';
+      items.add(row);
+    }
+
+    final chargesData = (vData['charges'] as List?) ?? [];
+    charges.clear();
+    for (var ch in chargesData) {
+      final map = ch as Map<String, dynamic>;
+      final row = PVChargeRow();
+      row.name.value = map['name']?.toString() ?? 'Others';
+      row.amount.value = map['amount']?.toString() ?? '0';
+      row.remarks.value = map['remarks']?.toString() ?? '';
+      charges.add(row);
+    }
+    if (items.isEmpty) addItemRow();
+    if (charges.isEmpty) addChargeRow();
+  }
+
+  /// Load voucher by numeric sequence (doc number).
+  Future<void> loadVoucherBySequence(int seq) async {
+    try {
+      isLoading.value = true;
+      final uri = Uri.parse(ApiConfig.purchaseVouchers).replace(
+        queryParameters: {
+          'limit': '1',
+          'search': seq.toString(),
+        },
+      );
+      final response = await http
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) {
+        _showError('Voucher $seq not found');
+        return;
+      }
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) {
+        _showError('Voucher $seq not found');
+        return;
+      }
+      final List list = data['data'] ?? [];
+      if (list.isEmpty) {
+        _showError('Voucher $seq not found');
+        return;
+      }
+      final summary = list.first as Map<String, dynamic>;
+      final idVal = summary['id'];
+      final id = idVal is int ? idVal : int.tryParse(idVal?.toString() ?? '');
+      if (id == null) {
+        _showError('Voucher $seq not found');
+        return;
+      }
+
+      // Fetch full details by id so we get voucher/items/charges.
+      final detailResp = await http.get(
+        Uri.parse('${ApiConfig.purchaseVouchers}/$id'),
+        headers: {'Accept': 'application/json'},
+      );
+      if (detailResp.statusCode != 200) {
+        _showError('Voucher $seq not found');
+        return;
+      }
+      final detailData = jsonDecode(detailResp.body) as Map<String, dynamic>;
+      if (detailData['success'] != true) {
+        _showError('Voucher $seq not found');
+        return;
+      }
+      final vData = detailData['data'] as Map<String, dynamic>?;
+      _applyVoucherData(vData);
+    } catch (e) {
+      debugPrint('[PURCHASE_VOUCHER] Load by sequence error: $e');
+      _showError('Failed to load voucher');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> goToPreviousVoucher() async {
+    final current = currentSeq.value;
+    if (current == null || current <= 1) return;
+    await loadVoucherBySequence(current - 1);
+  }
+
+  Future<void> goToNextVoucher() async {
+    final current = currentSeq.value;
+    if (current == null) return;
+    await loadVoucherBySequence(current + 1);
   }
 
   Future<void> searchProducts(String query) =>

@@ -14,12 +14,15 @@ class HsnCodeListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.put(HsnCodeListController());
+    final args = Get.arguments;
+    final bool isPickerMode =
+        args is Map && (args['pick'] == true || args['picker'] == true);
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: ModuleAppBar(
         title: 'HSN Codes',
-        subtitle: 'Manage HSN master',
+        subtitle: isPickerMode ? 'Tap to select' : 'Manage HSN master',
         onBackPressed: () => Get.back(),
         actions: [
           Obx(
@@ -146,18 +149,25 @@ class HsnCodeListScreen extends StatelessWidget {
                   itemCount: controller.codes.length,
                   itemBuilder: (context, index) {
                     final code = controller.codes[index];
-                    return _HsnCard(
-                      code: code,
-                      onTap: () async {
-                        final result = await Get.to(
-                          () => HsnCodeFormScreen(hsnId: code.id),
-                          binding: BindingsBuilder(() {
-                            Get.put(HsnCodeFormController(hsnId: code.id));
-                          }),
-                        );
-                        if (result == true) controller.refreshCodes();
-                      },
-                    );
+                    if (isPickerMode) {
+                      return _HsnCard(
+                        code: code,
+                        onTap: () => Get.back(result: code.code),
+                      );
+                    } else {
+                      return _HsnCard(
+                        code: code,
+                        onTap: () async {
+                          final result = await Get.to(
+                            () => HsnCodeFormScreen(hsnId: code.id),
+                            binding: BindingsBuilder(() {
+                              Get.put(HsnCodeFormController(hsnId: code.id));
+                            }),
+                          );
+                          if (result == true) controller.refreshCodes();
+                        },
+                      );
+                    }
                   },
                 ),
               );
@@ -165,14 +175,16 @@ class HsnCodeListScreen extends StatelessWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Get.to(() => const HsnCodeFormScreen());
-          if (result == true) controller.refreshCodes();
-        },
-        backgroundColor: AppColors.primary,
-        child: const Icon(Icons.add_rounded, color: Colors.white),
-      ),
+      floatingActionButton: isPickerMode
+          ? null
+          : FloatingActionButton(
+              onPressed: () async {
+                final result = await Get.to(() => const HsnCodeFormScreen());
+                if (result == true) controller.refreshCodes();
+              },
+              backgroundColor: AppColors.primary,
+              child: const Icon(Icons.add_rounded, color: Colors.white),
+            ),
     );
   }
 }
