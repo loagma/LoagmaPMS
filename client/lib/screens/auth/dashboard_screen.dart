@@ -216,14 +216,14 @@ class DashboardScreen extends StatelessWidget {
                     Get.toNamed(AppRoutes.purchaseVoucher);
                   },
                 ),
-                _ModuleCard(
-                  title: 'Taxes',
-                  subtitle: 'Create tax definition',
-                  icon: Icons.account_balance_outlined,
-                  onTap: () {
-                    Get.toNamed(AppRoutes.taxForm);
-                  },
-                ),
+                // _ModuleCard(
+                //   title: 'Taxes',
+                //   subtitle: 'Create tax definition',
+                //   icon: Icons.account_balance_outlined,
+                //   onTap: () {
+                //     Get.toNamed(AppRoutes.taxForm);
+                //   },
+                // ),
                 _ModuleCard(
                   title: 'Reports',
                   subtitle: 'View all module reports',

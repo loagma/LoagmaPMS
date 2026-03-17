@@ -247,7 +247,9 @@ class ProductFormScreen extends StatelessWidget {
                                 return;
                               }
                               final ok = await controller.save();
-                              if (ok) Get.back(result: true);
+                              if (ok) {
+                                Get.offAllNamed(AppRoutes.dashboard);
+                              }
                             },
                     ),
                   ],
@@ -714,26 +716,126 @@ class _ProductStepTwo extends StatelessWidget {
                 }),
                 const SizedBox(height: 16),
                 Obx(
-                  () => TextFormField(
-                    initialValue: controller.gstPercent.value,
-                    decoration: AppInputDecoration.standard(
-                      labelText: 'GST Percent *',
-                      hintText: 'e.g. 5, 12, 18',
-                    ),
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    onChanged: (v) => controller.gstPercent.value = v,
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) {
-                        return 'Required';
-                      }
-                      final value = double.tryParse(v.trim());
-                      if (value == null || value < 0 || value > 100) {
-                        return 'Enter valid percent (0-100)';
-                      }
-                      return null;
-                    },
-                  ),
+                  () {
+                    if (controller.availableTaxes.isEmpty) {
+                      return const Text(
+                        'No taxes found. Please create taxes first from Tax Master.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textMuted,
+                        ),
+                      );
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text(
+                          'Applicable Taxes *',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textDark,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ...controller.availableTaxes.map((tax) {
+                          final isSelected =
+                              controller.selectedTaxIds.contains(tax.id);
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.background,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  children: [
+                                    Checkbox(
+                                      value: isSelected,
+                                      onChanged: (v) =>
+                                          controller.toggleTaxSelection(
+                                        tax.id,
+                                        v ?? false,
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            tax.taxName,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.textDark,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '${tax.taxCategory} • ${tax.taxSubCategory}',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              color: AppColors.textMuted,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (isSelected) ...[
+                                  const SizedBox(height: 8),
+                                  TextFormField(
+                                    key: ValueKey(
+                                      'tax-percent-${tax.id}-${controller.taxPercentFor(tax.id)}',
+                                    ),
+                                    initialValue: controller.taxPercentFor(
+                                      tax.id,
+                                    ),
+                                    decoration: AppInputDecoration.standard(
+                                      labelText: 'Tax Percent *',
+                                      hintText: 'Enter percent (0-100)',
+                                    ),
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
+                                    onChanged: (v) =>
+                                        controller.updateTaxPercentFromInput(
+                                      tax.id,
+                                      v,
+                                    ),
+                                    validator: (v) {
+                                      if (!controller.selectedTaxIds
+                                          .contains(tax.id)) {
+                                        return null;
+                                      }
+                                      if (v == null || v.trim().isEmpty) {
+                                        return 'Required';
+                                      }
+                                      final value = double.tryParse(v.trim());
+                                      if (value == null ||
+                                          value < 0 ||
+                                          value > 100) {
+                                        return 'Enter valid percent (0-100)';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 Obx(
@@ -852,7 +954,7 @@ class _ProductStepTwo extends StatelessWidget {
   ) async {
     final descController = TextEditingController();
     final sizeController = TextEditingController();
-    final unitController = TextEditingController(text: 'KG');
+    String selectedUnit = 'KG';
     final marketPriceController = TextEditingController();
     final retailPricesController = TextEditingController();
     final formKey = GlobalKey<FormState>();
@@ -861,91 +963,111 @@ class _ProductStepTwo extends StatelessWidget {
       context: Get.context!,
       barrierDismissible: false,
       builder: (ctx) {
-        return AlertDialog(
-          title: const Text('Add New Package'),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: descController,
-                    decoration: const InputDecoration(
-                      labelText: 'Package Description *',
-                    ),
-                    validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'Required' : null,
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Add New Package'),
+              content: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: descController,
+                        decoration: const InputDecoration(
+                          labelText: 'Package Description *',
+                        ),
+                        validator: (v) =>
+                            v == null || v.trim().isEmpty ? 'Required' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: sizeController,
+                        decoration: const InputDecoration(
+                          labelText: 'Package Size *',
+                        ),
+                        keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Required';
+                          final value = double.tryParse(v.trim());
+                          if (value == null || value <= 0) {
+                            return 'Enter valid size';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: selectedUnit,
+                        decoration: const InputDecoration(
+                          labelText: 'Unit *',
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'KG', child: Text('KG')),
+                          DropdownMenuItem(value: 'GM', child: Text('GM')),
+                          DropdownMenuItem(value: 'L', child: Text('L')),
+                          DropdownMenuItem(value: 'ML', child: Text('ML')),
+                          DropdownMenuItem(value: 'PCS', child: Text('PCS')),
+                          DropdownMenuItem(value: 'BOX', child: Text('BOX')),
+                          DropdownMenuItem(value: 'PACK', child: Text('PACK')),
+                        ],
+                        onChanged: (v) {
+                          if (v != null) {
+                            setState(() {
+                              selectedUnit = v;
+                            });
+                          }
+                        },
+                        validator: (v) =>
+                            v == null || v.trim().isEmpty ? 'Required' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: marketPriceController,
+                        decoration: const InputDecoration(
+                          labelText: 'Market Price *',
+                        ),
+                        keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Required';
+                          final value = double.tryParse(v.trim());
+                          if (value == null || value < 0) {
+                            return 'Enter valid price';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: retailPricesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Retail Prices (Comma Separated)',
+                          hintText: '100.00, 95.00, 90.00',
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: sizeController,
-                    decoration: const InputDecoration(
-                      labelText: 'Package Size *',
-                    ),
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Required';
-                      final value = double.tryParse(v.trim());
-                      if (value == null || value <= 0) {
-                        return 'Enter valid size';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: unitController,
-                    decoration: const InputDecoration(
-                      labelText: 'Unit *',
-                    ),
-                    validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'Required' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: marketPriceController,
-                    decoration: const InputDecoration(
-                      labelText: 'Market Price *',
-                    ),
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Required';
-                      final value = double.tryParse(v.trim());
-                      if (value == null || value < 0) {
-                        return 'Enter valid price';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: retailPricesController,
-                    decoration: const InputDecoration(
-                      labelText: 'Retail Prices (Comma Separated)',
-                      hintText: '100.00, 95.00, 90.00',
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (formKey.currentState?.validate() ?? false) {
-                  Navigator.of(ctx).pop(true);
-                }
-              },
-              child: const Text('Add'),
-            ),
-          ],
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    if (formKey.currentState?.validate() ?? false) {
+                      Navigator.of(ctx).pop(true);
+                    }
+                  },
+                  child: const Text('Add'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -957,7 +1079,7 @@ class _ProductStepTwo extends StatelessWidget {
           id: id,
           description: descController.text.trim(),
           size: double.parse(sizeController.text.trim()),
-          unit: unitController.text.trim(),
+          unit: selectedUnit,
           marketPrice: double.parse(marketPriceController.text.trim()),
           retailPricesRaw: retailPricesController.text.trim(),
         ),

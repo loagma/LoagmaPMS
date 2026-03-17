@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -91,6 +92,231 @@ class ProductController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch products',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function show(int $id): JsonResponse
+    {
+        try {
+            $product = DB::table('product')
+                ->where('product_id', $id)
+                ->where('is_deleted', 0)
+                ->first();
+
+            if (!$product) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Product not found',
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => (array) $product,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Product show error', ['error' => $e->getMessage(), 'product_id' => $id]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch product',
+            ], 500);
+        }
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'product_name' => 'required|string|max:255',
+            'cat_id' => 'required|integer|min:0',
+            'parent_cat_id' => 'nullable|integer|min:0',
+            'brand' => 'required|string|max:255',
+            'ctype_id' => 'nullable|string|max:250',
+            'seq_no' => 'nullable|integer|min:0',
+            'is_published' => 'nullable|integer|in:0,1',
+            'in_stock' => 'nullable|integer|in:0,1',
+            'inventory_type' => 'nullable|in:SINGLE,PACK_WISE',
+            'inventory_unit_type' => 'nullable|string|max:255',
+            'description' => 'required|string',
+            'keywords' => 'nullable|string',
+            'packs' => 'nullable',
+            'default_pack_id' => 'nullable|string|max:255',
+            'hsn_code' => 'required|string|max:10',
+            'gst_percent' => 'nullable|numeric|min:0|max:999.99',
+            'order_limit' => 'nullable|integer|min:0',
+            'buffer_limit' => 'nullable|integer|min:0',
+        ]);
+
+        try {
+            $nextId = ((int) DB::table('product')->max('product_id')) + 1;
+
+            $packsValue = $validated['packs'] ?? null;
+            if (is_array($packsValue)) {
+                $packsValue = json_encode($packsValue, JSON_UNESCAPED_UNICODE);
+            }
+
+            DB::table('product')->insert([
+                'product_id' => $nextId,
+                'cat_id' => (int) ($validated['cat_id'] ?? 0),
+                'parent_cat_id' => (int) ($validated['parent_cat_id'] ?? 0),
+                'brand' => trim((string) $validated['brand']),
+                'ctype_id' => trim((string) ($validated['ctype_id'] ?? 'vegetables_fruits')),
+                'seq_no' => (int) ($validated['seq_no'] ?? 0),
+                'start_date' => time(),
+                'is_published' => (int) ($validated['is_published'] ?? 0),
+                'is_used' => 0,
+                'is_deleted' => 0,
+                'in_stock' => (int) ($validated['in_stock'] ?? 0),
+                'inventory_type' => (string) ($validated['inventory_type'] ?? 'SINGLE'),
+                'inventory_unit_type' => (string) ($validated['inventory_unit_type'] ?? 'WEIGHT'),
+                'name' => trim((string) $validated['product_name']),
+                'description' => (string) $validated['description'],
+                'display_photo' => null,
+                'keywords' => $validated['keywords'] ?? null,
+                'spec_params' => '{}',
+                'packs' => $packsValue,
+                'default_pack_id' => (string) ($validated['default_pack_id'] ?? ' '),
+                'hsn_code' => (string) $validated['hsn_code'],
+                'gst_percent' => (float) ($validated['gst_percent'] ?? 0),
+                'offers' => null,
+                'cache_txt' => null,
+                'img_last_updated' => 0,
+                'stock' => null,
+                'stock_ut_id' => null,
+                'order_limit' => (int) ($validated['order_limit'] ?? 0),
+                'buffer_limit' => (int) ($validated['buffer_limit'] ?? 0),
+            ]);
+
+            $created = DB::table('product')->where('product_id', $nextId)->first();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Product created successfully',
+                'data' => (array) $created,
+            ], 201);
+        } catch (\Exception $e) {
+            Log::error('Product store error', ['error' => $e->getMessage()]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create product',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function update(Request $request, int $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'product_name' => 'sometimes|required|string|max:255',
+            'cat_id' => 'sometimes|required|integer|min:0',
+            'parent_cat_id' => 'nullable|integer|min:0',
+            'brand' => 'sometimes|required|string|max:255',
+            'ctype_id' => 'nullable|string|max:250',
+            'seq_no' => 'nullable|integer|min:0',
+            'is_published' => 'nullable|integer|in:0,1',
+            'in_stock' => 'nullable|integer|in:0,1',
+            'inventory_type' => 'nullable|in:SINGLE,PACK_WISE',
+            'inventory_unit_type' => 'nullable|string|max:255',
+            'description' => 'sometimes|required|string',
+            'keywords' => 'nullable|string',
+            'packs' => 'nullable',
+            'default_pack_id' => 'nullable|string|max:255',
+            'hsn_code' => 'sometimes|required|string|max:10',
+            'gst_percent' => 'nullable|numeric|min:0|max:999.99',
+            'order_limit' => 'nullable|integer|min:0',
+            'buffer_limit' => 'nullable|integer|min:0',
+        ]);
+
+        try {
+            $exists = DB::table('product')->where('product_id', $id)->where('is_deleted', 0)->exists();
+            if (!$exists) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Product not found',
+                ], 404);
+            }
+
+            $updates = [];
+
+            if (array_key_exists('product_name', $validated)) {
+                $updates['name'] = trim((string) $validated['product_name']);
+            }
+            if (array_key_exists('cat_id', $validated)) {
+                $updates['cat_id'] = (int) $validated['cat_id'];
+            }
+            if (array_key_exists('parent_cat_id', $validated)) {
+                $updates['parent_cat_id'] = (int) ($validated['parent_cat_id'] ?? 0);
+            }
+            if (array_key_exists('brand', $validated)) {
+                $updates['brand'] = trim((string) $validated['brand']);
+            }
+            if (array_key_exists('ctype_id', $validated)) {
+                $updates['ctype_id'] = (string) ($validated['ctype_id'] ?? 'vegetables_fruits');
+            }
+            if (array_key_exists('seq_no', $validated)) {
+                $updates['seq_no'] = (int) ($validated['seq_no'] ?? 0);
+            }
+            if (array_key_exists('is_published', $validated)) {
+                $updates['is_published'] = (int) ($validated['is_published'] ?? 0);
+            }
+            if (array_key_exists('in_stock', $validated)) {
+                $updates['in_stock'] = (int) ($validated['in_stock'] ?? 0);
+            }
+            if (array_key_exists('inventory_type', $validated)) {
+                $updates['inventory_type'] = (string) ($validated['inventory_type'] ?? 'SINGLE');
+            }
+            if (array_key_exists('inventory_unit_type', $validated)) {
+                $updates['inventory_unit_type'] = (string) ($validated['inventory_unit_type'] ?? 'WEIGHT');
+            }
+            if (array_key_exists('description', $validated)) {
+                $updates['description'] = (string) $validated['description'];
+            }
+            if (array_key_exists('keywords', $validated)) {
+                $updates['keywords'] = $validated['keywords'];
+            }
+            if (array_key_exists('default_pack_id', $validated)) {
+                $updates['default_pack_id'] = (string) ($validated['default_pack_id'] ?? ' ');
+            }
+            if (array_key_exists('hsn_code', $validated)) {
+                $updates['hsn_code'] = (string) $validated['hsn_code'];
+            }
+            if (array_key_exists('gst_percent', $validated)) {
+                $updates['gst_percent'] = (float) ($validated['gst_percent'] ?? 0);
+            }
+            if (array_key_exists('order_limit', $validated)) {
+                $updates['order_limit'] = (int) ($validated['order_limit'] ?? 0);
+            }
+            if (array_key_exists('buffer_limit', $validated)) {
+                $updates['buffer_limit'] = (int) ($validated['buffer_limit'] ?? 0);
+            }
+            if (array_key_exists('packs', $validated)) {
+                $packsValue = $validated['packs'];
+                if (is_array($packsValue)) {
+                    $packsValue = json_encode($packsValue, JSON_UNESCAPED_UNICODE);
+                }
+                $updates['packs'] = $packsValue;
+            }
+
+            if (!empty($updates)) {
+                DB::table('product')->where('product_id', $id)->update($updates);
+            }
+
+            $updated = DB::table('product')->where('product_id', $id)->first();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Product updated successfully',
+                'data' => (array) $updated,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Product update error', ['error' => $e->getMessage(), 'product_id' => $id]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update product',
                 'error' => $e->getMessage(),
             ], 500);
         }

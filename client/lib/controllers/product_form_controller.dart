@@ -1,12 +1,14 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 
 import '../api_config.dart';
 import '../models/category_model.dart';
 import '../models/product_model.dart';
+import '../models/tax_model.dart';
 
 /// UI model for a single package row in the wizard.
 class PackageUiModel {
@@ -99,7 +101,9 @@ class ProductFormController extends GetxController {
 
   // Step 2 – tax, status, packages.
   final hsnCode = ''.obs;
-  final gstPercent = ''.obs;
+  final availableTaxes = <Tax>[].obs;
+  final selectedTaxIds = <int>[].obs;
+  final selectedTaxPercents = <int, String>{}.obs;
   final isPublished = true.obs;
   final inStock = true.obs;
 
@@ -117,8 +121,31 @@ class ProductFormController extends GetxController {
 
   Future<void> _init() async {
     await _loadCategories();
+    await loadAvailableTaxes();
     if (productId != null) {
       await _loadProduct();
+    }
+  }
+
+  Future<void> loadAvailableTaxes() async {
+    try {
+      final response = await http.get(
+        Uri.parse(ApiConfig.taxes).replace(
+          queryParameters: {'limit': '100', 'is_active': 'true'},
+        ),
+        headers: {'Accept': 'application/json'},
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        if (data['success'] == true) {
+          final List list = data['data'] ?? [];
+          availableTaxes.value = list
+              .map((e) => Tax.fromJson(e as Map<String, dynamic>))
+              .toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('[PRODUCT_FORM] Load taxes error: $e');
     }
   }
 
@@ -204,14 +231,199 @@ class ProductFormController extends GetxController {
   }
 
   bool validateStep2() {
-    if (hsnCode.value.trim().isEmpty) return false;
+    if (hsnCode.value.trim().isEmpty) {
+      Get.snackbar(
+        'Validation',
+        'Please select HSN code',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
+      return false;
+    }
+    if (selectedTaxIds.isEmpty) {
+      Get.snackbar(
+        'Validation',
+        'Please select at least one tax',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
+      return false;
+    }
+    for (final taxId in selectedTaxIds) {
+      final raw = selectedTaxPercents[taxId]?.trim() ?? '';
+      if (raw.isEmpty) {
+        Get.snackbar(
+          'Validation',
+          'Enter tax percent for selected taxes',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+        return false;
+      }
+      final value = double.tryParse(raw);
+      if (value == null || value < 0 || value > 100) {
+        Get.snackbar(
+          'Validation',
+          'Tax percent must be between 0 and 100',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+        return false;
+      }
+    }
     // For PACK_WISE products, require at least one active package.
     if (productType.value == 'PACK_WISE') {
       final hasActive =
           packages.any((p) => p.isActive); // at least one active package.
-      if (!hasActive) return false;
+      if (!hasActive) {
+        Get.snackbar(
+          'Validation',
+          'Add at least one package for pack-wise products',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+        return false;
+      }
     }
     return true;
+  }
+
+  void toggleTaxSelection(int taxId, bool isSelected) {
+    if (isSelected) {
+      if (!selectedTaxIds.contains(taxId)) {
+        selectedTaxIds.add(taxId);
+      }
+      selectedTaxPercents.putIfAbsent(taxId, () => '');
+    } else {
+      selectedTaxIds.remove(taxId);
+      selectedTaxPercents.remove(taxId);
+    }
+    selectedTaxIds.refresh();
+    selectedTaxPercents.refresh();
+  }
+
+  void updateTaxPercentFromInput(int taxId, String value) {
+    selectedTaxPercents[taxId] = value;
+    selectedTaxPercents.refresh();
+  }
+
+  String taxPercentFor(int taxId) {
+    return selectedTaxPercents[taxId] ?? '';
+  }
+
+  double get totalSelectedTaxPercent {
+    double sum = 0;
+    for (final taxId in selectedTaxIds) {
+      sum += double.tryParse(selectedTaxPercents[taxId]?.trim() ?? '') ?? 0;
+    }
+    return sum;
+  }
+
+  bool _isSamePercent(double a, double b) => (a - b).abs() < 0.0001;
+
+  Future<Map<int, ProductTax>> _fetchExistingProductTaxes(int savedProductId) async {
+    final map = <int, ProductTax>{};
+    final response = await http.get(
+      Uri.parse(ApiConfig.productTaxes).replace(
+        queryParameters: {'product_id': savedProductId.toString(), 'limit': '200'},
+      ),
+      headers: {'Accept': 'application/json'},
+    );
+    if (response.statusCode != 200) {
+      return map;
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    if (data['success'] != true) {
+      return map;
+    }
+    final List rows = data['data'] ?? [];
+    for (final row in rows) {
+      final model = ProductTax.fromJson(row as Map<String, dynamic>);
+      map[model.taxId] = model;
+    }
+    return map;
+  }
+
+  Future<bool> _syncProductTaxes(int savedProductId) async {
+    try {
+      final existingByTaxId = await _fetchExistingProductTaxes(savedProductId);
+      final desiredByTaxId = <int, double>{
+        for (final taxId in selectedTaxIds)
+          taxId: double.tryParse(selectedTaxPercents[taxId]?.trim() ?? '') ?? 0,
+      };
+
+      bool allSuccess = true;
+
+      for (final entry in existingByTaxId.entries) {
+        final existing = entry.value;
+        final desired = desiredByTaxId[entry.key];
+        if (desired == null || !_isSamePercent(existing.taxPercent, desired)) {
+          final deleteResponse = await http.delete(
+            Uri.parse('${ApiConfig.productTaxes}/${existing.id}'),
+            headers: {'Accept': 'application/json'},
+          );
+          if (deleteResponse.statusCode != 200 && deleteResponse.statusCode != 204) {
+            allSuccess = false;
+          }
+        }
+      }
+
+      for (final entry in desiredByTaxId.entries) {
+        final existing = existingByTaxId[entry.key];
+        if (existing != null && _isSamePercent(existing.taxPercent, entry.value)) {
+          continue;
+        }
+
+        final postResponse = await http.post(
+          Uri.parse(ApiConfig.productTaxes),
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'product_id': savedProductId,
+            'tax_id': entry.key,
+            'tax_percent': entry.value,
+          }),
+        );
+        if (postResponse.statusCode != 200 && postResponse.statusCode != 201) {
+          allSuccess = false;
+        }
+      }
+
+      return allSuccess;
+    } catch (e) {
+      debugPrint('[PRODUCT_FORM] Sync product taxes error: $e');
+      return false;
+    }
+  }
+
+  int? _extractSavedProductId(Map<String, dynamic> responseData) {
+    final rawData = responseData['data'];
+    if (rawData is Map<String, dynamic>) {
+      final rawId = rawData['product_id'] ?? rawData['id'];
+      if (rawId is int) return rawId;
+      if (rawId is String) return int.tryParse(rawId);
+    }
+    return productId;
+  }
+
+  Future<void> _loadSelectedTaxesForProduct(int targetProductId) async {
+    try {
+      final existingByTaxId = await _fetchExistingProductTaxes(targetProductId);
+      selectedTaxIds.assignAll(existingByTaxId.keys);
+      selectedTaxPercents.clear();
+      for (final entry in existingByTaxId.entries) {
+        selectedTaxPercents[entry.key] = entry.value.taxPercent.toString();
+      }
+    } catch (e) {
+      debugPrint('[PRODUCT_FORM] Load selected taxes error: $e');
+    }
   }
 
   void addPackage(PackageUiModel pkg) {
@@ -268,10 +480,11 @@ class ProductFormController extends GetxController {
 
           // Tax & status
           hsnCode.value = productJson['hsn_code']?.toString() ?? '';
-          gstPercent.value = productJson['gst_percent']?.toString() ?? '';
           isPublished.value =
               (productJson['is_published']?.toString() ?? '0') == '1';
           inStock.value = (productJson['in_stock']?.toString() ?? '0') == '1';
+
+            await _loadSelectedTaxesForProduct(product.id);
 
           // Packs JSON, if present.
           final packsRaw = productJson['packs'];
@@ -366,7 +579,7 @@ class ProductFormController extends GetxController {
 
         // Tax & status
         'hsn_code': hsnCode.value.trim(),
-        'gst_percent': double.tryParse(gstPercent.value.trim()) ?? 0.0,
+        'gst_percent': totalSelectedTaxPercent,
         'is_published': isPublished.value ? 1 : 0,
         'in_stock': inStock.value ? 1 : 0,
       };
@@ -403,12 +616,27 @@ class ProductFormController extends GetxController {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (data['success'] == true) {
-          Get.snackbar(
-            'Success',
-            data['message']?.toString() ?? 'Product saved successfully',
-            snackPosition: SnackPosition.BOTTOM,
+          final savedProductId = _extractSavedProductId(data);
+          if (savedProductId != null) {
+            final taxSyncOk = await _syncProductTaxes(savedProductId);
+            if (!taxSyncOk) {
+              Get.snackbar(
+                'Warning',
+                'Product saved, but some tax assignments could not be synced.',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: Colors.orange,
+                colorText: Colors.white,
+              );
+            }
+          }
+
+          await Fluttertoast.showToast(
+            msg: data['message']?.toString() ?? 'Product saved successfully',
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.BOTTOM,
             backgroundColor: Colors.green,
-            colorText: Colors.white,
+            textColor: Colors.white,
+            fontSize: 14,
           );
           return true;
         }

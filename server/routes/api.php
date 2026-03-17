@@ -19,6 +19,9 @@ use App\Http\Controllers\HsnCodeController;
 
 Route::get('/health', [HealthController::class, 'index']);
 Route::get('/products', [ProductController::class, 'index']);
+Route::post('/products', [ProductController::class, 'store']);
+Route::get('/products/{id}', [ProductController::class, 'show'])->where('id', '[0-9]+');
+Route::put('/products/{id}', [ProductController::class, 'update'])->where('id', '[0-9]+');
 
 // Vendor Products routes
 Route::get('/vendor-products', [VendorProductController::class, 'index']);
