@@ -83,15 +83,15 @@ class _ProductsTile {
 List<_ProductsTile> get _productsTiles => [
       _ProductsTile(
         title: 'Products',
-        subtitle: 'List and create products',
+        subtitle: 'Create product master',
         icon: Icons.inventory_2_outlined,
-        onTap: () => Get.toNamed(AppRoutes.productList),
+        onTap: () => Get.toNamed(AppRoutes.productForm),
       ),
       _ProductsTile(
         title: 'Taxes',
-        subtitle: 'Manage tax masters',
+        subtitle: 'Create tax master',
         icon: Icons.account_balance_outlined,
-        onTap: () => Get.toNamed(AppRoutes.taxList),
+        onTap: () => Get.toNamed(AppRoutes.taxForm),
       ),
       _ProductsTile(
         title: 'Product Taxes',
@@ -101,85 +101,21 @@ List<_ProductsTile> get _productsTiles => [
       ),
       _ProductsTile(
         title: 'Categories',
-        subtitle: 'Manage categories and subcategories',
+        subtitle: 'Create category and subcategory',
         icon: Icons.category_rounded,
-        onTap: () => Get.toNamed(AppRoutes.categoryList),
+        onTap: () => Get.toNamed(AppRoutes.categoryForm),
       ),
       _ProductsTile(
         title: 'HSN Codes',
-        subtitle: 'Manage HSN code master',
+        subtitle: 'Create HSN code master',
         icon: Icons.qr_code_rounded,
-        onTap: () => Get.toNamed(AppRoutes.hsnCodeList),
+        onTap: () => Get.toNamed(AppRoutes.hsnCodeForm),
       ),
       _ProductsTile(
         title: 'Product Packages',
-        subtitle: 'Configure product pack sizes',
+        subtitle: 'Create product package',
         icon: Icons.widgets_outlined,
-        onTap: () => Get.toNamed(AppRoutes.productPackageList),
+        onTap: () => Get.toNamed(AppRoutes.productPackageForm),
       ),
     ];
-
-class _ProductsTileCard extends StatelessWidget {
-  final _ProductsTile tile;
-
-  const _ProductsTileCard({required this.tile});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      elevation: 4,
-      shadowColor: Colors.black.withValues(alpha: 0.08),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: AppColors.primaryLight.withValues(alpha: 0.9),
-          width: 1,
-        ),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: tile.onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(tile.icon, color: AppColors.primary, size: 24),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                tile.title,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textDark,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                tile.subtitle,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textMuted,
-                  fontWeight: FontWeight.w500,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 

@@ -11,7 +11,6 @@ import 'purchase_voucher_list_screen.dart';
 import 'receive_from_production_list_screen.dart';
 import 'stock_voucher_list_screen.dart';
 import 'supplier_list_screen.dart';
-import 'tax_list_screen.dart';
 
 class ReportsScreen extends StatelessWidget {
   const ReportsScreen({super.key});
@@ -126,11 +125,11 @@ class ReportsScreen extends StatelessWidget {
                 },
               ),
               _ReportCard(
-                title: 'Taxes',
-                subtitle: 'View all tax definitions',
-                icon: Icons.account_balance_outlined,
+                title: 'Product Module',
+                subtitle: 'Products, HSN, categories, packages, taxes',
+                icon: Icons.inventory_2_outlined,
                 onTap: () {
-                  Get.to(() => const TaxListScreen());
+                  Get.toNamed(AppRoutes.productModuleReports);
                 },
               ),
             ];

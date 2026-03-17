@@ -29,6 +29,7 @@ import '../screens/modules/product_package_list_screen.dart';
 import '../screens/modules/product_package_form_screen.dart';
 import '../screens/modules/category_list_screen.dart';
 import '../screens/modules/category_form_screen.dart';
+import '../screens/modules/product_module_reports_screen.dart';
 
 /// Central route names. Use these instead of raw strings.
 abstract class AppRoutes {
@@ -43,6 +44,7 @@ abstract class AppRoutes {
   static const String stockVoucher = '/stock-voucher';
   static const String inventory = '/inventory';
   static const String reports = '/reports';
+  static const String productModuleReports = '/reports/product-module';
   static const String suppliers = '/suppliers';
   static const String supplierForm = '/supplier-form';
   static const String supplierProducts = '/supplier-products';
@@ -84,6 +86,10 @@ final List<GetPage<dynamic>> appPages = [
   GetPage(name: AppRoutes.stockVoucher, page: () => const StockVoucherScreen()),
   GetPage(name: AppRoutes.inventory, page: () => const InventoryListScreen()),
   GetPage(name: AppRoutes.reports, page: () => const ReportsScreen()),
+  GetPage(
+    name: AppRoutes.productModuleReports,
+    page: () => const ProductModuleReportsScreen(),
+  ),
   GetPage(name: AppRoutes.suppliers, page: () => const SupplierListScreen()),
   GetPage(name: AppRoutes.supplierForm, page: () => const SupplierFormScreen()),
   GetPage(
@@ -162,12 +168,23 @@ final List<GetPage<dynamic>> appPages = [
   ),
   GetPage(
     name: AppRoutes.productPackageForm,
-    page: () => ProductPackageFormScreen(
-      productId: Get.arguments is int ? Get.arguments as int : 0,
-      packageId: Get.arguments is Map
-          ? (Get.arguments as Map)['packageId'] as int?
-          : null,
-    ),
+    page: () {
+      final args = Get.arguments;
+      int? productId;
+      int? packageId;
+
+      if (args is int) {
+        productId = args;
+      } else if (args is Map) {
+        productId = args['productId'] as int?;
+        packageId = args['packageId'] as int?;
+      }
+
+      return ProductPackageFormScreen(
+        productId: productId,
+        packageId: packageId,
+      );
+    },
   ),
   GetPage(
     name: AppRoutes.categoryList,

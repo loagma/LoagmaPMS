@@ -10,7 +10,7 @@ import '../models/product_package_model.dart';
 class ProductPackageFormController extends GetxController {
   final formKey = GlobalKey<FormState>();
   final int? packageId;
-  final int productId;
+  final int? productId;
 
   final isLoading = false.obs;
   final isSaving = false.obs;
@@ -18,9 +18,10 @@ class ProductPackageFormController extends GetxController {
   final packSize = ''.obs;
   final unit = ''.obs;
   final price = ''.obs;
+  final productIdInput = ''.obs;
 
   ProductPackageFormController({
-    required this.productId,
+    this.productId,
     this.packageId,
   });
 
@@ -70,8 +71,20 @@ class ProductPackageFormController extends GetxController {
 
     isSaving.value = true;
     try {
+      final effectiveProductId = productId ?? int.tryParse(productIdInput.value.trim());
+      if (effectiveProductId == null || effectiveProductId <= 0) {
+        Get.snackbar(
+          'Validation',
+          'Enter a valid Product ID',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+        return false;
+      }
+
       final payload = {
-        'product_id': productId,
+        'product_id': effectiveProductId,
         'pack_size': double.parse(packSize.value.trim()),
         'unit': unit.value.trim(),
         'price': price.value.trim().isEmpty

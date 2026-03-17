@@ -6,12 +6,12 @@ import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 
 class ProductPackageFormScreen extends StatelessWidget {
-  final int productId;
+  final int? productId;
   final int? packageId;
 
   const ProductPackageFormScreen({
     super.key,
-    required this.productId,
+    this.productId,
     this.packageId,
   });
 
@@ -62,6 +62,32 @@ class ProductPackageFormScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        Obx(
+                          () => TextFormField(
+                            initialValue: controller.productId?.toString() ?? controller.productIdInput.value,
+                            decoration: AppInputDecoration.standard(
+                              labelText: 'Product ID *',
+                              hintText: 'Enter product id',
+                            ),
+                            keyboardType: TextInputType.number,
+                            readOnly: controller.productId != null,
+                            onChanged: (v) => controller.productIdInput.value = v,
+                            validator: (v) {
+                              if (controller.productId != null) {
+                                return null;
+                              }
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Required';
+                              }
+                              final value = int.tryParse(v.trim());
+                              if (value == null || value <= 0) {
+                                return 'Enter valid product id';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 16),
                         Obx(
                           () => TextFormField(
                             initialValue: controller.packSize.value,
