@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
@@ -18,6 +19,8 @@ class CategoryFormController extends GetxController {
   final name = ''.obs;
   final selectedParentCatId = 0.obs;
   final isActive = true.obs;
+  final addSubcategoryNow = false.obs;
+  final subcategoryName = ''.obs;
 
   final parentCategories = <Category>[].obs;
 
@@ -137,12 +140,36 @@ class CategoryFormController extends GetxController {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (data['success'] == true) {
-          Get.snackbar(
-            'Success',
+          if (!isEditMode &&
+              !isSubcategoryForm &&
+              addSubcategoryNow.value &&
+              subcategoryName.value.trim().isNotEmpty) {
+            final createdCategoryId = _extractCategoryId(data['data']);
+            if (createdCategoryId != null && createdCategoryId > 0) {
+              final subcategorySaved = await _createSubcategory(
+                parentCategoryId: createdCategoryId,
+                subcategoryNameText: subcategoryName.value.trim(),
+                isSubcategoryActive: isActive.value,
+              );
+
+              if (!subcategorySaved) {
+                Get.snackbar(
+                  'Partial Success',
+                  'Category saved, but subcategory could not be saved.',
+                  snackPosition: SnackPosition.BOTTOM,
+                  backgroundColor: Colors.orange,
+                  colorText: Colors.white,
+                );
+                return true;
+              }
+
+              _showSuccessToast('Category and subcategory saved successfully');
+              return true;
+            }
+          }
+
+          _showSuccessToast(
             data['message']?.toString() ?? 'Category saved successfully',
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.green,
-            colorText: Colors.white,
           );
           return true;
         }
@@ -169,5 +196,55 @@ class CategoryFormController extends GetxController {
     } finally {
       isSaving.value = false;
     }
+  }
+
+  int? _extractCategoryId(dynamic data) {
+    if (data is! Map<String, dynamic>) return null;
+    final rawId = data['cat_id'];
+    if (rawId is int) return rawId;
+    if (rawId is String) return int.tryParse(rawId);
+    return null;
+  }
+
+  Future<bool> _createSubcategory({
+    required int parentCategoryId,
+    required String subcategoryNameText,
+    required bool isSubcategoryActive,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse(ApiConfig.categories),
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'name': subcategoryNameText,
+          'parent_cat_id': parentCategoryId,
+          'is_active': isSubcategoryActive,
+        }),
+      );
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        return false;
+      }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return data['success'] == true;
+    } catch (e) {
+      debugPrint('[CATEGORY_FORM] Save subcategory error: $e');
+      return false;
+    }
+  }
+
+  Future<void> _showSuccessToast(String message) async {
+    await Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.green,
+      textColor: Colors.white,
+      fontSize: 14,
+    );
   }
 }

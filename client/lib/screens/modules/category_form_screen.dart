@@ -61,20 +61,22 @@ class CategoryFormScreen extends StatelessWidget {
           );
         }
 
-        return Form(
-          key: controller.formKey,
-          child: Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: ContentCard(
-                    title: controller.isSubcategoryForm
-                        ? 'Subcategory Details'
-                        : 'Category Details',
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
+        return Stack(
+          children: [
+            Form(
+              key: controller.formKey,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: ContentCard(
+                        title: controller.isSubcategoryForm
+                            ? 'Subcategory Details'
+                            : 'Category Details',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
                         Obx(
                           () => TextFormField(
                             initialValue: controller.name.value,
@@ -91,6 +93,52 @@ class CategoryFormScreen extends StatelessWidget {
                             },
                           ),
                         ),
+                        if (!controller.isEditMode &&
+                            !controller.isSubcategoryForm) ...[
+                          const SizedBox(height: 16),
+                          Obx(
+                            () => SwitchListTile.adaptive(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Add subcategory now'),
+                              subtitle: const Text(
+                                'Create one subcategory along with this category',
+                              ),
+                              value: controller.addSubcategoryNow.value,
+                              onChanged: (v) {
+                                controller.addSubcategoryNow.value = v;
+                                if (!v) {
+                                  controller.subcategoryName.value = '';
+                                }
+                              },
+                            ),
+                          ),
+                          Obx(
+                            () => controller.addSubcategoryNow.value
+                                ? Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: TextFormField(
+                                      initialValue:
+                                          controller.subcategoryName.value,
+                                      decoration: AppInputDecoration.standard(
+                                        labelText: 'Subcategory Name *',
+                                        hintText: 'Enter subcategory name',
+                                      ),
+                                      onChanged: (v) =>
+                                          controller.subcategoryName.value = v,
+                                      validator: (v) {
+                                        if (!controller.addSubcategoryNow.value) {
+                                          return null;
+                                        }
+                                        if (v == null || v.trim().isEmpty) {
+                                          return 'Required';
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                        ],
                         if (controller.isSubcategoryForm &&
                             controller.isEditMode) ...[
                           const SizedBox(height: 16),
@@ -142,36 +190,81 @@ class CategoryFormScreen extends StatelessWidget {
                             controlAffinity: ListTileControlAffinity.leading,
                           ),
                         ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Obx(
+                    () => ActionButtonBar(
+                      buttons: [
+                        ActionButton(
+                          label: 'Cancel',
+                          onPressed: controller.isSaving.value
+                              ? null
+                              : () => Get.back(),
+                        ),
+                        ActionButton(
+                          label: controller.isEditMode ? 'Update' : 'Save',
+                          isPrimary: true,
+                          isLoading: controller.isSaving.value,
+                          onPressed: controller.isSaving.value
+                              ? null
+                              : () async {
+                                  final ok = await controller.save();
+                                  if (ok) Get.back(result: true);
+                                },
+                        ),
                       ],
                     ),
                   ),
-                ),
+                ],
               ),
-              Obx(
-                () => ActionButtonBar(
-                  buttons: [
-                    ActionButton(
-                      label: 'Cancel',
-                      onPressed: controller.isSaving.value
-                          ? null
-                          : () => Get.back(),
-                    ),
-                    ActionButton(
-                      label: controller.isEditMode ? 'Update' : 'Save',
-                      isPrimary: true,
-                      isLoading: controller.isSaving.value,
-                      onPressed: controller.isSaving.value
-                          ? null
-                          : () async {
-                              final ok = await controller.save();
-                              if (ok) Get.back(result: true);
-                            },
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+            Obx(
+              () => controller.isSaving.value
+                  ? Positioned.fill(
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.28),
+                        child: Center(
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 32),
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppColors.primary,
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                Text(
+                                  controller.addSubcategoryNow.value &&
+                                          !controller.isEditMode &&
+                                          !controller.isSubcategoryForm
+                                      ? 'Saving category and subcategory...'
+                                      : 'Saving category...',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.textDark,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ],
         );
       }),
     );
