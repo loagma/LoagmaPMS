@@ -34,6 +34,7 @@ class ProductListController extends GetxController {
 
       final uri = Uri.parse(ApiConfig.products).replace(
         queryParameters: {
+          'include_taxes': '1',
           if (searchQuery.value.isNotEmpty) 'search': searchQuery.value,
         },
       );

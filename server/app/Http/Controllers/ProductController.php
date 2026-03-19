@@ -15,9 +15,15 @@ class ProductController extends Controller
             $search = request()->query('search', '');
             $limit = (int) request()->query('limit', 50);
             $limit = min(max($limit, 1), 500);
+            $page = (int) request()->query('page', 1);
+            if ($page < 1) {
+                $page = 1;
+            }
+            $offset = ($page - 1) * $limit;
             $includeStock = filter_var(request()->query('include_stock', false), FILTER_VALIDATE_BOOLEAN);
+            $includeTaxes = filter_var(request()->query('include_taxes', false), FILTER_VALIDATE_BOOLEAN);
 
-            $selectCols = ['product_id', 'name', 'inventory_type', 'inventory_unit_type'];
+            $selectCols = ['product_id', 'name', 'inventory_type', 'inventory_unit_type', 'gst_percent'];
             if ($includeStock) {
                 $selectCols[] = 'stock';
             }
@@ -49,9 +55,48 @@ class ProductController extends Controller
                 });
             }
 
-            $products = $query->orderBy('name')->limit($limit)->get();
+            $queryForData = clone $query;
+            $total = $query->count();
 
-            $cleanProducts = $products->map(function ($product) use ($includeStock) {
+            $products = $queryForData
+                ->orderBy('name')
+                ->limit($limit)
+                ->offset($offset)
+                ->get();
+
+            $taxesByProductId = [];
+            if ($includeTaxes && $products->isNotEmpty()) {
+                $productIds = $products->pluck('product_id')->values();
+                $taxRows = DB::table('product_taxes as pt')
+                    ->join('taxes as t', 'pt.tax_id', '=', 't.id')
+                    ->whereIn('pt.product_id', $productIds)
+                    ->select(
+                        'pt.product_id',
+                        'pt.tax_id',
+                        'pt.tax_percent',
+                        't.tax_name',
+                        't.tax_category',
+                        't.tax_sub_category'
+                    )
+                    ->orderBy('pt.tax_id')
+                    ->get();
+
+                foreach ($taxRows as $row) {
+                    $pid = (int) $row->product_id;
+                    if (!isset($taxesByProductId[$pid])) {
+                        $taxesByProductId[$pid] = [];
+                    }
+                    $taxesByProductId[$pid][] = [
+                        'tax_id' => (int) $row->tax_id,
+                        'tax_percent' => (float) $row->tax_percent,
+                        'tax_name' => $row->tax_name,
+                        'tax_category' => $row->tax_category,
+                        'tax_sub_category' => $row->tax_sub_category,
+                    ];
+                }
+            }
+
+            $cleanProducts = $products->map(function ($product) use ($includeStock, $includeTaxes, $taxesByProductId) {
                 $cleanName = trim($product->name);
                 $cleanName = str_replace(['"', '\\', "\n", "\r", "\t"], '', $cleanName);
 
@@ -70,9 +115,13 @@ class ProductController extends Controller
                     'name' => $cleanName,
                     'inventory_type' => $inventoryType,
                     'inventory_unit_type' => $unitType,
+                    'gst_percent' => isset($product->gst_percent) ? (float) $product->gst_percent : 0,
                 ];
                 if ($includeStock && isset($product->stock)) {
                     $result['stock'] = $product->stock !== null ? (float) $product->stock : 0;
+                }
+                if ($includeTaxes) {
+                    $result['taxes'] = $taxesByProductId[(int) $product->product_id] ?? [];
                 }
                 return $result;
             })->filter(fn ($p) => !empty($p['name']))->values();
@@ -82,6 +131,12 @@ class ProductController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $cleanProducts,
+                'pagination' => [
+                    'total' => $total,
+                    'page' => $page,
+                    'limit' => $limit,
+                    'total_pages' => $limit > 0 ? (int) ceil($total / $limit) : 1,
+                ],
                 'search' => $search,
                 'count' => $cleanProducts->count(),
             ], 200, [], JSON_UNESCAPED_UNICODE);
@@ -99,6 +154,8 @@ class ProductController extends Controller
 
     public function show(int $id): JsonResponse
     {
+        $includeTaxes = filter_var(request()->query('include_taxes', false), FILTER_VALIDATE_BOOLEAN);
+
         try {
             $product = DB::table('product')
                 ->where('product_id', $id)
@@ -112,9 +169,35 @@ class ProductController extends Controller
                 ], 404);
             }
 
+            $payload = (array) $product;
+            if ($includeTaxes) {
+                $taxRows = DB::table('product_taxes as pt')
+                    ->join('taxes as t', 'pt.tax_id', '=', 't.id')
+                    ->where('pt.product_id', $id)
+                    ->select(
+                        'pt.tax_id',
+                        'pt.tax_percent',
+                        't.tax_name',
+                        't.tax_category',
+                        't.tax_sub_category'
+                    )
+                    ->orderBy('pt.tax_id')
+                    ->get();
+
+                $payload['taxes'] = $taxRows->map(function ($row) {
+                    return [
+                        'tax_id' => (int) $row->tax_id,
+                        'tax_percent' => (float) $row->tax_percent,
+                        'tax_name' => $row->tax_name,
+                        'tax_category' => $row->tax_category,
+                        'tax_sub_category' => $row->tax_sub_category,
+                    ];
+                })->values();
+            }
+
             return response()->json([
                 'success' => true,
-                'data' => (array) $product,
+                'data' => $payload,
             ]);
         } catch (\Exception $e) {
             Log::error('Product show error', ['error' => $e->getMessage(), 'product_id' => $id]);

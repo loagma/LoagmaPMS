@@ -5,6 +5,8 @@ class Product {
   final String productType; // 'FINISHED' or 'RAW'
   final String? defaultUnit; // 'WEIGHT', 'QUANTITY', 'LITRE', 'METER'
   final double? stock; // Available stock (optional, when include_stock=1)
+  final double gstPercent;
+  final List<ProductTaxInfo> taxes;
 
   Product({
     required this.id,
@@ -13,6 +15,8 @@ class Product {
     required this.productType,
     this.defaultUnit,
     this.stock,
+    this.gstPercent = 0,
+    this.taxes = const [],
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -46,6 +50,24 @@ class Product {
       }
     }
 
+    double gstPercent = 0;
+    if (json['gst_percent'] != null) {
+      if (json['gst_percent'] is num) {
+        gstPercent = (json['gst_percent'] as num).toDouble();
+      } else if (json['gst_percent'] is String) {
+        gstPercent = double.tryParse(json['gst_percent'] as String) ?? 0;
+      }
+    }
+
+    final List<ProductTaxInfo> taxes = [];
+    if (json['taxes'] is List) {
+      for (final item in (json['taxes'] as List)) {
+        if (item is Map<String, dynamic>) {
+          taxes.add(ProductTaxInfo.fromJson(item));
+        }
+      }
+    }
+
     return Product(
       id: id,
       name: productName.toString().trim(),
@@ -53,6 +75,8 @@ class Product {
       productType: productType.toString().toUpperCase(),
       defaultUnit: json['default_unit'] ?? json['inventory_unit_type'],
       stock: stock,
+      gstPercent: gstPercent,
+      taxes: taxes,
     );
   }
 
@@ -63,6 +87,56 @@ class Product {
       'product_code': code,
       'product_type': productType,
       'default_unit': defaultUnit,
+      'gst_percent': gstPercent,
+      'taxes': taxes.map((t) => t.toJson()).toList(),
+    };
+  }
+}
+
+class ProductTaxInfo {
+  final int id;
+  final String name;
+  final String category;
+  final String subCategory;
+  final double percent;
+
+  ProductTaxInfo({
+    required this.id,
+    required this.name,
+    required this.category,
+    required this.subCategory,
+    required this.percent,
+  });
+
+  factory ProductTaxInfo.fromJson(Map<String, dynamic> json) {
+    final rawId = json['tax_id'] ?? json['id'];
+    final int id = rawId is int ? rawId : int.tryParse(rawId.toString()) ?? 0;
+
+    double percent = 0;
+    if (json['tax_percent'] != null) {
+      if (json['tax_percent'] is num) {
+        percent = (json['tax_percent'] as num).toDouble();
+      } else if (json['tax_percent'] is String) {
+        percent = double.tryParse(json['tax_percent'] as String) ?? 0;
+      }
+    }
+
+    return ProductTaxInfo(
+      id: id,
+      name: json['tax_name']?.toString() ?? '',
+      category: json['tax_category']?.toString() ?? '',
+      subCategory: json['tax_sub_category']?.toString() ?? '',
+      percent: percent,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'tax_id': id,
+      'tax_name': name,
+      'tax_category': category,
+      'tax_sub_category': subCategory,
+      'tax_percent': percent,
     };
   }
 }

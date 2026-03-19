@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/product_list_controller.dart';
-import '../../controllers/product_form_controller.dart';
 import '../../models/product_model.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 import 'product_form_screen.dart';
+import 'product_view_screen.dart';
 
 class ProductListScreen extends StatelessWidget {
   const ProductListScreen({super.key});
@@ -126,10 +126,7 @@ class ProductListScreen extends StatelessWidget {
                       product: product,
                       onTap: () async {
                         final result = await Get.to(
-                          () => ProductFormScreen(productId: product.id),
-                          binding: BindingsBuilder(() {
-                            Get.put(ProductFormController(productId: product.id));
-                          }),
+                          () => ProductViewScreen(productId: product.id),
                         );
                         if (result == true) {
                           controller.refreshProducts();
@@ -227,6 +224,27 @@ class _ProductCard extends StatelessWidget {
                         ),
                       ),
                     ],
+                    if (product.taxes.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: product.taxes
+                            .map(
+                              (tax) => Chip(
+                                label: Text(
+                                  '${tax.name} ${tax.percent.toStringAsFixed(2)}%',
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                                backgroundColor: AppColors.background,
+                                shape: StadiumBorder(
+                                  side: BorderSide(color: AppColors.border),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ]
                   ],
                 ),
               ),

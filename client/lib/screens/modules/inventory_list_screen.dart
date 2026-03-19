@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/inventory_controller.dart';
-import '../../models/inventory_model.dart';
+import '../../models/product_model.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
-import 'inventory_details_screen.dart';
+import 'product_view_screen.dart';
 
 class InventoryListScreen extends StatelessWidget {
   const InventoryListScreen({super.key});
@@ -163,9 +163,7 @@ class InventoryListScreen extends StatelessWidget {
                         product: product,
                         onTap: () async {
                           final result = await Get.to(
-                            () => InventoryDetailsScreen(
-                              vendorProductId: product.id,
-                            ),
+                            () => ProductViewScreen(productId: product.id),
                           );
                           if (result == true) {
                             controller.refreshProducts();
@@ -185,39 +183,36 @@ class InventoryListScreen extends StatelessWidget {
 }
 
 class _ProductCard extends StatelessWidget {
-  final VendorProduct product;
+  final Product product;
   final VoidCallback onTap;
 
   const _ProductCard({required this.product, required this.onTap});
 
   Color _getStockStatusColor() {
-    if (product.inStock == '0') {
+    final stock = product.stock;
+    if (stock == null) {
+      return Colors.grey;
+    }
+    if (stock <= 0) {
       return Colors.red;
     }
-
-    // Check if any pack has low stock
-    final hasLowStock = product.packs.any(
-      (pack) => pack.stock > 0 && pack.stock < 10,
-    );
-    if (hasLowStock) {
+    if (stock < 10) {
       return Colors.orange;
     }
-
     return Colors.green;
   }
 
   String _getStockStatusText() {
-    if (product.inStock == '0') {
+    final stock = product.stock;
+    if (stock == null) {
+      return 'Stock N/A';
+    }
+    if (stock <= 0) {
       return 'Out of Stock';
     }
-
-    final hasLowStock = product.packs.any(
-      (pack) => pack.stock > 0 && pack.stock < 10,
-    );
-    if (hasLowStock) {
+    if (stock < 10) {
       return 'Low Stock';
     }
-
     return 'In Stock';
   }
 
@@ -252,7 +247,7 @@ class _ProductCard extends StatelessWidget {
                   children: [
                     // Product ID
                     Text(
-                      'VP-${product.id}',
+                      'P-${product.id}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textMuted,
@@ -262,7 +257,7 @@ class _ProductCard extends StatelessWidget {
 
                     // Product Name
                     Text(
-                      product.productName,
+                      product.name,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -271,105 +266,63 @@ class _ProductCard extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 8),
-
-                    // Stock Status and Pack Count
-                    Row(
-                      children: [
-                        // Stock Status Badge
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _getStockStatusColor().withValues(
-                              alpha: 0.1,
-                            ),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            _getStockStatusText(),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: _getStockStatusColor(),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-
-                        // Pack Count
-                        Icon(
-                          Icons.inventory_2_outlined,
-                          size: 14,
+                    if (product.defaultUnit != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Unit: ${product.defaultUnit}',
+                        style: const TextStyle(
+                          fontSize: 12,
                           color: AppColors.textMuted,
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${product.packs.length} pack${product.packs.length != 1 ? 's' : ''}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    // Show pack sizes preview with stock
-                    if (product.packs.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: [
-                          ...product.packs.take(3).map((pack) {
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.primaryLight.withValues(
-                                  alpha: 0.2,
-                                ),
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(
-                                  color: AppColors.primaryLight.withValues(
-                                    alpha: 0.4,
-                                  ),
-                                ),
-                              ),
-                              child: Text(
-                                '${pack.displayName}: ${pack.stock.toStringAsFixed(1)}',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.primaryDark,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            );
-                          }),
-                          if (product.packs.length > 3)
-                            Text(
-                              '+${product.packs.length - 3} more',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textMuted,
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                        ],
                       ),
                     ],
+                    if (product.taxes.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: product.taxes
+                            .map(
+                              (tax) => Chip(
+                                label: Text(
+                                  '${tax.name} ${tax.percent.toStringAsFixed(2)}%',
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                                backgroundColor: AppColors.background,
+                                shape: StadiumBorder(
+                                  side: BorderSide(color: AppColors.border),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ]
                   ],
                 ),
               ),
-
-              // Chevron
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.primaryDark,
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    _getStockStatusText(),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _getStockStatusColor(),
+                    ),
+                  ),
+                  if (product.stock != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Stock: ${product.stock!.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),

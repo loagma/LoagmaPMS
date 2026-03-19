@@ -5,10 +5,10 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 
 import '../api_config.dart';
-import '../models/inventory_model.dart';
+import '../models/product_model.dart';
 
 class InventoryController extends GetxController {
-  final products = <VendorProduct>[].obs;
+  final products = <Product>[].obs;
   final isLoading = false.obs;
   final searchQuery = ''.obs;
   final currentPage = 1.obs;
@@ -40,10 +40,12 @@ class InventoryController extends GetxController {
         products.clear();
       }
 
-      final uri = Uri.parse('${ApiConfig.apiBaseUrl}/vendor-products').replace(
+      final uri = Uri.parse(ApiConfig.products).replace(
         queryParameters: {
           'limit': limit.toString(),
           'page': currentPage.value.toString(),
+          'include_taxes': '1',
+          'include_stock': '1',
           if (searchQuery.value.isNotEmpty) 'search': searchQuery.value,
         },
       );
@@ -59,9 +61,7 @@ class InventoryController extends GetxController {
           final List productsData = data['data'] ?? [];
 
           final newProducts = productsData
-              .map(
-                (item) => VendorProduct.fromJson(item as Map<String, dynamic>),
-              )
+              .map((item) => Product.fromJson(item as Map<String, dynamic>))
               .toList();
 
           if (loadMore) {
@@ -70,8 +70,17 @@ class InventoryController extends GetxController {
             products.value = newProducts;
           }
 
-          // Check if there are more products to load
-          hasMore.value = newProducts.length >= limit;
+          final pagination = data['pagination'];
+          if (pagination is Map<String, dynamic> && pagination['total_pages'] != null) {
+            final totalPagesRaw = pagination['total_pages'];
+            final totalPages = totalPagesRaw is int
+                ? totalPagesRaw
+                : int.tryParse(totalPagesRaw.toString()) ?? 1;
+            hasMore.value = currentPage.value < totalPages;
+          } else {
+            // Fallback when pagination is not provided
+            hasMore.value = newProducts.length >= limit;
+          }
 
           if (hasMore.value) {
             currentPage.value++;
