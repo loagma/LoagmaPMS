@@ -792,12 +792,8 @@ class _ProductStepTwo extends StatelessWidget {
                                 if (isSelected) ...[
                                   const SizedBox(height: 8),
                                   TextFormField(
-                                    key: ValueKey(
-                                      'tax-percent-${tax.id}-${controller.taxPercentFor(tax.id)}',
-                                    ),
-                                    initialValue: controller.taxPercentFor(
-                                      tax.id,
-                                    ),
+                                    controller: controller
+                                        .taxPercentControllerFor(tax.id),
                                     decoration: AppInputDecoration.standard(
                                       labelText: 'Tax Percent *',
                                       hintText: 'Enter percent (0-100)',
@@ -805,11 +801,6 @@ class _ProductStepTwo extends StatelessWidget {
                                     keyboardType:
                                         const TextInputType.numberWithOptions(
                                       decimal: true,
-                                    ),
-                                    onChanged: (v) =>
-                                        controller.updateTaxPercentFromInput(
-                                      tax.id,
-                                      v,
                                     ),
                                     validator: (v) {
                                       if (!controller.selectedTaxIds

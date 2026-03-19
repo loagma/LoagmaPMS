@@ -104,6 +104,7 @@ class ProductFormController extends GetxController {
   final availableTaxes = <Tax>[].obs;
   final selectedTaxIds = <int>[].obs;
   final selectedTaxPercents = <int, String>{}.obs;
+  final Map<int, TextEditingController> taxPercentControllers = {};
   final isPublished = true.obs;
   final inStock = true.obs;
 
@@ -112,6 +113,27 @@ class ProductFormController extends GetxController {
   final packages = <PackageUiModel>[].obs;
 
   bool get isEditMode => productId != null;
+
+  TextEditingController taxPercentControllerFor(int taxId) {
+    return taxPercentControllers.putIfAbsent(taxId, () {
+      final controller = TextEditingController(
+        text: selectedTaxPercents[taxId] ?? '',
+      );
+      controller.addListener(() {
+        selectedTaxPercents[taxId] = controller.text;
+      });
+      return controller;
+    });
+  }
+
+  void _setTaxPercentText(int taxId, String value) {
+    selectedTaxPercents[taxId] = value;
+    final controller = taxPercentControllers[taxId];
+    if (controller != null && controller.text != value) {
+      controller.text = value;
+      controller.selection = TextSelection.collapsed(offset: value.length);
+    }
+  }
 
   @override
   void onInit() {
@@ -299,9 +321,12 @@ class ProductFormController extends GetxController {
         selectedTaxIds.add(taxId);
       }
       selectedTaxPercents.putIfAbsent(taxId, () => '');
+      taxPercentControllerFor(taxId);
     } else {
       selectedTaxIds.remove(taxId);
       selectedTaxPercents.remove(taxId);
+      final controller = taxPercentControllers.remove(taxId);
+      controller?.dispose();
     }
     selectedTaxIds.refresh();
     selectedTaxPercents.refresh();
@@ -419,11 +444,21 @@ class ProductFormController extends GetxController {
       selectedTaxIds.assignAll(existingByTaxId.keys);
       selectedTaxPercents.clear();
       for (final entry in existingByTaxId.entries) {
-        selectedTaxPercents[entry.key] = entry.value.taxPercent.toString();
+        _setTaxPercentText(entry.key, entry.value.taxPercent.toString());
+        taxPercentControllerFor(entry.key);
       }
     } catch (e) {
       debugPrint('[PRODUCT_FORM] Load selected taxes error: $e');
     }
+  }
+
+  @override
+  void onClose() {
+    for (final controller in taxPercentControllers.values) {
+      controller.dispose();
+    }
+    taxPercentControllers.clear();
+    super.onClose();
   }
 
   void addPackage(PackageUiModel pkg) {
