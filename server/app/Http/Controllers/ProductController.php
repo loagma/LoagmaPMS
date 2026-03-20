@@ -404,4 +404,46 @@ class ProductController extends Controller
             ], 500);
         }
     }
+
+    public function destroy(int $id): JsonResponse
+    {
+        try {
+            $product = DB::table('product')
+                ->where('product_id', $id)
+                ->first();
+
+            if (!$product) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Product not found',
+                ], 404);
+            }
+
+            if ((int) ($product->is_deleted ?? 0) === 1) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Product already deleted',
+                ]);
+            }
+
+            DB::table('product')
+                ->where('product_id', $id)
+                ->update([
+                    'is_deleted' => 1,
+                ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Product deleted successfully',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Product delete error', ['error' => $e->getMessage(), 'product_id' => $id]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete product',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 }

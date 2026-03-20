@@ -133,5 +133,36 @@ class HsnCodeController extends Controller
             'message' => 'HSN code updated successfully',
         ]);
     }
+
+    /**
+     * DELETE /api/hsn-codes/{id}
+     */
+    public function destroy(int $id)
+    {
+        $item = DB::table('hsn_codes')
+            ->select('id', 'hsn_code')
+            ->where('id', $id)
+            ->first();
+
+        if (!$item) {
+            return response()->json([
+                'success' => false,
+                'message' => 'HSN code not found',
+            ], 404);
+        }
+
+        $impactedProducts = DB::table('product')
+            ->where('hsn_code', $item->hsn_code)
+            ->where('is_deleted', 0)
+            ->count();
+
+        DB::table('hsn_codes')->where('id', $id)->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'HSN code deleted successfully',
+            'impacted_products_count' => $impactedProducts,
+        ]);
+    }
 }
 
