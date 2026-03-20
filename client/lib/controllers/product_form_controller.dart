@@ -473,7 +473,7 @@ class ProductFormController extends GetxController {
     try {
       isLoading.value = true;
       final response = await http.get(
-        Uri.parse('${ApiConfig.products}/$productId'),
+        Uri.parse('${ApiConfig.products}/$productId/edit'),
         headers: {'Accept': 'application/json'},
       );
       if (response.statusCode == 200) {

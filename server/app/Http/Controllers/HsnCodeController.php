@@ -65,5 +65,73 @@ class HsnCodeController extends Controller
             'message' => 'HSN code saved successfully',
         ], 201);
     }
+
+    /**
+     * GET /api/hsn-codes/{id}
+     */
+    public function show(int $id)
+    {
+        $item = DB::table('hsn_codes')
+            ->select('id', 'hsn_code', 'is_active')
+            ->where('id', $id)
+            ->first();
+
+        if (!$item) {
+            return response()->json([
+                'success' => false,
+                'message' => 'HSN code not found',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $item,
+        ]);
+    }
+
+    /**
+     * PUT /api/hsn-codes/{id}
+     * Body: { hsn_code?: string, is_active?: bool }
+     */
+    public function update(Request $request, int $id)
+    {
+        $exists = DB::table('hsn_codes')->where('id', $id)->exists();
+
+        if (!$exists) {
+            return response()->json([
+                'success' => false,
+                'message' => 'HSN code not found',
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            'hsn_code' => 'sometimes|required|string|max:50|unique:hsn_codes,hsn_code,' . $id,
+            'is_active' => 'sometimes|boolean',
+        ]);
+
+        $updates = [];
+        if (array_key_exists('hsn_code', $validated)) {
+            $updates['hsn_code'] = $validated['hsn_code'];
+        }
+        if (array_key_exists('is_active', $validated)) {
+            $updates['is_active'] = $validated['is_active'];
+        }
+
+        if (!empty($updates)) {
+            $updates['updated_at'] = now();
+            DB::table('hsn_codes')->where('id', $id)->update($updates);
+        }
+
+        $item = DB::table('hsn_codes')
+            ->select('id', 'hsn_code', 'is_active')
+            ->where('id', $id)
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'data' => $item,
+            'message' => 'HSN code updated successfully',
+        ]);
+    }
 }
 

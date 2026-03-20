@@ -21,6 +21,7 @@ Route::get('/health', [HealthController::class, 'index']);
 Route::get('/products', [ProductController::class, 'index']);
 Route::post('/products', [ProductController::class, 'store']);
 Route::get('/products/{id}', [ProductController::class, 'show'])->where('id', '[0-9]+');
+Route::get('/products/{id}/edit', [ProductController::class, 'show'])->where('id', '[0-9]+');
 Route::put('/products/{id}', [ProductController::class, 'update'])->where('id', '[0-9]+');
 
 // Vendor Products routes
@@ -97,6 +98,9 @@ Route::delete('/product-taxes/{id}', [ProductTaxController::class, 'destroy'])->
 // HSN code routes
 Route::get('/hsn-codes', [HsnCodeController::class, 'index']);
 Route::post('/hsn-codes', [HsnCodeController::class, 'store']);
+Route::get('/hsn-codes/{id}', [HsnCodeController::class, 'show'])->where('id', '[0-9]+');
+Route::get('/hsn-codes/{id}/edit', [HsnCodeController::class, 'show'])->where('id', '[0-9]+');
+Route::put('/hsn-codes/{id}', [HsnCodeController::class, 'update'])->where('id', '[0-9]+');
 
 // Category routes (parent_cat_id=0: category, parent_cat_id>0: subcategory)
 Route::get('/categories', [CategoryController::class, 'index']);

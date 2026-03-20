@@ -33,7 +33,7 @@ class HsnCodeFormController extends GetxController {
     try {
       isLoading.value = true;
       final response = await http.get(
-        Uri.parse('${ApiConfig.hsnCodes}/$hsnId'),
+        Uri.parse('${ApiConfig.hsnCodes}/$hsnId/edit'),
         headers: {'Accept': 'application/json'},
       );
       if (response.statusCode == 200) {
