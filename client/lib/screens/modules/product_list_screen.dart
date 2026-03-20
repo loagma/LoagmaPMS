@@ -132,6 +132,34 @@ class ProductListScreen extends StatelessWidget {
                           controller.refreshProducts();
                         }
                       },
+                      onDelete: () async {
+                        final shouldDelete = await showDialog<bool>(
+                          context: context,
+                          builder: (_) => AlertDialog(
+                            title: const Text('Delete Product'),
+                            content: Text(
+                              'Delete "${product.name}"? This will hide it from active product lists.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(false),
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(true),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.red,
+                                ),
+                                child: const Text('Delete'),
+                              ),
+                            ],
+                          ),
+                        );
+
+                        if (shouldDelete == true) {
+                          await controller.deleteProduct(product.id);
+                        }
+                      },
                     );
                   },
                 ),
@@ -157,8 +185,13 @@ class ProductListScreen extends StatelessWidget {
 class _ProductCard extends StatelessWidget {
   final Product product;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
 
-  const _ProductCard({required this.product, required this.onTap});
+  const _ProductCard({
+    required this.product,
+    required this.onTap,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -248,9 +281,20 @@ class _ProductCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.primaryDark,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    onPressed: onDelete,
+                    icon: const Icon(Icons.delete_outline_rounded),
+                    color: Colors.redAccent,
+                    tooltip: 'Delete product',
+                  ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.primaryDark,
+                  ),
+                ],
               ),
             ],
           ),

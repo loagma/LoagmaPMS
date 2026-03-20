@@ -82,5 +82,47 @@ class ProductListController extends GetxController {
   }
 
   Future<void> refreshProducts() => fetchProducts();
+
+  Future<bool> deleteProduct(int productId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('${ApiConfig.products}/$productId'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(const Duration(seconds: 15));
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        Get.snackbar(
+          'Success',
+          data['message']?.toString() ?? 'Product deleted',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+        await fetchProducts();
+        return true;
+      }
+
+      Get.snackbar(
+        'Error',
+        data['message']?.toString() ?? 'Failed to delete product',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
+      return false;
+    } catch (e) {
+      debugPrint('[PRODUCT_LIST] Delete error: $e');
+      Get.snackbar(
+        'Error',
+        'Failed to delete product: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
+      return false;
+    }
+  }
 }
 

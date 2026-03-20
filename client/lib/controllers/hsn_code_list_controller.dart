@@ -84,5 +84,51 @@ class HsnCodeListController extends GetxController {
   }
 
   Future<void> refreshCodes() => fetchCodes();
+
+  Future<bool> deleteHsnCode(int id) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('${ApiConfig.hsnCodes}/$id'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(const Duration(seconds: 15));
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        final impactedCount = data['impacted_products_count'];
+        final impactedSuffix = impactedCount is int && impactedCount > 0
+            ? ' ($impactedCount products impacted)'
+            : '';
+        Get.snackbar(
+          'Success',
+          '${data['message']?.toString() ?? 'HSN code deleted'}$impactedSuffix',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+        await fetchCodes();
+        return true;
+      }
+
+      Get.snackbar(
+        'Error',
+        data['message']?.toString() ?? 'Failed to delete HSN code',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
+      return false;
+    } catch (e) {
+      debugPrint('[HSN_LIST] Delete error: $e');
+      Get.snackbar(
+        'Error',
+        'Failed to delete HSN code: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
+      return false;
+    }
+  }
 }
 

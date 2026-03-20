@@ -166,6 +166,34 @@ class HsnCodeListScreen extends StatelessWidget {
                           );
                           if (result == true) controller.refreshCodes();
                         },
+                        onDelete: () async {
+                          final shouldDelete = await showDialog<bool>(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              title: const Text('Delete HSN Code'),
+                              content: Text(
+                                'Delete HSN code "${code.code}"?',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(false),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(true),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.red,
+                                  ),
+                                  child: const Text('Delete'),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (shouldDelete == true) {
+                            await controller.deleteHsnCode(code.id);
+                          }
+                        },
                       );
                     }
                   },
@@ -192,8 +220,9 @@ class HsnCodeListScreen extends StatelessWidget {
 class _HsnCard extends StatelessWidget {
   final HsnCode code;
   final VoidCallback onTap;
+  final VoidCallback? onDelete;
 
-  const _HsnCard({required this.code, required this.onTap});
+  const _HsnCard({required this.code, required this.onTap, this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -245,9 +274,21 @@ class _HsnCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.primaryDark,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (onDelete != null)
+                    IconButton(
+                      onPressed: onDelete,
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      color: Colors.redAccent,
+                      tooltip: 'Delete HSN code',
+                    ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.primaryDark,
+                  ),
+                ],
               ),
             ],
           ),
