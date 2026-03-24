@@ -76,6 +76,9 @@ roff total of all product
 purchase order me bhi add on fields qwqd
 
 
+supplier form ` department dropdown, business type dropdown, preferred ki jagah active
+
+
 
 
 

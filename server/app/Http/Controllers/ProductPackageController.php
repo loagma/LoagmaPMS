@@ -58,9 +58,12 @@ class ProductPackageController extends Controller
     {
         $validated = $request->validate([
             'product_id' => 'required|integer|exists:product,product_id',
+            'description' => 'nullable|string|max:255',
             'pack_size' => 'required|numeric|gt:0',
             'unit' => 'required|string|max:50',
             'price' => 'nullable|numeric|min:0',
+            'market_price' => 'nullable|numeric|min:0',
+            'retail_prices' => 'nullable|string|max:255',
         ]);
 
         $product = DB::table('product')
@@ -78,13 +81,29 @@ class ProductPackageController extends Controller
 
         $packs = $this->decodePacks($product->packs);
 
+        $marketPrice = null;
+        if (array_key_exists('market_price', $validated)) {
+            $marketPrice = $validated['market_price'] === null ? null : (float) $validated['market_price'];
+        } elseif (array_key_exists('price', $validated)) {
+            $marketPrice = $validated['price'] === null ? null : (float) $validated['price'];
+        }
+
+        $retailPrices = $this->parseRetailPrices($validated['retail_prices'] ?? null);
+
         $newPack = [
             'id' => (string) round(microtime(true) * 1000),
-            'description' => trim(((float) $validated['pack_size']) . ' ' . $validated['unit']),
+            'description' => trim((string) ($validated['description'] ?? '')) !== ''
+                ? trim((string) $validated['description'])
+                : trim(((float) $validated['pack_size']) . ' ' . $validated['unit']),
             'size' => (float) $validated['pack_size'],
+            'ps' => (float) $validated['pack_size'],
             'unit' => trim((string) $validated['unit']),
-            'market_price' => array_key_exists('price', $validated) ? (float) ($validated['price'] ?? 0) : 0,
-            'price' => array_key_exists('price', $validated) ? (float) ($validated['price'] ?? 0) : null,
+            'pu' => trim((string) $validated['unit']),
+            'market_price' => $marketPrice,
+            'price' => $marketPrice,
+            'op' => $marketPrice,
+            'rp' => $retailPrices['regular'] ?? $marketPrice,
+            'prices' => $retailPrices,
             'is_active' => true,
         ];
 
@@ -108,9 +127,12 @@ class ProductPackageController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $validated = $request->validate([
+            'description' => 'sometimes|nullable|string|max:255',
             'pack_size' => 'sometimes|required|numeric|gt:0',
             'unit' => 'sometimes|required|string|max:50',
             'price' => 'nullable|numeric|min:0',
+            'market_price' => 'nullable|numeric|min:0',
+            'retail_prices' => 'sometimes|nullable|string|max:255',
         ]);
 
         $found = $this->findPackageByRouteId($id);
@@ -125,27 +147,37 @@ class ProductPackageController extends Controller
         $index = $found['index'];
         $pack = $packs[$index];
 
+        if (array_key_exists('description', $validated)) {
+            $description = trim((string) ($validated['description'] ?? ''));
+            if ($description !== '') {
+                $pack['description'] = $description;
+            }
+        }
+
         if (array_key_exists('pack_size', $validated)) {
             $pack['size'] = (float) $validated['pack_size'];
-            if (isset($pack['ps'])) {
-                $pack['ps'] = (float) $validated['pack_size'];
-            }
+            $pack['ps'] = (float) $validated['pack_size'];
         }
         if (array_key_exists('unit', $validated)) {
             $pack['unit'] = trim((string) $validated['unit']);
-            if (isset($pack['pu'])) {
-                $pack['pu'] = trim((string) $validated['unit']);
-            }
+            $pack['pu'] = trim((string) $validated['unit']);
         }
-        if (array_key_exists('price', $validated)) {
-            $price = $validated['price'] === null ? null : (float) $validated['price'];
-            $pack['price'] = $price;
-            $pack['market_price'] = $price ?? 0;
-            if (isset($pack['op'])) {
-                $pack['op'] = $price ?? 0;
-            }
-            if (isset($pack['rp'])) {
-                $pack['rp'] = $price ?? 0;
+
+        if (array_key_exists('market_price', $validated) || array_key_exists('price', $validated)) {
+            $marketPrice = array_key_exists('market_price', $validated)
+                ? ($validated['market_price'] === null ? null : (float) $validated['market_price'])
+                : ($validated['price'] === null ? null : (float) $validated['price']);
+
+            $pack['price'] = $marketPrice;
+            $pack['market_price'] = $marketPrice;
+            $pack['op'] = $marketPrice;
+        }
+
+        if (array_key_exists('retail_prices', $validated)) {
+            $retailPrices = $this->parseRetailPrices($validated['retail_prices']);
+            if ($retailPrices !== null) {
+                $pack['prices'] = $retailPrices;
+                $pack['rp'] = $retailPrices['regular'] ?? ($pack['market_price'] ?? null);
             }
         }
 
@@ -199,10 +231,48 @@ class ProductPackageController extends Controller
         return [
             'id' => $this->routeIdForPack($productId, $pack, $index),
             'product_id' => $productId,
+            'description' => $this->firstString($pack, ['description']),
             'pack_size' => $packSize,
             'unit' => $unit,
             'price' => $price,
+            'market_price' => $this->firstNumeric($pack, ['market_price', 'price', 'op']),
+            'retail_prices' => $this->retailPricesToRaw($pack['prices'] ?? null),
         ];
+    }
+
+    private function parseRetailPrices(?string $raw): ?array
+    {
+        if ($raw === null) {
+            return null;
+        }
+
+        $parts = array_map('trim', explode(',', $raw));
+        if (count($parts) !== 3) {
+            return null;
+        }
+
+        if (!is_numeric($parts[0]) || !is_numeric($parts[1]) || !is_numeric($parts[2])) {
+            return null;
+        }
+
+        return [
+            'new' => (float) $parts[0],
+            'regular' => (float) $parts[1],
+            'home' => (float) $parts[2],
+        ];
+    }
+
+    private function retailPricesToRaw($prices): ?string
+    {
+        if (!is_array($prices)) {
+            return null;
+        }
+
+        if (!array_key_exists('new', $prices) || !array_key_exists('regular', $prices) || !array_key_exists('home', $prices)) {
+            return null;
+        }
+
+        return $prices['new'] . ',' . $prices['regular'] . ',' . $prices['home'];
     }
 
     private function findPackageByRouteId(int $routeId): ?array

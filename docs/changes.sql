@@ -247,3 +247,19 @@ CREATE TABLE IF NOT EXISTS `hsn_codes` (
 ALTER TABLE `product`
     ADD COLUMN `order_limit` int unsigned NOT NULL DEFAULT 0,
     ADD COLUMN `buffer_limit` int unsigned NOT NULL DEFAULT 0;
+
+
+-- 2026-03-24: Master dropdown tables for supplier form
+CREATE TABLE IF NOT EXISTS `BusinessType` (
+    `id` varchar(10) NOT NULL,
+    `name` varchar(100) NOT NULL,
+    `createdAt` timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `Department` (
+    `id` varchar(10) NOT NULL,
+    `name` varchar(100) NOT NULL,
+    `createdAt` timestamp(3) NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

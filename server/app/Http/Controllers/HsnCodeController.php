@@ -30,10 +30,24 @@ class HsnCodeController extends Controller
 
         $items = $query->limit(500)->get();
 
-        return response()->json([
+        $meta = null;
+        if ($request->boolean('include_next_id', false)) {
+            $maxId = DB::table('hsn_codes')->max('id');
+            $meta = [
+                'next_id' => ((int) ($maxId ?? 0)) + 1,
+            ];
+        }
+
+        $response = [
             'success' => true,
             'data' => $items,
-        ]);
+        ];
+
+        if ($meta !== null) {
+            $response['meta'] = $meta;
+        }
+
+        return response()->json($response);
     }
 
     /**
