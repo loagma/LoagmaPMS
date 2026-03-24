@@ -165,17 +165,25 @@ class _PackageCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${pkg.packSize} ${pkg.unit}',
+                      pkg.description,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: AppColors.primaryDark,
                       ),
                     ),
-                    if (pkg.price != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '${pkg.packSize} ${pkg.unit}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                    if (pkg.marketPrice != null || pkg.price != null) ...[
                       const SizedBox(height: 4),
                       Text(
-                        'Price: ${pkg.price}',
+                        'Market: ${pkg.marketPrice ?? pkg.price}',
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppColors.textMuted,

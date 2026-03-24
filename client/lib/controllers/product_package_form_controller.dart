@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 
@@ -15,9 +16,11 @@ class ProductPackageFormController extends GetxController {
   final isLoading = false.obs;
   final isSaving = false.obs;
 
+  final description = ''.obs;
   final packSize = ''.obs;
-  final unit = ''.obs;
-  final price = ''.obs;
+  final unit = 'KG'.obs;
+  final marketPrice = ''.obs;
+  final retailPrices = ''.obs;
   final productIdInput = ''.obs;
 
   ProductPackageFormController({
@@ -47,9 +50,12 @@ class ProductPackageFormController extends GetxController {
         if (data['success'] == true) {
           final json = data['data'] as Map<String, dynamic>;
           final model = ProductPackage.fromJson(json);
+          description.value = model.description;
           packSize.value = model.packSize.toString();
           unit.value = model.unit;
-          price.value = model.price?.toString() ?? '';
+          marketPrice.value =
+              (model.marketPrice ?? model.price)?.toString() ?? '';
+          retailPrices.value = model.retailPrices ?? '';
         }
       }
     } catch (e) {
@@ -85,11 +91,13 @@ class ProductPackageFormController extends GetxController {
 
       final payload = {
         'product_id': effectiveProductId,
+        'description': description.value.trim(),
         'pack_size': double.parse(packSize.value.trim()),
         'unit': unit.value.trim(),
-        'price': price.value.trim().isEmpty
+        'market_price': double.parse(marketPrice.value.trim()),
+        'retail_prices': retailPrices.value.trim().isEmpty
             ? null
-            : double.parse(price.value.trim()),
+            : retailPrices.value.trim(),
       };
 
       final url = isEditMode
@@ -118,12 +126,14 @@ class ProductPackageFormController extends GetxController {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (data['success'] == true) {
-          Get.snackbar(
-            'Success',
-            data['message']?.toString() ?? 'Package saved successfully',
-            snackPosition: SnackPosition.BOTTOM,
+          await Future.delayed(const Duration(milliseconds: 450));
+          await Fluttertoast.showToast(
+            msg: data['message']?.toString() ?? 'Package saved successfully',
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.BOTTOM,
             backgroundColor: Colors.green,
-            colorText: Colors.white,
+            textColor: Colors.white,
+            fontSize: 14,
           );
           return true;
         }

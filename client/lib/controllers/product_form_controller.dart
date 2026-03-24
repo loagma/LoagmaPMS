@@ -665,6 +665,7 @@ class ProductFormController extends GetxController {
             }
           }
 
+          await Future.delayed(const Duration(milliseconds: 450));
           await Fluttertoast.showToast(
             msg: data['message']?.toString() ?? 'Product saved successfully',
             toastLength: Toast.LENGTH_SHORT,

@@ -194,26 +194,53 @@ class _SupplierBasicsCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Obx(
-                  () => TextFormField(
-                    initialValue: controller.businessType.value,
+                  () => DropdownButtonFormField<String>(
+                    value: controller.businessType.value.isEmpty
+                        ? ''
+                        : controller.businessType.value,
                     decoration: AppInputDecoration.standard(
                       labelText: 'Business Type',
-                      hintText: 'Manufacturer / Distributor',
                     ),
-                    onChanged: (value) => controller.businessType.value = value,
+                    items: [
+                      const DropdownMenuItem<String>(
+                        value: '',
+                        child: Text('Select business type'),
+                      ),
+                      ...controller.businessTypeOptions.map(
+                        (type) => DropdownMenuItem<String>(
+                          value: type,
+                          child: Text(type),
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) =>
+                        controller.businessType.value = value ?? '',
                   ),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Obx(
-                  () => TextFormField(
-                    initialValue: controller.department.value,
+                  () => DropdownButtonFormField<String>(
+                    value: controller.department.value.isEmpty
+                        ? ''
+                        : controller.department.value,
                     decoration: AppInputDecoration.standard(
                       labelText: 'Department',
-                      hintText: 'Food & Beverages',
                     ),
-                    onChanged: (value) => controller.department.value = value,
+                    items: [
+                      const DropdownMenuItem<String>(
+                        value: '',
+                        child: Text('Select department'),
+                      ),
+                      ...controller.departmentOptions.map(
+                        (department) => DropdownMenuItem<String>(
+                          value: department,
+                          child: Text(department),
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) => controller.department.value = value ?? '',
                   ),
                 ),
               ),

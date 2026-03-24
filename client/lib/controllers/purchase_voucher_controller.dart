@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
@@ -545,11 +546,13 @@ class PurchaseVoucherController extends GetxController {
   /// by supplier name, PO number or id.
   Future<List<Map<String, dynamic>>> fetchPurchaseOrdersForLink({
     String? search,
+    int? supplierId,
   }) async {
     try {
       final uri = Uri.parse(ApiConfig.purchaseOrders).replace(
         queryParameters: {
           'limit': '50',
+          if (supplierId != null) 'supplier_id': supplierId.toString(),
           if (search != null && search.trim().isNotEmpty)
             'search': search.trim(),
         },
@@ -565,6 +568,7 @@ class PurchaseVoucherController extends GetxController {
       return list
           .map((e) => {
                 'id': (e as Map)['id'],
+                'supplier_id': (e)['supplier_id'],
                 'po_number': (e)['po_number']?.toString(),
                 'supplier_name': (e)['supplier_name']?.toString() ?? (e)['supplier']?['supplier_name']?.toString(),
                 'doc_date': (e)['doc_date']?.toString(),
@@ -747,14 +751,24 @@ class PurchaseVoucherController extends GetxController {
 
       if ((response.statusCode == 201 || response.statusCode == 200) &&
           data['success'] == true) {
-        Get.back(result: true);
-        _showSuccess(
-          isEdit
-              ? 'Voucher updated'
-              : saveStatus == 'DRAFT'
-                  ? 'Voucher saved as draft'
-                  : 'Purchase voucher posted',
+        final successMessage = isEdit
+            ? 'Voucher updated'
+            : saveStatus == 'DRAFT'
+                ? 'Voucher saved as draft'
+                : 'Purchase voucher posted';
+
+        // Brief buffer so the user sees submit completion before navigation.
+        await Future.delayed(const Duration(milliseconds: 450));
+        await Fluttertoast.showToast(
+          msg: successMessage,
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.green,
+          textColor: Colors.white,
+          fontSize: 14,
         );
+
+        Get.back(result: true);
       } else {
         final msg = data['message'] ?? 'Failed to save voucher';
         final err = data['error'];

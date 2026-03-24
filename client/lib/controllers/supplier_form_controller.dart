@@ -15,6 +15,7 @@ class SupplierFormController extends GetxController {
 
   final isLoading = false.obs;
   final isSaving = false.obs;
+  final isLoadingMasterOptions = false.obs;
 
   // Text editing controllers
   final pincodeController = TextEditingController();
@@ -64,6 +65,9 @@ class SupplierFormController extends GetxController {
   final status = 'ACTIVE'.obs;
   final notes = ''.obs;
 
+  final businessTypeOptions = <String>[].obs;
+  final departmentOptions = <String>[].obs;
+
   final products = <Product>[].obs;
   final supplierProducts = <SupplierProductRow>[].obs;
 
@@ -74,6 +78,7 @@ class SupplierFormController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    _loadMasterOptions();
     if (supplierId != null) {
       _initEdit();
     } else {
@@ -91,6 +96,62 @@ class SupplierFormController extends GetxController {
   Future<void> _initEdit() async {
     await _loadProducts();
     await _loadSupplier();
+  }
+
+  Future<void> _loadMasterOptions() async {
+    try {
+      isLoadingMasterOptions.value = true;
+
+      final responses = await Future.wait([
+        http
+            .get(
+              Uri.parse(ApiConfig.businessTypes),
+              headers: {'Accept': 'application/json'},
+            )
+            .timeout(const Duration(seconds: 30)),
+        http
+            .get(
+              Uri.parse(ApiConfig.departments),
+              headers: {'Accept': 'application/json'},
+            )
+            .timeout(const Duration(seconds: 30)),
+      ]);
+
+      final businessTypeResponse = responses[0];
+      final departmentResponse = responses[1];
+
+      if (businessTypeResponse.statusCode == 200) {
+        final data = jsonDecode(businessTypeResponse.body) as Map<String, dynamic>;
+        if (data['success'] == true && data['data'] is List) {
+          final options = <String>{};
+          for (final item in (data['data'] as List)) {
+            if (item is! Map<String, dynamic>) continue;
+            final name = item['name']?.toString().trim() ?? '';
+            if (name.isNotEmpty) options.add(name);
+          }
+          businessTypeOptions.value = options.toList()..sort();
+        }
+      }
+
+      if (departmentResponse.statusCode == 200) {
+        final data = jsonDecode(departmentResponse.body) as Map<String, dynamic>;
+        if (data['success'] == true && data['data'] is List) {
+          final options = <String>{};
+          for (final item in (data['data'] as List)) {
+            if (item is! Map<String, dynamic>) continue;
+            final name = item['name']?.toString().trim() ?? '';
+            if (name.isNotEmpty) options.add(name);
+          }
+          departmentOptions.value = options.toList()..sort();
+        }
+      }
+
+      _ensureCurrentSelectionsInOptions();
+    } catch (e) {
+      debugPrint('[SUPPLIER_FORM] Master options error: $e');
+    } finally {
+      isLoadingMasterOptions.value = false;
+    }
   }
 
   Future<void> _loadSupplier() async {
@@ -185,6 +246,23 @@ class SupplierFormController extends GetxController {
     isPreferred.value = supplier.isPreferred;
     status.value = supplier.status;
     notes.value = supplier.notes ?? '';
+    _ensureCurrentSelectionsInOptions();
+  }
+
+  void _ensureCurrentSelectionsInOptions() {
+    final currentBusinessType = businessType.value.trim();
+    if (currentBusinessType.isNotEmpty &&
+        !businessTypeOptions.contains(currentBusinessType)) {
+      businessTypeOptions.add(currentBusinessType);
+      businessTypeOptions.sort();
+    }
+
+    final currentDepartment = department.value.trim();
+    if (currentDepartment.isNotEmpty &&
+        !departmentOptions.contains(currentDepartment)) {
+      departmentOptions.add(currentDepartment);
+      departmentOptions.sort();
+    }
   }
 
   Future<void> _loadProducts() async {

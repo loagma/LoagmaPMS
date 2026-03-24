@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 
@@ -268,6 +269,7 @@ class BomController extends GetxController {
             : (saveStatus == 'DRAFT'
                   ? 'BOM saved as draft'
                   : 'BOM approved successfully');
+        await Future.delayed(const Duration(milliseconds: 450));
         _showSuccess(message);
         debugPrint('[BOM] ✅ Success: ${data['data']}');
 
@@ -323,14 +325,13 @@ class RawMaterialRow {
 }
 
 void _showSuccess(String message) {
-  Get.snackbar(
-    'Success',
-    message,
-    snackPosition: SnackPosition.BOTTOM,
+  Fluttertoast.showToast(
+    msg: message,
+    toastLength: Toast.LENGTH_SHORT,
+    gravity: ToastGravity.BOTTOM,
     backgroundColor: AppColors.primary,
-    colorText: Colors.white,
-    margin: const EdgeInsets.all(12),
-    borderRadius: 8,
+    textColor: Colors.white,
+    fontSize: 14,
   );
 }
 

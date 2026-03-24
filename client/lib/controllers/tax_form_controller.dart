@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 
@@ -121,12 +122,15 @@ class TaxFormController extends GetxController {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (data['success'] == true) {
-          Get.snackbar(
-            'Success',
-            data['message']?.toString() ?? 'Tax saved successfully',
-            snackPosition: SnackPosition.BOTTOM,
+          final message = data['message']?.toString() ?? 'Tax saved successfully';
+          await Future.delayed(const Duration(milliseconds: 450));
+          await Fluttertoast.showToast(
+            msg: message,
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.BOTTOM,
             backgroundColor: Colors.green,
-            colorText: Colors.white,
+            textColor: Colors.white,
+            fontSize: 14,
           );
           return true;
         }

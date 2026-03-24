@@ -26,11 +26,6 @@ class PurchaseVoucherScreen extends StatelessWidget {
         onBackPressed: () => Get.back(),
         actions: [
           IconButton(
-            icon: const Icon(Icons.link_rounded, color: Colors.white),
-            tooltip: 'Link to Purchase Order',
-            onPressed: () => _showLinkToPurchaseOrderDialog(context, controller),
-          ),
-          IconButton(
             icon: const Icon(Icons.help_outline_rounded, color: Colors.white),
             tooltip: 'Help',
             onPressed: () {
@@ -139,12 +134,27 @@ Future<void> _showLinkToPurchaseOrderDialog(
   BuildContext context,
   PurchaseVoucherController controller,
 ) async {
-  final list = await controller.fetchPurchaseOrdersForLink();
+  final supplierId = controller.vendorId.value;
+  if (supplierId == null) {
+    Get.snackbar(
+      'Select Supplier',
+      'Please select supplier first to view purchase orders.',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.orange,
+      colorText: Colors.white,
+    );
+    return;
+  }
+
+  final list = await controller.fetchPurchaseOrdersForLink(
+    supplierId: supplierId,
+  );
   if (!context.mounted) return;
   await showDialog<void>(
     context: context,
     builder: (ctx) => _LinkToPODialog(
       list: list,
+      supplierId: supplierId,
       controller: controller,
       onClose: () => Navigator.of(ctx).pop(),
     ),
@@ -153,11 +163,13 @@ Future<void> _showLinkToPurchaseOrderDialog(
 
 class _LinkToPODialog extends StatefulWidget {
   final List<Map<String, dynamic>> list;
+  final int supplierId;
   final PurchaseVoucherController controller;
   final VoidCallback onClose;
 
   const _LinkToPODialog({
     required this.list,
+    required this.supplierId,
     required this.controller,
     required this.onClose,
   });
@@ -192,6 +204,7 @@ class _LinkToPODialogState extends State<_LinkToPODialog> {
       setState(() => _loading = true);
       final results = await widget.controller.fetchPurchaseOrdersForLink(
         search: q.isEmpty ? null : q,
+        supplierId: widget.supplierId,
       );
       if (!mounted) return;
 
@@ -487,6 +500,22 @@ class _HeaderCard extends StatelessWidget {
               validator: (v) => v == null ? 'Please select Vendor' : null,
             );
           }),
+          const SizedBox(height: 8),
+          Obx(() => Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: controller.vendorId.value == null
+                      ? null
+                      : () => _showLinkToPurchaseOrderDialog(context, controller),
+                  icon: const Icon(Icons.link_rounded, size: 16),
+                  label: const Text('Link Purchase Order'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    minimumSize: const Size(0, 30),
+                  ),
+                ),
+              )),
           const SizedBox(height: 16),
           Obx(() => TextFormField(
                 initialValue: controller.narration.value,
@@ -690,12 +719,6 @@ class _ItemsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return ContentCard(
       title: 'Item Details',
-      titleAction: TextButton.icon(
-        onPressed: () => controller.addItemRow(),
-        icon: const Icon(Icons.add_rounded, size: 20),
-        label: const Text('Add Item'),
-        style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-      ),
       child: Obx(() {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -711,6 +734,18 @@ class _ItemsCard extends StatelessWidget {
                   row: controller.items[index],
                 );
               },
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => controller.addItemRow(),
+                icon: const Icon(Icons.add_rounded, size: 20),
+                label: const Text('Add Item'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                ),
+              ),
             ),
           ],
         );
@@ -1243,114 +1278,106 @@ class _ChargesCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return ContentCard(
       title: 'Charges / Discounts',
-      titleAction: TextButton.icon(
-        onPressed: () => controller.addChargeRow(),
-        icon: const Icon(Icons.add_rounded, size: 20),
-        label: const Text('Add'),
-        style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-      ),
       child: Obx(() {
-        if (controller.charges.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              'No charges. Tap Add to add Freight, TCS, Discount, etc.',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-            ),
-          );
-        }
-        return ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: controller.charges.length,
-          itemBuilder: (context, index) {
-            final row = controller.charges[index];
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.primaryLighter.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: AppColors.primaryLight.withValues(alpha: 0.5),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (controller.charges.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'No charges. Tap Add to add Freight, TCS, Discount, etc.',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
                 ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: Obx(() => DropdownButtonFormField<String>(
-                          value: PurchaseVoucherController.chargeTypeNames
-                                  .contains(row.name.value)
-                              ? row.name.value
-                              : PurchaseVoucherController.chargeTypeNames.first,
-                          decoration: AppInputDecoration.standard(
-                            labelText: 'Name',
-                          ).copyWith(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 8,
-                            ),
-                          ),
-                          isExpanded: true,
-                          isDense: true,
-                          items: PurchaseVoucherController.chargeTypeNames
-                              .map(
-                                (s) => DropdownMenuItem(
-                                  value: s,
-                                  child: Text(
-                                    s,
-                                    overflow: TextOverflow.ellipsis,
+              )
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: controller.charges.length,
+                itemBuilder: (context, index) {
+                  final row = controller.charges[index];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryLighter.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.primaryLight.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Obx(() => DropdownButtonFormField<String>(
+                                value: PurchaseVoucherController.chargeTypeNames
+                                        .contains(row.name.value)
+                                    ? row.name.value
+                                    : PurchaseVoucherController.chargeTypeNames.first,
+                                decoration: AppInputDecoration.standard(
+                                  labelText: 'Name',
+                                ).copyWith(
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 8,
                                   ),
                                 ),
-                              )
-                              .toList(),
-                          onChanged: (v) {
-                            if (v != null) row.name.value = v;
-                          },
-                        )),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Obx(() => TextFormField(
-                          initialValue: row.amount.value,
-                          decoration: AppInputDecoration.standard(
-                            labelText: 'Amount',
-                            hintText: '0',
-                          ).copyWith(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 8,
-                            ),
-                          ),
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          onChanged: (v) => row.amount.value = v,
-                        )),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Obx(() => Text(
-                          row.name.value.toLowerCase().contains('discount')
-                              ? '-${row.amount.value}'
-                              : row.amount.value,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        )),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.remove_circle_outline, size: 20),
-                    color: Colors.redAccent,
-                    onPressed: () => controller.removeChargeRow(index),
-                  ),
-                ],
+                                isExpanded: true,
+                                isDense: true,
+                                items: PurchaseVoucherController.chargeTypeNames
+                                    .map(
+                                      (s) => DropdownMenuItem(
+                                        value: s,
+                                        child: Text(
+                                          s,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (v) {
+                                  if (v != null) row.name.value = v;
+                                },
+                              )),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Obx(() => TextFormField(
+                                initialValue: row.amount.value,
+                                decoration: AppInputDecoration.standard(
+                                  labelText: 'Amount',
+                                  hintText: '0',
+                                ),
+                                keyboardType: const TextInputType.numberWithOptions(
+                                  decimal: true,
+                                ),
+                                onChanged: (v) => row.amount.value = v,
+                              )),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded),
+                          color: Colors.redAccent,
+                          onPressed: () => controller.removeChargeRow(index),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
-            );
-          },
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => controller.addChargeRow(),
+                icon: const Icon(Icons.add_rounded, size: 20),
+                label: const Text('Add'),
+                style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+              ),
+            ),
+          ],
         );
       }),
     );

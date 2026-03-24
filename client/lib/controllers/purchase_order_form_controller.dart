@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
@@ -560,7 +561,20 @@ class PurchaseOrderFormController extends GetxController {
 
       if ((response.statusCode == 200 || response.statusCode == 201) &&
           data['success'] == true) {
-        _showSuccess(isCreate ? 'Purchase order created' : 'Purchase order updated');
+        final successMessage =
+            isCreate ? 'Purchase order created' : 'Purchase order updated';
+
+        // Brief buffer so users see submit completion before navigation.
+        await Future.delayed(const Duration(milliseconds: 450));
+        await Fluttertoast.showToast(
+          msg: successMessage,
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.green,
+          textColor: Colors.white,
+          fontSize: 14,
+        );
+
         Get.back(result: true);
       } else {
         _showError(data['message']?.toString() ?? 'Failed to save');

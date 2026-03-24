@@ -238,6 +238,7 @@ class CategoryFormController extends GetxController {
   }
 
   Future<void> _showSuccessToast(String message) async {
+    await Future.delayed(const Duration(milliseconds: 450));
     await Fluttertoast.showToast(
       msg: message,
       toastLength: Toast.LENGTH_SHORT,

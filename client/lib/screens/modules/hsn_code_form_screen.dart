@@ -54,6 +54,19 @@ class HsnCodeFormScreen extends StatelessWidget {
                       children: [
                         Obx(
                           () => TextFormField(
+                            initialValue: controller.previewId.value
+                                ?.toString() ??
+                                'Auto-generated',
+                            readOnly: true,
+                            decoration: AppInputDecoration.standard(
+                              labelText: 'ID',
+                              hintText: 'Auto-generated',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Obx(
+                          () => TextFormField(
                             initialValue: controller.code.value,
                             decoration: AppInputDecoration.standard(
                               labelText: 'HSN Code *',

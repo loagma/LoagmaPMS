@@ -290,30 +290,41 @@ class _ItemsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return ContentCard(
       title: 'Line Items',
-      titleAction: controller.isReadOnly
-          ? null
-          : TextButton.icon(
-              onPressed: controller.addItem,
-              icon: const Icon(Icons.add_rounded, size: 20),
-              label: const Text('Add Item'),
-              style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-            ),
       child: Obx(() {
-        if (controller.items.isEmpty) {
-          return const EmptyState(
-            icon: Icons.shopping_cart_outlined,
-            message: 'No items. Tap "Add Item" to add lines.',
-          );
-        }
-        return ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: controller.items.length,
-          itemBuilder: (context, index) => _ItemRow(
-            controller: controller,
-            index: index,
-            row: controller.items[index],
-          ),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (controller.items.isEmpty)
+              const EmptyState(
+                icon: Icons.shopping_cart_outlined,
+                message: 'No items. Tap "Add Item" to add lines.',
+              )
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: controller.items.length,
+                itemBuilder: (context, index) => _ItemRow(
+                  controller: controller,
+                  index: index,
+                  row: controller.items[index],
+                ),
+              ),
+            if (!controller.isReadOnly) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: controller.addItem,
+                  icon: const Icon(Icons.add_rounded, size: 20),
+                  label: const Text('Add Item'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ],
         );
       }),
     );
