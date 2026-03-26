@@ -12,6 +12,7 @@ use App\Http\Controllers\VendorProductController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SupplierProductController;
 use App\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\PurchaseVoucherController;
 use App\Http\Controllers\TaxController;
 use App\Http\Controllers\ProductTaxController;
 use App\Http\Controllers\CategoryController;
@@ -89,6 +90,12 @@ Route::post('/purchase-orders', [PurchaseOrderController::class, 'store']);
 Route::get('/purchase-orders/{id}', [PurchaseOrderController::class, 'show']);
 Route::put('/purchase-orders/{id}', [PurchaseOrderController::class, 'update']);
 Route::delete('/purchase-orders/{id}', [PurchaseOrderController::class, 'destroy']);
+
+// Purchase Voucher routes
+Route::get('/purchase-vouchers', [PurchaseVoucherController::class, 'index']);
+Route::post('/purchase-vouchers', [PurchaseVoucherController::class, 'store']);
+Route::get('/purchase-vouchers/{id}', [PurchaseVoucherController::class, 'show']);
+Route::put('/purchase-vouchers/{id}', [PurchaseVoucherController::class, 'update']);
 
 // Tax routes
 Route::get('/taxes', [TaxController::class, 'index']);

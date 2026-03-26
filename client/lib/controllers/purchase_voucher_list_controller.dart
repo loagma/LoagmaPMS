@@ -28,6 +28,7 @@ class PurchaseVoucherListController extends GetxController {
   final vouchers = <PurchaseVoucherSummary>[].obs;
   final isLoading = false.obs;
   final _lastRefreshTime = Rxn<DateTime>();
+  final loadError = RxnString();
 
   @override
   void onInit() {
@@ -50,6 +51,7 @@ class PurchaseVoucherListController extends GetxController {
   Future<void> fetchVouchers() async {
     try {
       isLoading.value = true;
+      loadError.value = null;
 
       final response = await http
           .get(
@@ -83,24 +85,48 @@ class PurchaseVoucherListController extends GetxController {
           }).toList();
         } else {
           vouchers.value = [];
+          final message = data['message']?.toString() ??
+              'Could not load purchase vouchers from server.';
+          loadError.value = message;
+          _showLoadError(message);
         }
       } else {
-        // Backend may not exist yet; treat as empty list
+        String message =
+            'Server returned ${response.statusCode} while loading purchase vouchers.';
+        try {
+          final body = jsonDecode(response.body) as Map<String, dynamic>;
+          final backendMessage = body['message']?.toString();
+          if (backendMessage != null && backendMessage.isNotEmpty) {
+            message = backendMessage;
+          }
+        } catch (_) {
+          // Keep status-based fallback message.
+        }
         vouchers.value = [];
+        loadError.value = message;
+        _showLoadError(message);
       }
     } catch (e) {
       debugPrint('[PURCHASE_VOUCHER_LIST] Failed: $e');
       vouchers.value = [];
-      Get.snackbar(
-        'Notice',
-        'Could not load purchase vouchers. Backend may not be ready.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange.shade700,
-        colorText: Colors.white,
-      );
+      const message =
+          'Could not load purchase vouchers. Please check backend/API URL.';
+      loadError.value = message;
+      _showLoadError(message);
     } finally {
       isLoading.value = false;
     }
+  }
+
+  void _showLoadError(String message) {
+    Get.snackbar(
+      'Purchase Voucher Report',
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.redAccent,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 4),
+    );
   }
 
   String _formatDate(String dateStr) {
