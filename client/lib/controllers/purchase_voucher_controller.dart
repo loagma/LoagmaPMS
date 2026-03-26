@@ -55,6 +55,8 @@ class PurchaseVoucherController extends GetxController {
   final isLoading = false.obs;
   final isSaving = false.obs;
 
+  final _productTaxCache = <int, List<Map<String, dynamic>>>{};
+
   /// Parsed numeric sequence from docNoNumber/docNo used for navigation.
   final RxnInt currentSeq = RxnInt();
 
@@ -104,6 +106,16 @@ class PurchaseVoucherController extends GetxController {
     final qty = double.tryParse(row.quantity.value) ?? 0;
     final price = double.tryParse(row.unitPrice.value) ?? 0;
     row.taxableAmount.value = (qty * price).toStringAsFixed(2);
+
+    if (row.autoTaxRecompute.value) {
+      final taxable = double.tryParse(row.taxableAmount.value) ?? 0;
+      row.sgst.value = _taxAmountFromPercent(taxable, row.sgstPercent.value);
+      row.cgst.value = _taxAmountFromPercent(taxable, row.cgstPercent.value);
+      row.igst.value = _taxAmountFromPercent(taxable, row.igstPercent.value);
+      row.cess.value = _taxAmountFromPercent(taxable, row.cessPercent.value);
+      row.roff.value = _taxAmountFromPercent(taxable, row.roffPercent.value);
+    }
+
     final taxable = double.tryParse(row.taxableAmount.value) ?? 0;
     final sgst = double.tryParse(row.sgst.value) ?? 0;
     final cgst = double.tryParse(row.cgst.value) ?? 0;
@@ -113,6 +125,189 @@ class PurchaseVoucherController extends GetxController {
     final value = taxable + sgst + cgst + igst + cess + roff;
     row.value.value = value.toStringAsFixed(2);
   }
+
+  String _taxAmountFromPercent(double taxable, String percentRaw) {
+    final percent = double.tryParse(percentRaw) ?? 0;
+    if (taxable <= 0 || percent <= 0) return '';
+    return (taxable * percent / 100).toStringAsFixed(2);
+  }
+
+  void onTaxAmountManuallyChanged(PVItemRow row, String key, String value) {
+    final taxable = double.tryParse(row.taxableAmount.value) ?? 0;
+    final amount = double.tryParse(value) ?? 0;
+    final percent = (taxable > 0 && amount > 0) ? (amount * 100 / taxable) : 0;
+
+    switch (key.toUpperCase()) {
+      case 'SGST':
+        row.sgstPercent.value = percent.toStringAsFixed(4);
+        row.taxFieldValues['SGST'] = row.sgstPercent.value;
+        break;
+      case 'CGST':
+        row.cgstPercent.value = percent.toStringAsFixed(4);
+        row.taxFieldValues['CGST'] = row.cgstPercent.value;
+        break;
+      case 'IGST':
+        row.igstPercent.value = percent.toStringAsFixed(4);
+        row.taxFieldValues['IGST'] = row.igstPercent.value;
+        break;
+      case 'CESS':
+        row.cessPercent.value = percent.toStringAsFixed(4);
+        row.taxFieldValues['CESS'] = row.cessPercent.value;
+        break;
+      case 'ROFF':
+      case 'ROUND':
+        row.roffPercent.value = percent.toStringAsFixed(4);
+        row.taxFieldValues['ROFF'] = row.roffPercent.value;
+        break;
+    }
+
+    row.autoTaxRecompute.value = true;
+    recalcItemRow(row);
+  }
+
+  /// Resolves voucher line taxes only from product_taxes for selected product.
+  Future<void> applyResolvedTaxesToVoucherRow(
+    PVItemRow row, {
+    required int productId,
+  }) async {
+    _clearVoucherTaxBreakdown(row);
+
+    final productTaxes = await _fetchProductTaxRows(productId);
+    final applied = _applyTaxRowsToVoucherAmounts(row, productTaxes);
+
+    if (!applied) {
+      recalcItemRow(row);
+    }
+  }
+
+  void _clearVoucherTaxBreakdown(PVItemRow row) {
+    row.sgst.value = '';
+    row.cgst.value = '';
+    row.igst.value = '';
+    row.cess.value = '';
+    row.roff.value = '';
+    row.sgstPercent.value = '';
+    row.cgstPercent.value = '';
+    row.igstPercent.value = '';
+    row.cessPercent.value = '';
+    row.roffPercent.value = '';
+    row.autoTaxRecompute.value = false;
+    row.taxFieldValues.clear();
+    row.availableTaxKeys.clear();
+  }
+
+  bool _applyTaxRowsToVoucherAmounts(
+    PVItemRow row,
+    List<Map<String, dynamic>> rows,
+  ) {
+    if (rows.isEmpty) return false;
+    final taxable = double.tryParse(row.taxableAmount.value) ??
+        ((double.tryParse(row.quantity.value) ?? 0) *
+            (double.tryParse(row.unitPrice.value) ?? 0));
+    if (taxable <= 0) return false;
+
+    var applied = false;
+    final fixedKeys = <String>{};
+    final customKeys = <String>[];
+
+    for (final map in rows) {
+      final tax = map['tax'] as Map<String, dynamic>?;
+      final rawName = (tax?['tax_name'] ?? map['tax_name'] ?? '').toString().trim();
+      final rawSub = (tax?['tax_sub_category'] ?? map['tax_sub_category'] ?? '')
+          .toString()
+          .trim();
+      final taxName = rawName.toUpperCase();
+      final taxSub = rawSub.toUpperCase();
+      final percent = (map['tax_percent'] ?? 0) is num
+          ? (map['tax_percent'] as num).toDouble()
+          : double.tryParse(map['tax_percent']?.toString() ?? '') ?? 0;
+      if (percent <= 0) continue;
+
+      final canonical = _canonicalTaxKey(taxName, taxSub);
+      final label = canonical ??
+          (rawName.isNotEmpty
+              ? rawName
+              : (rawSub.isNotEmpty ? rawSub : 'Tax'));
+      row.taxFieldValues[label] = percent.toStringAsFixed(2);
+
+      if (canonical == null && !customKeys.contains(label)) {
+        customKeys.add(label);
+      }
+
+      if (canonical == 'SGST') {
+        row.sgstPercent.value = percent.toStringAsFixed(4);
+        fixedKeys.add('SGST');
+        applied = true;
+      } else if (canonical == 'CGST') {
+        row.cgstPercent.value = percent.toStringAsFixed(4);
+        fixedKeys.add('CGST');
+        applied = true;
+      } else if (canonical == 'IGST') {
+        row.igstPercent.value = percent.toStringAsFixed(4);
+        fixedKeys.add('IGST');
+        applied = true;
+      } else if (canonical == 'CESS') {
+        row.cessPercent.value = percent.toStringAsFixed(4);
+        fixedKeys.add('CESS');
+        applied = true;
+      } else if (canonical == 'ROFF') {
+        row.roffPercent.value = percent.toStringAsFixed(4);
+        fixedKeys.add('ROFF');
+        applied = true;
+      } else {
+        applied = true;
+      }
+    }
+
+    if (applied) {
+      final ordered = ['SGST', 'CGST', 'IGST', 'CESS', 'ROFF']
+          .where(fixedKeys.contains)
+          .toList();
+      ordered.addAll(customKeys);
+      row.availableTaxKeys.assignAll(ordered);
+      row.autoTaxRecompute.value = true;
+      recalcItemRow(row);
+    }
+    return applied;
+  }
+
+  bool _matchesTax(String taxName, String taxSub, String key) {
+    return taxName.contains(key) || taxSub.contains(key);
+  }
+
+  String? _canonicalTaxKey(String taxName, String taxSub) {
+    if (_matchesTax(taxName, taxSub, 'SGST')) return 'SGST';
+    if (_matchesTax(taxName, taxSub, 'CGST')) return 'CGST';
+    if (_matchesTax(taxName, taxSub, 'IGST')) return 'IGST';
+    if (_matchesTax(taxName, taxSub, 'CESS')) return 'CESS';
+    if (_matchesTax(taxName, taxSub, 'ROFF') || taxName.contains('ROUND')) {
+      return 'ROFF';
+    }
+    return null;
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchProductTaxRows(int productId) async {
+    final cached = _productTaxCache[productId];
+    if (cached != null) return cached;
+
+    final uri = Uri.parse(ApiConfig.productTaxes).replace(
+      queryParameters: {'product_id': productId.toString(), 'limit': '100'},
+    );
+    final response = await http
+        .get(uri, headers: {'Accept': 'application/json'})
+        .timeout(const Duration(seconds: 10));
+    if (response.statusCode != 200) return [];
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    if (data['success'] != true) return [];
+    final List list = data['data'] ?? [];
+    final rows = list
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+    _productTaxCache[productId] = rows;
+    return rows;
+  }
+
 
   Future<void> _loadVoucherData() async {
     if (voucherId == null) return;
@@ -388,6 +583,8 @@ class PurchaseVoucherController extends GetxController {
       row.igst.value = map['igst']?.toString() ?? '0';
       row.cess.value = map['cess']?.toString() ?? '0';
       row.roff.value = map['roff']?.toString() ?? '0';
+      _deriveTaxPercentsFromCurrentAmounts(row);
+      _syncAvailableTaxKeysFromCurrentValues(row);
       row.value.value = map['value']?.toString() ?? '0';
       row.purchaseAccount.value = map['purchase_account']?.toString() ?? 'Def Purchase Accounts';
       row.gstItcEligibility.value = map['gst_itc_eligibility']?.toString() ?? '';
@@ -582,7 +779,7 @@ class PurchaseVoucherController extends GetxController {
   }
 
   /// Fills the voucher from a purchase order (vendor, narration, and all line items).
-  void loadFromPurchaseOrder(PurchaseOrder po) {
+  Future<void> loadFromPurchaseOrder(PurchaseOrder po) async {
     linkedPurchaseOrderId.value = po.id;
     linkedPoNumber.value = po.poNumber;
     setVendor(po.supplierId, po.supplierName ?? 'Vendor');
@@ -613,7 +810,10 @@ class PurchaseVoucherController extends GetxController {
       row.unitType.value = item.unit ?? (unitTypes.isNotEmpty ? unitTypes.first : 'Nos');
       row.unitPrice.value = item.price.toStringAsFixed(2);
       row.taxableAmount.value = (item.quantity * item.price).toStringAsFixed(2);
-      row.value.value = row.taxableAmount.value;
+      await applyResolvedTaxesToVoucherRow(
+        row,
+        productId: item.productId,
+      );
       items.add(row);
     }
     if (items.isEmpty) addItemRow();
@@ -788,6 +988,67 @@ class PurchaseVoucherController extends GetxController {
 
   Future<void> saveDraft() => _saveVoucher('DRAFT');
 
+  void _deriveTaxPercentsFromCurrentAmounts(PVItemRow row) {
+    final taxable = double.tryParse(row.taxableAmount.value) ?? 0;
+    if (taxable <= 0) {
+      row.autoTaxRecompute.value = false;
+      return;
+    }
+
+    double asPct(String amountRaw) {
+      final amount = double.tryParse(amountRaw) ?? 0;
+      if (amount <= 0) return 0;
+      return (amount * 100) / taxable;
+    }
+
+    row.sgstPercent.value = asPct(row.sgst.value).toStringAsFixed(4);
+    row.cgstPercent.value = asPct(row.cgst.value).toStringAsFixed(4);
+    row.igstPercent.value = asPct(row.igst.value).toStringAsFixed(4);
+    row.cessPercent.value = asPct(row.cess.value).toStringAsFixed(4);
+    row.roffPercent.value = asPct(row.roff.value).toStringAsFixed(4);
+    row.autoTaxRecompute.value = true;
+  }
+
+  void _syncAvailableTaxKeysFromCurrentValues(PVItemRow row) {
+    final keys = <String>[];
+    bool has(String value) => value.trim().isNotEmpty && value.trim() != '0' && value.trim() != '0.00';
+
+    row.taxFieldValues.clear();
+
+    if (has(row.sgst.value) || has(row.sgstPercent.value)) {
+      keys.add('SGST');
+      row.taxFieldValues['SGST'] =
+          has(row.sgstPercent.value) ? row.sgstPercent.value : row.sgst.value;
+    }
+    if (has(row.cgst.value) || has(row.cgstPercent.value)) {
+      keys.add('CGST');
+      row.taxFieldValues['CGST'] =
+          has(row.cgstPercent.value) ? row.cgstPercent.value : row.cgst.value;
+    }
+    if (has(row.igst.value) || has(row.igstPercent.value)) {
+      keys.add('IGST');
+      row.taxFieldValues['IGST'] =
+          has(row.igstPercent.value) ? row.igstPercent.value : row.igst.value;
+    }
+    if (has(row.cess.value) || has(row.cessPercent.value)) {
+      keys.add('CESS');
+      row.taxFieldValues['CESS'] =
+          has(row.cessPercent.value) ? row.cessPercent.value : row.cess.value;
+    }
+    if (has(row.roff.value) || has(row.roffPercent.value)) {
+      keys.add('ROFF');
+      row.taxFieldValues['ROFF'] =
+          has(row.roffPercent.value) ? row.roffPercent.value : row.roff.value;
+    }
+
+    row.availableTaxKeys.assignAll(keys);
+  }
+
+  void clearVoucherTaxesForRow(PVItemRow row) {
+    _clearVoucherTaxBreakdown(row);
+    recalcItemRow(row);
+  }
+
   Future<void> confirmPost() async {
     final confirmed = await Get.dialog<bool>(
       AlertDialog(
@@ -820,11 +1081,19 @@ class PVItemRow {
   final unitType = 'Nos'.obs;
   final unitPrice = ''.obs;
   final taxableAmount = '0'.obs;
-  final sgst = '0'.obs;
-  final cgst = '0'.obs;
-  final igst = '0'.obs;
-  final cess = '0'.obs;
-  final roff = '0'.obs;
+  final sgst = ''.obs;
+  final cgst = ''.obs;
+  final igst = ''.obs;
+  final cess = ''.obs;
+  final roff = ''.obs;
+  final sgstPercent = ''.obs;
+  final cgstPercent = ''.obs;
+  final igstPercent = ''.obs;
+  final cessPercent = ''.obs;
+  final roffPercent = ''.obs;
+  final taxFieldValues = <String, String>{}.obs;
+  final availableTaxKeys = <String>[].obs;
+  final autoTaxRecompute = false.obs;
   final value = '0'.obs;
   final purchaseAccount = 'Def Purchase Accounts'.obs;
   final gstItcEligibility = ''.obs;

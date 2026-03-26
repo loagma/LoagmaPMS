@@ -248,7 +248,7 @@ class _LinkToPODialogState extends State<_LinkToPODialog> {
       );
       return;
     }
-    widget.controller.loadFromPurchaseOrder(po);
+    await widget.controller.loadFromPurchaseOrder(po);
     nav.pop();
   }
 
@@ -823,6 +823,26 @@ class _ItemRow extends StatelessWidget {
             row: row,
             excludeIds: excludeIds.toSet(),
           ),
+          Obx(() {
+            if (row.product.value == null || row.availableTaxKeys.isEmpty) {
+              return const SizedBox.shrink();
+            }
+            return Column(
+              children: [
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: row.availableTaxKeys
+                      .map((k) => SizedBox(
+                            width: 140,
+                            child: _smallNumField(row.taxFieldValues[k] ?? '', k),
+                          ))
+                      .toList(),
+                ),
+              ],
+            );
+          }),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -944,24 +964,6 @@ class _ItemRow extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _smallNumField(row.sgst, 'SGST'),
-              const SizedBox(width: 8),
-              _smallNumField(row.cgst, 'CGST'),
-              const SizedBox(width: 8),
-              _smallNumField(row.igst, 'IGST'),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              _smallNumField(row.cess, 'Cess'),
-              const SizedBox(width: 8),
-              _smallNumField(row.roff, 'Roff'),
-            ],
-          ),
           const SizedBox(height: 8),
           Obx(() => Align(
                 alignment: Alignment.centerRight,
@@ -979,29 +981,25 @@ class _ItemRow extends StatelessWidget {
     );
   }
 
-  Widget _smallNumField(Rx<String> obs, String label) {
-    return Expanded(
-      child: TextFormField(
-        key: ValueKey('$label${obs.value}'),
-        initialValue: obs.value,
-        decoration: InputDecoration(
-          labelText: label,
-          isDense: true,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: AppColors.primaryLight),
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 8,
-            vertical: 8,
-          ),
+  Widget _smallNumField(String value, String label) {
+    return TextFormField(
+      key: ValueKey('${label}_$value'),
+      initialValue: value,
+      enabled: false,
+      decoration: InputDecoration(
+        labelText: label,
+        isDense: true,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.primaryLight),
         ),
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        onChanged: (v) {
-          obs.value = v;
-          controller.recalcItemRow(row);
-        },
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 8,
+          vertical: 8,
+        ),
       ),
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      readOnly: true,
     );
   }
 }
@@ -1045,7 +1043,10 @@ class _ProductPickerField extends StatelessWidget {
                   if (unit != null && unit.isNotEmpty && controller.unitTypes.contains(unit)) {
                     row.unitType.value = unit;
                   }
-                  controller.recalcItemRow(row);
+                  await controller.applyResolvedTaxesToVoucherRow(
+                    row,
+                    productId: product.id,
+                  );
                   state.didChange(product);
                 }
               },
@@ -1075,7 +1076,7 @@ class _ProductPickerField extends StatelessWidget {
                           row.productName.value = '';
                           row.productCode.value = '';
                           row.alias.value = '';
-                          controller.recalcItemRow(row);
+                          controller.clearVoucherTaxesForRow(row);
                           state.didChange(null);
                         },
                       ),

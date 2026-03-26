@@ -134,58 +134,126 @@ class PurchaseOrderFormController extends GetxController {
   Future<List<Map<String, dynamic>>> searchProducts(String query) =>
       _searchAllProducts(query);
 
-  /// Fetches product taxes for a product and applies them to the given row.
-  /// Maps tax_name/tax_sub_category to sgst, cgst, igst, cess, roff.
-  /// Sets taxPercent to the sum of all tax percentages for API compatibility.
+  /// Resolves line-item taxes only from product_taxes for selected product.
+  /// If no product taxes are found, tax fields remain empty.
   Future<void> applyProductTaxesToRow(POLineRow row, int productId) async {
+    _clearTaxBreakdown(row);
     try {
-      final uri = Uri.parse(ApiConfig.productTaxes).replace(
-        queryParameters: {'product_id': productId.toString(), 'limit': '50'},
-      );
-      final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode != 200) return;
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (data['success'] != true) return;
-      final List list = data['data'] ?? [];
-      double totalPercent = 0;
-      for (final e in list) {
-        final map = e as Map<String, dynamic>;
-        final tax = map['tax'] as Map<String, dynamic>?;
-        final taxName = (tax?['tax_name'] ?? tax?['tax_sub_category'] ?? '')
-            .toString()
-            .toUpperCase();
-        final taxSub = (tax?['tax_sub_category'] ?? '')
-            .toString()
-            .toUpperCase();
-        final percent = (map['tax_percent'] ?? 0) is num
-            ? (map['tax_percent'] as num).toDouble()
-            : double.tryParse(map['tax_percent']?.toString() ?? '') ?? 0;
-        totalPercent += percent;
-        if (_matchesTax(taxName, taxSub, 'SGST')) {
-          row.sgst.value = percent.toStringAsFixed(2);
-        } else if (_matchesTax(taxName, taxSub, 'CGST')) {
-          row.cgst.value = percent.toStringAsFixed(2);
-        } else if (_matchesTax(taxName, taxSub, 'IGST')) {
-          row.igst.value = percent.toStringAsFixed(2);
-        } else if (_matchesTax(taxName, taxSub, 'CESS')) {
-          row.cess.value = percent.toStringAsFixed(2);
-        } else if (_matchesTax(taxName, taxSub, 'ROFF') ||
-            taxName.contains('ROUND')) {
-          row.roff.value = percent.toStringAsFixed(2);
-        }
-      }
-      if (totalPercent > 0) {
-        row.taxPercent.value = totalPercent.toStringAsFixed(2);
+      final productTaxes = await _fetchProductTaxRows(productId);
+      final applied = _applyTaxRowsToRow(row, productTaxes);
+
+      if (!applied) {
+        row.taxPercent.value = '';
       }
     } catch (e) {
-      debugPrint('[PO FORM] Fetch product taxes error: $e');
+      debugPrint('[PO FORM] Resolve taxes error: $e');
+      row.taxPercent.value = '';
     }
+  }
+
+  void _clearTaxBreakdown(POLineRow row) {
+    row.sgst.value = '';
+    row.cgst.value = '';
+    row.igst.value = '';
+    row.cess.value = '';
+    row.roff.value = '';
+    row.taxFieldValues.clear();
+    row.availableTaxKeys.clear();
+  }
+
+  bool _applyTaxRowsToRow(POLineRow row, List<Map<String, dynamic>> rows) {
+    if (rows.isEmpty) return false;
+    var applied = false;
+    var totalPercent = 0.0;
+    final fixedKeys = <String>{};
+    final customKeys = <String>[];
+
+    for (final map in rows) {
+      final tax = map['tax'] as Map<String, dynamic>?;
+      final rawName = (tax?['tax_name'] ?? map['tax_name'] ?? '').toString().trim();
+      final rawSub =
+          (tax?['tax_sub_category'] ?? map['tax_sub_category'] ?? '').toString().trim();
+      final taxName = rawName.toUpperCase();
+      final taxSub = rawSub.toUpperCase();
+      final percent = (map['tax_percent'] ?? 0) is num
+          ? (map['tax_percent'] as num).toDouble()
+          : double.tryParse(map['tax_percent']?.toString() ?? '') ?? 0;
+
+      if (percent <= 0) continue;
+      totalPercent += percent;
+      final canonical = _canonicalTaxKey(taxName, taxSub);
+      final label = canonical ?? (rawName.isNotEmpty ? rawName : (rawSub.isNotEmpty ? rawSub : 'Tax'));
+      row.taxFieldValues[label] = percent.toStringAsFixed(2);
+      if (canonical == null && !customKeys.contains(label)) {
+        customKeys.add(label);
+      }
+
+      if (canonical == 'SGST') {
+        row.sgst.value = percent.toStringAsFixed(2);
+        fixedKeys.add('SGST');
+        applied = true;
+      } else if (canonical == 'CGST') {
+        row.cgst.value = percent.toStringAsFixed(2);
+        fixedKeys.add('CGST');
+        applied = true;
+      } else if (canonical == 'IGST') {
+        row.igst.value = percent.toStringAsFixed(2);
+        fixedKeys.add('IGST');
+        applied = true;
+      } else if (canonical == 'CESS') {
+        row.cess.value = percent.toStringAsFixed(2);
+        fixedKeys.add('CESS');
+        applied = true;
+      } else if (canonical == 'ROFF') {
+        row.roff.value = percent.toStringAsFixed(2);
+        fixedKeys.add('ROFF');
+        applied = true;
+      } else {
+        applied = true;
+      }
+    }
+
+    if (applied) {
+      final ordered = ['SGST', 'CGST', 'IGST', 'CESS', 'ROFF']
+          .where(fixedKeys.contains)
+          .toList();
+      ordered.addAll(customKeys);
+      row.availableTaxKeys.assignAll(ordered);
+      row.taxPercent.value = totalPercent.toStringAsFixed(2);
+    }
+    return applied;
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchProductTaxRows(int productId) async {
+    final uri = Uri.parse(ApiConfig.productTaxes).replace(
+      queryParameters: {'product_id': productId.toString(), 'limit': '100'},
+    );
+    final response = await http
+        .get(uri, headers: {'Accept': 'application/json'})
+        .timeout(const Duration(seconds: 10));
+    if (response.statusCode != 200) return [];
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    if (data['success'] != true) return [];
+    final List list = data['data'] ?? [];
+    return list
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
   }
 
   bool _matchesTax(String taxName, String taxSub, String key) {
     return taxName.contains(key) || taxSub.contains(key);
+  }
+
+  String? _canonicalTaxKey(String taxName, String taxSub) {
+    if (_matchesTax(taxName, taxSub, 'SGST')) return 'SGST';
+    if (_matchesTax(taxName, taxSub, 'CGST')) return 'CGST';
+    if (_matchesTax(taxName, taxSub, 'IGST')) return 'IGST';
+    if (_matchesTax(taxName, taxSub, 'CESS')) return 'CESS';
+    if (_matchesTax(taxName, taxSub, 'ROFF') || taxName.contains('ROUND')) {
+      return 'ROFF';
+    }
+    return null;
   }
 
   void _setDefaultDocDate() {
@@ -282,7 +350,7 @@ class PurchaseOrderFormController extends GetxController {
     return (base ?? 0) + 1;
   }
 
-  void _applyPurchaseOrderToState(PurchaseOrder po) {
+  Future<void> _applyPurchaseOrderToState(PurchaseOrder po) async {
     financialYear.value = po.financialYear ?? '25-26';
     supplierId.value = po.supplierId;
     docDate.value = po.docDate;
@@ -311,6 +379,15 @@ class PurchaseOrderFormController extends GetxController {
       ));
     }
     if (items.isEmpty) items.add(POLineRow());
+    await _hydrateLineItemTaxes();
+  }
+
+  Future<void> _hydrateLineItemTaxes() async {
+    for (final row in items) {
+      final pid = row.productId.value;
+      if (pid == null || pid <= 0) continue;
+      await applyProductTaxesToRow(row, pid);
+    }
   }
 
   /// Load a purchase order by a numeric sequence (voucher number).
@@ -364,7 +441,7 @@ class PurchaseOrderFormController extends GetxController {
       }
       final poData = detailData['data'] as Map<String, dynamic>;
       final po = PurchaseOrder.fromJson(poData);
-      _applyPurchaseOrderToState(po);
+      await _applyPurchaseOrderToState(po);
       // Navigated vouchers should start in view-only mode.
       viewOnly.value = true;
     } catch (e) {
@@ -421,6 +498,7 @@ class PurchaseOrderFormController extends GetxController {
             ));
           }
           if (items.isEmpty) items.add(POLineRow());
+          await _hydrateLineItemTaxes();
         }
       }
     } catch (e) {
@@ -618,11 +696,13 @@ class POLineRow {
   // Whether the entered unit price is inclusive of tax (true) or exclusive (false).
   final isInclusiveTax = false.obs;
   // Detailed tax breakdown (frontend only for now, default 0).
-  final sgst = '0'.obs;
-  final cgst = '0'.obs;
-  final igst = '0'.obs;
-  final cess = '0'.obs;
-  final roff = '0'.obs;
+  final sgst = ''.obs;
+  final cgst = ''.obs;
+  final igst = ''.obs;
+  final cess = ''.obs;
+  final roff = ''.obs;
+  final taxFieldValues = <String, String>{}.obs;
+  final availableTaxKeys = <String>[].obs;
   final unit = 'PCS'.obs;
   final description = ''.obs;
 
@@ -651,6 +731,9 @@ class POLineRow {
 
   /// Total tax percent from breakdown (sgst+cgst+igst+cess+roff) or taxPercent.
   double get _effectiveTaxPercent {
+    final fromTaxPercent = double.tryParse(taxPercent.value) ?? 0;
+    if (fromTaxPercent > 0) return fromTaxPercent;
+
     final sgst = double.tryParse(this.sgst.value) ?? 0;
     final cgst = double.tryParse(this.cgst.value) ?? 0;
     final igst = double.tryParse(this.igst.value) ?? 0;
@@ -658,7 +741,7 @@ class POLineRow {
     final roff = double.tryParse(this.roff.value) ?? 0;
     final fromBreakdown = sgst + cgst + igst + cess + roff;
     if (fromBreakdown > 0) return fromBreakdown;
-    return double.tryParse(taxPercent.value) ?? 0;
+    return 0;
   }
 
   /// Price including tax (computed).

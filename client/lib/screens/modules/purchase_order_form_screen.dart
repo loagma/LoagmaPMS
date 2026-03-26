@@ -391,6 +391,26 @@ class _ItemRow extends StatelessWidget {
             row: row,
             readOnly: controller.isReadOnly,
           ),
+          Obx(() {
+            if (row.productId.value == null || row.availableTaxKeys.isEmpty) {
+              return const SizedBox.shrink();
+            }
+            return Column(
+              children: [
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: row.availableTaxKeys
+                      .map((k) => SizedBox(
+                            width: 140,
+                            child: _taxField(row.taxFieldValues[k] ?? '', k),
+                          ))
+                      .toList(),
+                ),
+              ],
+            );
+          }),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -558,24 +578,6 @@ class _ItemRow extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              _taxField(row.sgst, 'SGST'),
-              const SizedBox(width: 8),
-              _taxField(row.cgst, 'CGST'),
-              const SizedBox(width: 8),
-              _taxField(row.igst, 'IGST'),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              _taxField(row.cess, 'Cess'),
-              const SizedBox(width: 8),
-              _taxField(row.roff, 'Roff'),
-            ],
-          ),
           const SizedBox(height: 6),
           Obx(() => Text(
                 'Price (incl. tax): ₹ ${row.priceInclTax.toStringAsFixed(2)}',
@@ -614,29 +616,25 @@ class _ItemRow extends StatelessWidget {
     );
   }
 
-  Widget _taxField(RxString value, String label) {
-    return Expanded(
-      child: Obx(
-        () => TextFormField(
-          enabled: !controller.isReadOnly,
-          initialValue: value.value,
-          decoration: InputDecoration(
-            labelText: label,
-            isDense: true,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: AppColors.primaryLight),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 8,
-            ),
-          ),
-          keyboardType:
-              const TextInputType.numberWithOptions(decimal: true),
-          onChanged: (v) => value.value = v,
+  Widget _taxField(String value, String label) {
+    return TextFormField(
+      enabled: false,
+      key: ValueKey('${label}_$value'),
+      initialValue: value,
+      decoration: InputDecoration(
+        labelText: label,
+        isDense: true,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.primaryLight),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 8,
+          vertical: 8,
         ),
       ),
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      readOnly: true,
     );
   }
 }
