@@ -137,6 +137,7 @@ class PurchaseOrderFormController extends GetxController {
   /// Resolves line-item taxes only from product_taxes for selected product.
   /// If no product taxes are found, tax fields remain empty.
   Future<void> applyProductTaxesToRow(POLineRow row, int productId) async {
+    row.isTaxLoading.value = true;
     _clearTaxBreakdown(row);
     try {
       final productTaxes = await _fetchProductTaxRows(productId);
@@ -148,6 +149,8 @@ class PurchaseOrderFormController extends GetxController {
     } catch (e) {
       debugPrint('[PO FORM] Resolve taxes error: $e');
       row.taxPercent.value = '';
+    } finally {
+      row.isTaxLoading.value = false;
     }
   }
 
@@ -703,6 +706,7 @@ class POLineRow {
   final roff = ''.obs;
   final taxFieldValues = <String, String>{}.obs;
   final availableTaxKeys = <String>[].obs;
+  final isTaxLoading = false.obs;
   final unit = 'PCS'.obs;
   final description = ''.obs;
 

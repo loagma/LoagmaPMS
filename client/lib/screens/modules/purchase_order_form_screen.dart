@@ -392,6 +392,26 @@ class _ItemRow extends StatelessWidget {
             readOnly: controller.isReadOnly,
           ),
           Obx(() {
+            if (!row.isTaxLoading.value) return const SizedBox.shrink();
+            return const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Fetching taxes...',
+                    style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                  ),
+                ],
+              ),
+            );
+          }),
+          Obx(() {
             if (row.productId.value == null || row.availableTaxKeys.isEmpty) {
               return const SizedBox.shrink();
             }

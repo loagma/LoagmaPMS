@@ -190,61 +190,97 @@ class _SupplierBasicsCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Obx(
-                  () => DropdownButtonFormField<String>(
-                    value: controller.businessType.value.isEmpty
-                        ? ''
-                        : controller.businessType.value,
-                    decoration: AppInputDecoration.standard(
-                      labelText: 'Business Type',
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 520;
+              final businessTypeField = Obx(
+                () => DropdownButtonFormField<String>(
+                  value: controller.businessType.value.isEmpty
+                      ? ''
+                      : controller.businessType.value,
+                  isExpanded: true,
+                  decoration: AppInputDecoration.standard(
+                    labelText: 'Business Type',
+                  ).copyWith(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 12,
                     ),
-                    items: [
-                      const DropdownMenuItem<String>(
-                        value: '',
-                        child: Text('Select business type'),
+                  ),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: '',
+                      child: Text(
+                        'Select business type',
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      ...controller.businessTypeOptions.map(
-                        (type) => DropdownMenuItem<String>(
-                          value: type,
-                          child: Text(type),
+                    ),
+                    ...controller.businessTypeOptions.map(
+                      (type) => DropdownMenuItem<String>(
+                        value: type,
+                        child: Text(type, overflow: TextOverflow.ellipsis),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) =>
+                      controller.businessType.value = value ?? '',
+                ),
+              );
+
+              final departmentField = Obx(
+                () => DropdownButtonFormField<String>(
+                  value: controller.department.value.isEmpty
+                      ? ''
+                      : controller.department.value,
+                  isExpanded: true,
+                  decoration: AppInputDecoration.standard(
+                    labelText: 'Department',
+                  ).copyWith(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 12,
+                    ),
+                  ),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: '',
+                      child: Text(
+                        'Select department',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    ...controller.departmentOptions.map(
+                      (department) => DropdownMenuItem<String>(
+                        value: department,
+                        child: Text(
+                          department,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ],
-                    onChanged: (value) =>
-                        controller.businessType.value = value ?? '',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Obx(
-                  () => DropdownButtonFormField<String>(
-                    value: controller.department.value.isEmpty
-                        ? ''
-                        : controller.department.value,
-                    decoration: AppInputDecoration.standard(
-                      labelText: 'Department',
                     ),
-                    items: [
-                      const DropdownMenuItem<String>(
-                        value: '',
-                        child: Text('Select department'),
-                      ),
-                      ...controller.departmentOptions.map(
-                        (department) => DropdownMenuItem<String>(
-                          value: department,
-                          child: Text(department),
-                        ),
-                      ),
-                    ],
-                    onChanged: (value) => controller.department.value = value ?? '',
-                  ),
+                  ],
+                  onChanged: (value) => controller.department.value = value ?? '',
                 ),
-              ),
-            ],
+              );
+
+              if (isCompact) {
+                return Column(
+                  children: [
+                    businessTypeField,
+                    const SizedBox(height: 12),
+                    departmentField,
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: businessTypeField),
+                  const SizedBox(width: 12),
+                  Expanded(child: departmentField),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 12),
           Obx(

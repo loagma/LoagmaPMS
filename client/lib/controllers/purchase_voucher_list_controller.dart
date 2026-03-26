@@ -27,11 +27,24 @@ class PurchaseVoucherSummary {
 class PurchaseVoucherListController extends GetxController {
   final vouchers = <PurchaseVoucherSummary>[].obs;
   final isLoading = false.obs;
+  final _lastRefreshTime = Rxn<DateTime>();
 
   @override
   void onInit() {
     super.onInit();
     fetchVouchers();
+    
+    // Auto-refresh list when screen comes back into view
+    ever<DateTime?>(_lastRefreshTime, (timestamp) {
+      if (timestamp != null) {
+        fetchVouchers();
+      }
+    });
+  }
+
+  /// Trigger refresh when returning from form creation
+  void markForRefresh() {
+    _lastRefreshTime.value = DateTime.now();
   }
 
   Future<void> fetchVouchers() async {

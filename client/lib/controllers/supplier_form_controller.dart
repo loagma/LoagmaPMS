@@ -269,19 +269,13 @@ class SupplierFormController extends GetxController {
     try {
       final response = await http
           .get(
-            Uri.parse('${ApiConfig.products}?limit=200'),
+            Uri.parse('${ApiConfig.products}?limit=100'),
             headers: {'Accept': 'application/json'},
           )
           .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        if (data['success'] == true) {
-          final List items = data['data'] ?? [];
-          products.value = items
-              .map((e) => Product.fromJson(e as Map<String, dynamic>))
-              .toList();
-        }
+        products.value = _decodeProductsSafely(response.body);
       }
     } catch (e) {
       debugPrint('[SUPPLIER_FORM] Products error: $e');
@@ -404,17 +398,91 @@ class SupplierFormController extends GetxController {
           .get(Uri.parse(url), headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: 30));
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        if (data['success'] == true) {
-          final List items = data['data'] ?? [];
-          products.value = items
-              .map((e) => Product.fromJson(e as Map<String, dynamic>))
-              .toList();
-        }
+        products.value = _decodeProductsSafely(response.body);
       }
     } catch (e) {
       debugPrint('[SUPPLIER_FORM] Search error: $e');
     }
+  }
+
+  List<Product> _decodeProductsSafely(String body) {
+    try {
+      final data = jsonDecode(body) as Map<String, dynamic>;
+      if (data['success'] != true) return const <Product>[];
+      final List items = data['data'] ?? const [];
+      return items
+          .whereType<Map>()
+          .map((e) => Product.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+    } on FormatException catch (e) {
+      debugPrint('[SUPPLIER_FORM] Products JSON malformed, using fallback parser: $e');
+      final recovered = _recoverProductsFromMalformedBody(body);
+      if (recovered.isNotEmpty) return recovered;
+      return const <Product>[];
+    } catch (e) {
+      debugPrint('[SUPPLIER_FORM] Products decode error: $e');
+      return const <Product>[];
+    }
+  }
+
+  List<Product> _recoverProductsFromMalformedBody(String body) {
+    const marker = '"data":[';
+    final markerIndex = body.indexOf(marker);
+    if (markerIndex < 0) return const <Product>[];
+
+    final start = markerIndex + marker.length;
+    final recovered = <Product>[];
+    var inString = false;
+    var escaped = false;
+    var braceDepth = 0;
+    var objectStart = -1;
+
+    for (var i = start; i < body.length; i++) {
+      final ch = body[i];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch == '\\') {
+        escaped = true;
+        continue;
+      }
+      if (ch == '"') {
+        inString = !inString;
+        continue;
+      }
+      if (inString) continue;
+
+      if (ch == '{') {
+        if (braceDepth == 0) objectStart = i;
+        braceDepth++;
+        continue;
+      }
+
+      if (ch == '}') {
+        if (braceDepth > 0) {
+          braceDepth--;
+          if (braceDepth == 0 && objectStart >= 0) {
+            final raw = body.substring(objectStart, i + 1);
+            try {
+              final decoded = jsonDecode(raw) as Map<String, dynamic>;
+              recovered.add(Product.fromJson(decoded));
+            } catch (_) {
+              // Skip malformed object and continue recovering remaining ones.
+            }
+            objectStart = -1;
+          }
+        }
+        continue;
+      }
+
+      if (ch == ']' && braceDepth == 0) {
+        break;
+      }
+    }
+
+    return recovered;
   }
 
   bool _validateForm() {

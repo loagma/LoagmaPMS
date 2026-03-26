@@ -9,6 +9,7 @@ import '../api_config.dart';
 import '../models/product_model.dart';
 import '../models/purchase_order_model.dart';
 import '../theme/app_colors.dart';
+import 'purchase_voucher_list_controller.dart';
 
 class PurchaseVoucherController extends GetxController {
   final formKey = GlobalKey<FormState>();
@@ -957,16 +958,27 @@ class PurchaseVoucherController extends GetxController {
                 ? 'Voucher saved as draft'
                 : 'Purchase voucher posted';
 
-        // Brief buffer so the user sees submit completion before navigation.
-        await Future.delayed(const Duration(milliseconds: 450));
+        // Show prominent success toast with adequate buffering time.
         await Fluttertoast.showToast(
           msg: successMessage,
-          toastLength: Toast.LENGTH_SHORT,
+          toastLength: Toast.LENGTH_LONG,
           gravity: ToastGravity.BOTTOM,
-          backgroundColor: Colors.green,
+          backgroundColor: Colors.green.shade600,
           textColor: Colors.white,
-          fontSize: 14,
+          fontSize: 16,
+          timeInSecForIosWeb: 3,
         );
+
+        // Buffer to ensure toast is fully visible before navigation.
+        await Future.delayed(const Duration(milliseconds: 1200));
+
+        // Trigger refresh on list controller if it's available
+        try {
+          final listController = Get.find<PurchaseVoucherListController>();
+          listController.markForRefresh();
+        } catch (_) {
+          // List controller not initialized, which is fine
+        }
 
         Get.back(result: true);
       } else {
