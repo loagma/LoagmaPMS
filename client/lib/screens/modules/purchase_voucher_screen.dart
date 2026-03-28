@@ -545,11 +545,9 @@ class _HeaderCard extends StatelessWidget {
                 child: Obx(() => TextFormField(
                       initialValue: controller.billNo.value,
                       decoration: AppInputDecoration.standard(
-                        labelText: 'Bill No *',
+                        labelText: 'Bill No',
                         hintText: 'Supplier invoice no',
                       ),
-                      validator: (v) =>
-                          v == null || v.trim().isEmpty ? 'Required' : null,
                       onChanged: controller.setBillNo,
                     )),
               ),

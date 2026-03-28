@@ -14,6 +14,7 @@ import 'purchase_voucher_list_controller.dart';
 class PurchaseVoucherController extends GetxController {
   final formKey = GlobalKey<FormState>();
   final int? voucherId;
+  final activeVoucherId = RxnInt();
 
   // Header
   final docNoPrefix = '25-26/'.obs;
@@ -66,6 +67,7 @@ class PurchaseVoucherController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    activeVoucherId.value = voucherId;
     _loadSuppliers();
     _loadUnitTypes();
     _loadProducts();
@@ -79,7 +81,7 @@ class PurchaseVoucherController extends GetxController {
     }
   }
 
-  bool get isEditMode => voucherId != null;
+  bool get isEditMode => activeVoucherId.value != null;
 
   String get netTotal {
     double itemsTotal = 0;
@@ -311,11 +313,12 @@ class PurchaseVoucherController extends GetxController {
 
 
   Future<void> _loadVoucherData() async {
-    if (voucherId == null) return;
+    final id = activeVoucherId.value;
+    if (id == null) return;
     try {
       isLoading.value = true;
       final response = await http.get(
-        Uri.parse('${ApiConfig.purchaseVouchers}/$voucherId'),
+        Uri.parse('${ApiConfig.purchaseVouchers}/$id'),
         headers: {'Accept': 'application/json'},
       );
       if (response.statusCode == 200) {
@@ -472,6 +475,7 @@ class PurchaseVoucherController extends GetxController {
   }
 
   Future<void> _resetToNewVoucherForm() async {
+    activeVoucherId.value = null;
     docNoPrefix.value = '25-26/';
     docNoNumber.value = '';
     vendorId.value = null;
@@ -586,6 +590,10 @@ class PurchaseVoucherController extends GetxController {
     if (vData == null) return;
     final v = vData['voucher'] as Map<String, dynamic>?;
     if (v != null) {
+      final idRaw = v['id'];
+      activeVoucherId.value = idRaw is int
+          ? idRaw
+          : int.tryParse(idRaw?.toString() ?? '');
       docNoPrefix.value = v['doc_no_prefix']?.toString() ?? '25-26/';
       docNoNumber.value = v['doc_no_number']?.toString() ?? '';
       // update numeric sequence from docNoNumber or doc_no
@@ -694,6 +702,7 @@ class PurchaseVoucherController extends GetxController {
         await _resetToNewVoucherForm();
         return;
       }
+      activeVoucherId.value = id;
 
       // Fetch full details by id so we get voucher/items/charges.
       final detailResp = await http.get(
@@ -892,10 +901,6 @@ class PurchaseVoucherController extends GetxController {
       _showError('Please enter Doc Date');
       return false;
     }
-    if (billNo.value.trim().isEmpty) {
-      _showError('Please enter Bill No');
-      return false;
-    }
     if (items.isEmpty) {
       _showError('Please add at least one item');
       return false;
@@ -978,9 +983,10 @@ class PurchaseVoucherController extends GetxController {
         }).toList(),
       };
 
-      final isEdit = voucherId != null;
+        final currentVoucherId = activeVoucherId.value;
+        final isEdit = currentVoucherId != null;
       final url = isEdit
-          ? '${ApiConfig.purchaseVouchers}/$voucherId'
+          ? '${ApiConfig.purchaseVouchers}/$currentVoucherId'
           : ApiConfig.createPurchaseVoucher;
 
       final response = isEdit
