@@ -8,6 +8,8 @@ class PurchaseVoucherItem extends Model
 {
     protected $fillable = [
         'purchase_voucher_id',
+        'source_purchase_order_id',
+        'source_po_number',
         'product_id',
         'line_no',
         'product_name',
@@ -28,6 +30,7 @@ class PurchaseVoucherItem extends Model
     ];
 
     protected $casts = [
+        'source_purchase_order_id' => 'integer',
         'line_no' => 'integer',
         'quantity' => 'decimal:3',
         'unit_price' => 'decimal:2',

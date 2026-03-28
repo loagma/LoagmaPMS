@@ -46,9 +46,9 @@ class PurchaseVoucherController extends GetxController {
   final items = <PVItemRow>[].obs;
   final charges = <PVChargeRow>[].obs;
 
-  /// When set, this voucher was created from the given purchase order.
-  final linkedPurchaseOrderId = Rxn<int>();
-  final linkedPoNumber = ''.obs;
+  /// Linked purchase orders for this voucher.
+  final linkedPurchaseOrderIds = <int>[].obs;
+  final linkedPoNumbers = <String>[].obs;
 
   /// Controls whether product searches show only vendor-assigned products
   /// (via /supplier-products) or the full product catalogue.
@@ -305,7 +305,7 @@ class PurchaseVoucherController extends GetxController {
     final List list = data['data'] ?? [];
     final rows = list
         .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e as Map))
+      .map((e) => Map<String, dynamic>.from(e))
         .toList();
     _productTaxCache[productId] = rows;
     return rows;
@@ -488,8 +488,8 @@ class PurchaseVoucherController extends GetxController {
     gstReverseCharge.value = 'N';
     billDate.value = '';
     purchaseAgentId.value = '';
-    linkedPurchaseOrderId.value = null;
-    linkedPoNumber.value = '';
+    linkedPurchaseOrderIds.clear();
+    linkedPoNumbers.clear();
     _productTaxCache.clear();
 
     items.clear();
@@ -588,6 +588,8 @@ class PurchaseVoucherController extends GetxController {
 
   void _applyVoucherData(Map<String, dynamic>? vData) {
     if (vData == null) return;
+    linkedPurchaseOrderIds.clear();
+    linkedPoNumbers.clear();
     final v = vData['voucher'] as Map<String, dynamic>?;
     if (v != null) {
       final idRaw = v['id'];
@@ -619,6 +621,11 @@ class PurchaseVoucherController extends GetxController {
       gstReverseCharge.value = v['gst_reverse_charge']?.toString() ?? 'N';
       billDate.value = v['bill_date']?.toString() ?? '';
       purchaseAgentId.value = v['purchase_agent_id']?.toString() ?? '';
+
+      final headerPoId = int.tryParse(v['purchase_order_id']?.toString() ?? '');
+      if (headerPoId != null && !linkedPurchaseOrderIds.contains(headerPoId)) {
+        linkedPurchaseOrderIds.add(headerPoId);
+      }
     }
 
     final itemsData = (vData['items'] as List?) ?? [];
@@ -626,6 +633,16 @@ class PurchaseVoucherController extends GetxController {
     for (var item in itemsData) {
       final map = item as Map<String, dynamic>;
       final row = PVItemRow();
+      final srcPoId = int.tryParse(map['source_purchase_order_id']?.toString() ?? '');
+      final srcPoNo = map['source_po_number']?.toString() ?? '';
+      row.sourcePurchaseOrderId.value = srcPoId;
+      row.sourcePoNumber.value = srcPoNo;
+      if (srcPoId != null && !linkedPurchaseOrderIds.contains(srcPoId)) {
+        linkedPurchaseOrderIds.add(srcPoId);
+      }
+      if (srcPoNo.isNotEmpty && !linkedPoNumbers.contains(srcPoNo)) {
+        linkedPoNumbers.add(srcPoNo);
+      }
       final pid = int.tryParse(map['product_id']?.toString() ?? '');
       if (pid != null) {
         row.product.value = Product(
@@ -790,6 +807,24 @@ class PurchaseVoucherController extends GetxController {
   List<Product> getProductsExcluding(Iterable<int> excludeIds) =>
       products.where((p) => !excludeIds.contains(p.id)).toList();
 
+  bool _isPlaceholderItemRow(PVItemRow row) {
+    final qty = double.tryParse(row.quantity.value) ?? 0;
+    final unitPrice = double.tryParse(row.unitPrice.value) ?? 0;
+    final hasAnyText = row.productCode.value.trim().isNotEmpty ||
+        row.productName.value.trim().isNotEmpty ||
+        row.alias.value.trim().isNotEmpty;
+    return row.product.value == null && qty <= 0 && unitPrice <= 0 && !hasAnyText;
+  }
+
+  void _addLinkedPurchaseOrderMeta(int poId, String poNumber) {
+    if (!linkedPurchaseOrderIds.contains(poId)) {
+      linkedPurchaseOrderIds.add(poId);
+    }
+    if (poNumber.trim().isNotEmpty && !linkedPoNumbers.contains(poNumber.trim())) {
+      linkedPoNumbers.add(poNumber.trim());
+    }
+  }
+
   /// Fetches a single purchase order by id (with items) for linking.
   Future<PurchaseOrder?> fetchPurchaseOrderById(int poId) async {
     try {
@@ -849,46 +884,83 @@ class PurchaseVoucherController extends GetxController {
     }
   }
 
-  /// Fills the voucher from a purchase order (vendor, narration, and all line items).
-  Future<void> loadFromPurchaseOrder(PurchaseOrder po) async {
-    linkedPurchaseOrderId.value = po.id;
-    linkedPoNumber.value = po.poNumber;
-    setVendor(po.supplierId, po.supplierName ?? 'Vendor');
-    setNarration(po.narration ?? '');
-    if (po.docDate.isNotEmpty) docDate.value = po.docDate.split(' ').first;
-    if (po.financialYear != null && po.financialYear!.isNotEmpty) {
-      docNoPrefix.value = po.financialYear!.endsWith('/')
-          ? po.financialYear!
-          : '${po.financialYear}/';
-    }
-    if (po.poNumber.isNotEmpty) billNo.value = po.poNumber;
+  /// Appends line items from one or more purchase orders into this voucher.
+  Future<void> loadFromPurchaseOrders(List<PurchaseOrder> orders) async {
+    if (orders.isEmpty) return;
 
-    items.clear();
-    for (final item in po.items) {
-      final row = PVItemRow();
-      row.product.value = Product(
-        id: item.productId,
-        name: item.productName?.trim().isEmpty == true
-            ? 'Product ${item.productId}'
-            : (item.productName ?? 'Product ${item.productId}'),
-        productType: 'SINGLE',
-        defaultUnit: item.unit,
-      );
-      row.productName.value = row.product.value!.name;
-      row.productCode.value = '${item.productId}';
-      row.alias.value = '${item.productName ?? ''} : ${item.unit ?? 'Nos'}';
-      row.quantity.value = item.quantity.toStringAsFixed(2);
-      row.unitType.value = item.unit ?? (unitTypes.isNotEmpty ? unitTypes.first : 'Nos');
-      row.unitPrice.value = item.price.toStringAsFixed(2);
-      row.taxableAmount.value = (item.quantity * item.price).toStringAsFixed(2);
-      await applyResolvedTaxesToVoucherRow(
-        row,
-        productId: item.productId,
-      );
-      items.add(row);
+    final existingVendor = vendorId.value;
+    final targetVendor = orders.first.supplierId;
+
+    final mixedVendor = orders.any((o) => o.supplierId != targetVendor);
+    if (mixedVendor) {
+      _showError('Please select purchase orders of the same vendor');
+      return;
     }
-    if (items.isEmpty) addItemRow();
-    _showSuccess('Invoice filled from Purchase Order ${po.poNumber}');
+    if (existingVendor != null && existingVendor != targetVendor) {
+      _showError('Selected purchase orders do not match current vendor');
+      return;
+    }
+
+    if (existingVendor == null) {
+      setVendor(targetVendor, orders.first.supplierName ?? 'Vendor');
+    }
+
+    if (narration.value.trim().isEmpty) {
+      final firstNarration = orders.first.narration?.trim() ?? '';
+      if (firstNarration.isNotEmpty) {
+        setNarration(firstNarration);
+      }
+    }
+
+    if (items.length == 1 && _isPlaceholderItemRow(items.first)) {
+      items.clear();
+    }
+
+    var addedCount = 0;
+    for (final po in orders) {
+      final poId = po.id;
+      if (poId == null) {
+        continue;
+      }
+      _addLinkedPurchaseOrderMeta(poId, po.poNumber);
+
+      for (final item in po.items) {
+        final row = PVItemRow();
+        row.sourcePurchaseOrderId.value = poId;
+        row.sourcePoNumber.value = po.poNumber;
+        row.product.value = Product(
+          id: item.productId,
+          name: item.productName?.trim().isEmpty == true
+              ? 'Product ${item.productId}'
+              : (item.productName ?? 'Product ${item.productId}'),
+          productType: 'SINGLE',
+          defaultUnit: item.unit,
+        );
+        row.productName.value = row.product.value!.name;
+        row.productCode.value = '${item.productId}';
+        row.alias.value = '${item.productName ?? ''} : ${item.unit ?? 'Nos'}';
+        row.quantity.value = item.quantity.toStringAsFixed(2);
+        row.unitType.value = item.unit ?? (unitTypes.isNotEmpty ? unitTypes.first : 'Nos');
+        row.unitPrice.value = item.price.toStringAsFixed(2);
+        row.taxableAmount.value = (item.quantity * item.price).toStringAsFixed(2);
+        await applyResolvedTaxesToVoucherRow(
+          row,
+          productId: item.productId,
+        );
+        items.add(row);
+        addedCount++;
+      }
+    }
+
+    if (items.isEmpty) {
+      addItemRow();
+    }
+
+    _showSuccess('Added $addedCount items from ${orders.length} purchase order(s)');
+  }
+
+  Future<void> loadFromPurchaseOrder(PurchaseOrder po) async {
+    await loadFromPurchaseOrders([po]);
   }
 
   bool _validateForm() {
@@ -932,7 +1004,7 @@ class PurchaseVoucherController extends GetxController {
       final payload = {
         'doc_no_prefix': docNoPrefix.value,
         'doc_no_number': docNoNumber.value.trim().isEmpty ? null : docNoNumber.value,
-        if (linkedPurchaseOrderId.value != null) 'purchase_order_id': linkedPurchaseOrderId.value,
+        if (linkedPurchaseOrderIds.isNotEmpty) 'purchase_order_id': linkedPurchaseOrderIds.first,
         'vendor_id': vendorId.value,
         'doc_date': docDate.value.trim().isEmpty ? _formatDate(DateTime.now()) : docDate.value,
         'bill_no': billNo.value.trim(),
@@ -969,6 +1041,10 @@ class PurchaseVoucherController extends GetxController {
             'value': taxable + sgst + cgst + igst + cess + roff,
             'purchase_account': row.purchaseAccount.value,
             'gst_itc_eligibility': row.gstItcEligibility.value,
+            if (row.sourcePurchaseOrderId.value != null)
+              'source_purchase_order_id': row.sourcePurchaseOrderId.value,
+            if (row.sourcePoNumber.value.trim().isNotEmpty)
+              'source_po_number': row.sourcePoNumber.value.trim(),
           };
         }).toList(),
         'charges': charges.map((row) {
@@ -1152,6 +1228,8 @@ class PurchaseVoucherController extends GetxController {
 }
 
 class PVItemRow {
+  final sourcePurchaseOrderId = Rxn<int>();
+  final sourcePoNumber = ''.obs;
   final product = Rxn<Product>();
   final productCode = ''.obs;
   final productName = ''.obs;

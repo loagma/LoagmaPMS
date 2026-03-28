@@ -114,6 +114,7 @@ class PurchaseVoucherController extends Controller
                         'doc_no_number' => (string) $voucher->doc_no_number,
                         'doc_no' => $voucher->doc_no,
                         'vendor_id' => $voucher->vendor_id,
+                        'purchase_order_id' => $voucher->purchase_order_id,
                         'vendor_name' => $voucher->vendor_name,
                         'supplier_name' => $voucher->supplier_name,
                         'doc_date' => optional($voucher->doc_date)->format('Y-m-d'),
@@ -132,6 +133,8 @@ class PurchaseVoucherController extends Controller
                     'items' => $voucher->items->map(function (PurchaseVoucherItem $item) {
                         return [
                             'id' => $item->id,
+                            'source_purchase_order_id' => $item->source_purchase_order_id,
+                            'source_po_number' => $item->source_po_number,
                             'product_id' => $item->product_id,
                             'product_name' => $item->product_name,
                             'product_code' => $item->product_code,
@@ -330,6 +333,10 @@ class PurchaseVoucherController extends Controller
         foreach ($items as $index => $row) {
             PurchaseVoucherItem::create([
                 'purchase_voucher_id' => $voucher->id,
+                'source_purchase_order_id' => isset($row['source_purchase_order_id'])
+                    ? (int) $row['source_purchase_order_id']
+                    : null,
+                'source_po_number' => $row['source_po_number'] ?? null,
                 'product_id' => (int) $row['product_id'],
                 'line_no' => (int) ($row['line_no'] ?? ($index + 1)),
                 'product_name' => $row['product_name'] ?? null,
@@ -431,6 +438,8 @@ class PurchaseVoucherController extends Controller
             'items.*.purchase_account' => 'nullable|string|max:255',
             'items.*.gst_itc_eligibility' => 'nullable|string|max:255',
             'items.*.line_no' => 'nullable|integer|min:1',
+            'items.*.source_purchase_order_id' => 'nullable|integer|exists:purchase_orders,id',
+            'items.*.source_po_number' => 'nullable|string|max:100',
 
             'charges' => 'nullable|array',
             'charges.*.name' => 'nullable|string|max:100',

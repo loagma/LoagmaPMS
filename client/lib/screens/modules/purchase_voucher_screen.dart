@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/purchase_voucher_controller.dart';
+import '../../models/purchase_order_model.dart';
 import '../../models/product_model.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
@@ -182,6 +183,7 @@ class _LinkToPODialogState extends State<_LinkToPODialog> {
   bool _loading = false;
   final TextEditingController _searchController = TextEditingController();
   final List<Map<String, dynamic>> _items = [];
+  final Set<int> _selectedPoIds = <int>{};
   Timer? _debounce;
 
   @override
@@ -232,23 +234,45 @@ class _LinkToPODialogState extends State<_LinkToPODialog> {
     });
   }
 
-  Future<void> _onSelectPo(BuildContext context, int poId) async {
+  Future<void> _onLinkSelected(BuildContext context) async {
+    if (_selectedPoIds.isEmpty) return;
+
     final nav = Navigator.of(context);
     setState(() => _loading = true);
-    final po = await widget.controller.fetchPurchaseOrderById(poId);
+    final orderedIds = <int>[];
+    for (final po in _items) {
+      final id = po['id'] as int?;
+      if (id != null && _selectedPoIds.contains(id)) {
+        orderedIds.add(id);
+      }
+    }
+    for (final id in _selectedPoIds) {
+      if (!orderedIds.contains(id)) {
+        orderedIds.add(id);
+      }
+    }
+
+    final purchaseOrders = <PurchaseOrder>[];
+    for (final poId in orderedIds) {
+      final po = await widget.controller.fetchPurchaseOrderById(poId);
+      if (po != null) {
+        purchaseOrders.add(po);
+      }
+    }
+
     if (!mounted) return;
     setState(() => _loading = false);
-    if (po == null) {
+    if (purchaseOrders.isEmpty) {
       Get.snackbar(
         'Error',
-        'Could not load purchase order details.',
+        'Could not load selected purchase order details.',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.redAccent,
         colorText: Colors.white,
       );
       return;
     }
-    await widget.controller.loadFromPurchaseOrder(po);
+    await widget.controller.loadFromPurchaseOrders(purchaseOrders);
     nav.pop();
   }
 
@@ -261,7 +285,9 @@ class _LinkToPODialogState extends State<_LinkToPODialog> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Link to Purchase Order',
+              _selectedPoIds.isEmpty
+                  ? 'Link to Purchase Order'
+                  : 'Link to Purchase Order (${_selectedPoIds.length} selected)',
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 18),
             ),
@@ -335,8 +361,31 @@ class _LinkToPODialogState extends State<_LinkToPODialog> {
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                trailing: const Icon(Icons.chevron_right_rounded),
-                                onTap: () => _onSelectPo(context, id),
+                                trailing: Checkbox(
+                                  value: _selectedPoIds.contains(id),
+                                  onChanged: _loading
+                                      ? null
+                                      : (checked) {
+                                          setState(() {
+                                            if (checked == true) {
+                                              _selectedPoIds.add(id);
+                                            } else {
+                                              _selectedPoIds.remove(id);
+                                            }
+                                          });
+                                        },
+                                ),
+                                onTap: _loading
+                                    ? null
+                                    : () {
+                                        setState(() {
+                                          if (_selectedPoIds.contains(id)) {
+                                            _selectedPoIds.remove(id);
+                                          } else {
+                                            _selectedPoIds.add(id);
+                                          }
+                                        });
+                                      },
                               );
                             },
                           ),
@@ -345,6 +394,12 @@ class _LinkToPODialogState extends State<_LinkToPODialog> {
               ),
       ),
       actions: [
+        TextButton(
+          onPressed: _loading || _selectedPoIds.isEmpty
+              ? null
+              : () => _onLinkSelected(context),
+          child: const Text('Link Selected'),
+        ),
         TextButton(
           onPressed: _loading ? null : widget.onClose,
           child: const Text('Cancel'),
@@ -367,7 +422,7 @@ class _HeaderCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Obx(() {
-            if (controller.linkedPurchaseOrderId.value == null) {
+            if (controller.linkedPurchaseOrderIds.isEmpty) {
               return const SizedBox.shrink();
             }
             return Container(
@@ -377,18 +432,58 @@ class _HeaderCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.primary),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.link_rounded, size: 16, color: AppColors.primaryDark),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Linked to PO: ${controller.linkedPoNumber.value}',
+                  const Text(
+                    'Linked Purchase Orders',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: AppColors.primaryDark,
                     ),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: controller.linkedPoNumbers.isNotEmpty
+                        ? controller.linkedPoNumbers
+                            .map((poNo) => Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: AppColors.primaryLight),
+                                  ),
+                                  child: Text(
+                                    poNo,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.primaryDark,
+                                    ),
+                                  ),
+                                ))
+                            .toList()
+                        : controller.linkedPurchaseOrderIds
+                            .map((id) => Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: AppColors.primaryLight),
+                                  ),
+                                  child: Text(
+                                    'PO #$id',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.primaryDark,
+                                    ),
+                                  ),
+                                ))
+                            .toList(),
                   ),
                 ],
               ),
@@ -814,6 +909,31 @@ class _ItemRow extends StatelessWidget {
               ),
             ],
           ),
+          Obx(() {
+            final sourcePo = row.sourcePoNumber.value.trim();
+            if (sourcePo.isEmpty) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'From PO: $sourcePo',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryDark,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
           const SizedBox(height: 16),
           _ProductPickerField(
             controller: controller,
