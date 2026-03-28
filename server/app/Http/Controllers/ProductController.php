@@ -230,6 +230,11 @@ class ProductController extends Controller
             'gst_percent' => 'nullable|numeric|min:0|max:999.99',
             'order_limit' => 'nullable|integer|min:0',
             'buffer_limit' => 'nullable|integer|min:0',
+            'product_pack_count' => 'nullable|integer|min:0',
+            'nop' => 'nullable|integer|min:0',
+            'pack_prd_wt' => 'nullable|numeric|min:0',
+            'gross_wt_of_pack' => 'nullable|numeric|min:0',
+            'gst_tax_type' => 'nullable|string|max:50',
         ]);
 
         try {
@@ -270,6 +275,25 @@ class ProductController extends Controller
                 'stock_ut_id' => null,
                 'order_limit' => (int) ($validated['order_limit'] ?? 0),
                 'buffer_limit' => (int) ($validated['buffer_limit'] ?? 0),
+                'product_pack_count' => (int) (
+                    $validated['product_pack_count']
+                        ?? $validated['nop']
+                        ?? 0
+                ),
+                'nop' => (int) (
+                    $validated['nop']
+                        ?? $validated['product_pack_count']
+                        ?? 0
+                ),
+                'pack_prd_wt' => isset($validated['pack_prd_wt'])
+                    ? (float) $validated['pack_prd_wt']
+                    : null,
+                'gross_wt_of_pack' => isset($validated['gross_wt_of_pack'])
+                    ? (float) $validated['gross_wt_of_pack']
+                    : null,
+                'gst_tax_type' => isset($validated['gst_tax_type'])
+                    ? trim((string) $validated['gst_tax_type'])
+                    : null,
             ]);
 
             $created = DB::table('product')->where('product_id', $nextId)->first();
@@ -311,6 +335,11 @@ class ProductController extends Controller
             'gst_percent' => 'nullable|numeric|min:0|max:999.99',
             'order_limit' => 'nullable|integer|min:0',
             'buffer_limit' => 'nullable|integer|min:0',
+            'product_pack_count' => 'nullable|integer|min:0',
+            'nop' => 'nullable|integer|min:0',
+            'pack_prd_wt' => 'nullable|numeric|min:0',
+            'gross_wt_of_pack' => 'nullable|numeric|min:0',
+            'gst_tax_type' => 'nullable|string|max:50',
         ]);
 
         try {
@@ -374,6 +403,33 @@ class ProductController extends Controller
             }
             if (array_key_exists('buffer_limit', $validated)) {
                 $updates['buffer_limit'] = (int) ($validated['buffer_limit'] ?? 0);
+            }
+            if (array_key_exists('product_pack_count', $validated) || array_key_exists('nop', $validated)) {
+                $updates['product_pack_count'] = (int) (
+                    $validated['product_pack_count']
+                        ?? $validated['nop']
+                        ?? 0
+                );
+                $updates['nop'] = (int) (
+                    $validated['nop']
+                        ?? $validated['product_pack_count']
+                        ?? 0
+                );
+            }
+            if (array_key_exists('pack_prd_wt', $validated)) {
+                $updates['pack_prd_wt'] = $validated['pack_prd_wt'] !== null
+                    ? (float) $validated['pack_prd_wt']
+                    : null;
+            }
+            if (array_key_exists('gross_wt_of_pack', $validated)) {
+                $updates['gross_wt_of_pack'] = $validated['gross_wt_of_pack'] !== null
+                    ? (float) $validated['gross_wt_of_pack']
+                    : null;
+            }
+            if (array_key_exists('gst_tax_type', $validated)) {
+                $updates['gst_tax_type'] = $validated['gst_tax_type'] !== null
+                    ? trim((string) $validated['gst_tax_type'])
+                    : null;
             }
             if (array_key_exists('packs', $validated)) {
                 $packsValue = $validated['packs'];

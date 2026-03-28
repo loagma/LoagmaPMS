@@ -234,6 +234,15 @@ CREATE TABLE IF NOT EXISTS `product_taxes` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
+-- 2026-03-28: Minimal product pack and GST metadata fields
+ALTER TABLE `product`
+    ADD COLUMN IF NOT EXISTS `product_pack_count` int unsigned NOT NULL DEFAULT '0' AFTER `buffer_limit`,
+    ADD COLUMN IF NOT EXISTS `nop` int unsigned NOT NULL DEFAULT '0' AFTER `product_pack_count`,
+    ADD COLUMN IF NOT EXISTS `pack_prd_wt` decimal(12,3) DEFAULT NULL AFTER `nop`,
+    ADD COLUMN IF NOT EXISTS `gross_wt_of_pack` decimal(12,3) DEFAULT NULL AFTER `pack_prd_wt`,
+    ADD COLUMN IF NOT EXISTS `gst_tax_type` varchar(50) DEFAULT NULL AFTER `gross_wt_of_pack`;
+
+
 -- 2026-03-12: HSN codes master and per-product order/buffer limits
 CREATE TABLE IF NOT EXISTS `hsn_codes` (
     `id` bigint unsigned NOT NULL AUTO_INCREMENT,

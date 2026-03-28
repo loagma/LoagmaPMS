@@ -71,6 +71,7 @@ class PackageUiModel {
 class ProductFormController extends GetxController {
   final formKey = GlobalKey<FormState>();
   final int? productId;
+  final activeProductId = RxnInt();
 
   ProductFormController({this.productId});
 
@@ -78,6 +79,7 @@ class ProductFormController extends GetxController {
   final currentStep = 1.obs;
 
   final isLoading = false.obs;
+  final isNavigating = false.obs;
   final isSaving = false.obs;
 
   // Step 1 – basic info & inventory.
@@ -98,6 +100,16 @@ class ProductFormController extends GetxController {
   final defaultUnit = 'WEIGHT'.obs;
   final orderLimit = ''.obs;
   final bufferLimit = ''.obs;
+  final productPackCount = ''.obs;
+  final noOfPackages = ''.obs;
+  final packPrdWt = ''.obs;
+  final grossWtOfPack = ''.obs;
+  final gstTaxType = ''.obs;
+  static const List<String> gstTaxTypeOptions = [
+    'CGST_SGST',
+    'IGST',
+    'EXEMPT',
+  ];
 
   // Step 2 – tax, status, packages.
   final hsnCode = ''.obs;
@@ -111,8 +123,9 @@ class ProductFormController extends GetxController {
   final code = ''.obs;
 
   final packages = <PackageUiModel>[].obs;
+  final currentProductSeq = RxnInt();
 
-  bool get isEditMode => productId != null;
+  bool get isEditMode => activeProductId.value != null;
 
   TextEditingController taxPercentControllerFor(int taxId) {
     return taxPercentControllers.putIfAbsent(taxId, () {
@@ -144,9 +157,53 @@ class ProductFormController extends GetxController {
   Future<void> _init() async {
     await _loadCategories();
     await loadAvailableTaxes();
-    if (productId != null) {
+    activeProductId.value = productId;
+    if (activeProductId.value != null) {
       await _loadProduct();
+    } else {
+      await _loadNextProductNumberForNew();
     }
+  }
+
+  int? _productSequenceFromSummary(Map<String, dynamic> summary) {
+    final rawId = summary['product_id'] ?? summary['id'];
+    if (rawId is int) return rawId;
+    return int.tryParse(rawId?.toString() ?? '');
+  }
+
+  Future<int?> _fetchLatestProductSequence() async {
+    try {
+      final uri = Uri.parse(ApiConfig.products).replace(
+        queryParameters: {
+          'limit': '50',
+        },
+      );
+      final response = await http
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return null;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) return null;
+      final List list = data['data'] ?? [];
+      if (list.isEmpty) return null;
+      int? maxId;
+      for (final row in list) {
+        if (row is! Map<String, dynamic>) continue;
+        final id = _productSequenceFromSummary(row);
+        if (id == null) continue;
+        if (maxId == null || id > maxId) {
+          maxId = id;
+        }
+      }
+      return maxId;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _loadNextProductNumberForNew() async {
+    final latest = await _fetchLatestProductSequence();
+    currentProductSeq.value = (latest ?? 0) + 1;
   }
 
   Future<void> loadAvailableTaxes() async {
@@ -463,116 +520,275 @@ class ProductFormController extends GetxController {
 
   void addPackage(PackageUiModel pkg) {
     packages.add(pkg);
+    productPackCount.value = packages.length.toString();
+    noOfPackages.value = packages.length.toString();
   }
 
   void removePackage(String id) {
     packages.removeWhere((p) => p.id == id);
+    productPackCount.value = packages.length.toString();
+    noOfPackages.value = packages.length.toString();
+  }
+
+  Future<void> _resetToNewProductForm({int? nextSeq}) async {
+    activeProductId.value = null;
+
+    name.value = '';
+    keywords.value = '';
+    description.value = '';
+    brand.value = '';
+    ctypeId.value = 'vegetables_fruits';
+    seqNo.value = '';
+    selectedCategoryId.value = 0;
+    selectedSubcategoryId.value = 0;
+    subcategories.clear();
+
+    productType.value = 'SINGLE';
+    defaultUnit.value = 'WEIGHT';
+    orderLimit.value = '';
+    bufferLimit.value = '';
+    productPackCount.value = '';
+    noOfPackages.value = '';
+    packPrdWt.value = '';
+    grossWtOfPack.value = '';
+    gstTaxType.value = '';
+
+    hsnCode.value = '';
+    selectedTaxIds.clear();
+    selectedTaxPercents.clear();
+    for (final c in taxPercentControllers.values) {
+      c.clear();
+    }
+    isPublished.value = true;
+    inStock.value = true;
+    code.value = '';
+    packages.clear();
+
+    if (nextSeq != null && nextSeq > 0) {
+      currentProductSeq.value = nextSeq;
+    } else {
+      await _loadNextProductNumberForNew();
+    }
+  }
+
+  Future<bool> loadProductBySequence(
+    int seq, {
+    bool resetToNewIfMissing = true,
+  }) async {
+    final loaded = await _loadProductById(seq, showError: false);
+    if (loaded) return true;
+    if (resetToNewIfMissing) {
+      await _resetToNewProductForm(nextSeq: seq);
+    }
+    return false;
+  }
+
+  Future<void> goToPreviousProduct() async {
+    final current = currentProductSeq.value;
+    if (current == null || current <= 1 || isNavigating.value) return;
+
+    try {
+      isNavigating.value = true;
+      int candidate = current - 1;
+      var loaded = await loadProductBySequence(
+        candidate,
+        resetToNewIfMissing: false,
+      );
+
+      // Deleted/gapped IDs: keep moving backward to nearest existing id.
+      var scanned = 0;
+      while (!loaded && candidate > 1 && scanned < 50) {
+        candidate -= 1;
+        scanned += 1;
+        loaded = await loadProductBySequence(
+          candidate,
+          resetToNewIfMissing: false,
+        );
+      }
+    } finally {
+      isNavigating.value = false;
+    }
+  }
+
+  Future<void> goToNextProduct() async {
+    final current = currentProductSeq.value;
+    if (current == null || isNavigating.value) return;
+    final nextSeq = current + 1;
+
+    try {
+      isNavigating.value = true;
+      var loaded = await loadProductBySequence(
+        nextSeq,
+        resetToNewIfMissing: false,
+      );
+
+      // Deleted/gapped IDs: scan forward for the next existing one.
+      final latest = await _fetchLatestProductSequence();
+      var candidate = nextSeq;
+      var scanned = 0;
+      while (!loaded && latest != null && candidate < latest && scanned < 50) {
+        candidate += 1;
+        scanned += 1;
+        loaded = await loadProductBySequence(
+          candidate,
+          resetToNewIfMissing: false,
+        );
+      }
+
+      // If no next existing product is found, switch to fresh new-form id.
+      if (!loaded) {
+        await _resetToNewProductForm(nextSeq: nextSeq);
+      }
+    } finally {
+      isNavigating.value = false;
+    }
+  }
+
+  Future<bool> _loadProductById(int id, {bool showError = true}) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.products}/$id/edit'),
+        headers: {'Accept': 'application/json'},
+      );
+      if (response.statusCode != 200) {
+        return false;
+      }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) {
+        return false;
+      }
+
+      final productJson = data['data'] as Map<String, dynamic>?;
+      if (productJson == null) {
+        return false;
+      }
+
+      final product = Product.fromJson(productJson);
+      activeProductId.value = product.id;
+      currentProductSeq.value = product.id;
+
+      // Basic info
+      name.value = product.name;
+      code.value = product.code ?? '';
+      keywords.value = productJson['keywords']?.toString() ?? '';
+      description.value = productJson['description']?.toString() ?? '';
+      brand.value = productJson['brand']?.toString() ?? '';
+      ctypeId.value = productJson['ctype_id']?.toString() ?? 'vegetables_fruits';
+      seqNo.value = productJson['seq_no']?.toString() ?? '';
+
+      // Category & subcategory (product has cat_id, parent_cat_id)
+      final int catId = _intFromJson(productJson['cat_id']);
+      final int parentCatId = _intFromJson(productJson['parent_cat_id']);
+      if (parentCatId != 0) {
+        selectedCategoryId.value = parentCatId;
+        selectedSubcategoryId.value = catId;
+        loadSubcategoriesForCategory(parentCatId);
+      } else {
+        selectedCategoryId.value = catId;
+        selectedSubcategoryId.value = 0;
+        if (catId != 0) loadSubcategoriesForCategory(catId);
+      }
+
+      // Inventory
+      productType.value =
+          (productJson['inventory_type'] ?? product.productType).toString();
+      defaultUnit.value =
+          (productJson['inventory_unit_type'] ?? product.defaultUnit ?? '')
+              .toString();
+      orderLimit.value = productJson['order_limit']?.toString() ?? '0';
+      bufferLimit.value = productJson['buffer_limit']?.toString() ?? '0';
+        productPackCount.value =
+          productJson['product_pack_count']?.toString() ??
+          productJson['nop']?.toString() ??
+          '';
+        noOfPackages.value =
+          productJson['nop']?.toString() ??
+          productJson['product_pack_count']?.toString() ??
+          '';
+        packPrdWt.value = productJson['pack_prd_wt']?.toString() ?? '';
+        grossWtOfPack.value = productJson['gross_wt_of_pack']?.toString() ?? '';
+        gstTaxType.value = productJson['gst_tax_type']?.toString() ?? '';
+
+      // Tax & status
+      hsnCode.value = productJson['hsn_code']?.toString() ?? '';
+      isPublished.value =
+          (productJson['is_published']?.toString() ?? '0') == '1';
+      inStock.value = (productJson['in_stock']?.toString() ?? '0') == '1';
+
+      await _loadSelectedTaxesForProduct(product.id);
+
+      // Packs JSON, if present.
+      packages.clear();
+      final packsRaw = productJson['packs'];
+      if (packsRaw is String && packsRaw.trim().isNotEmpty) {
+        try {
+          final decoded = jsonDecode(packsRaw);
+          if (decoded is List) {
+            packages.assignAll(decoded.map((e) {
+              final m = e as Map<String, dynamic>;
+              final desc = m['description']?.toString() ?? '';
+              final size = (m['size'] as num?)?.toDouble() ?? 0.0;
+              final unit = m['unit']?.toString() ?? '';
+              final marketPrice =
+                  (m['market_price'] as num?)?.toDouble() ?? 0.0;
+              final prices = m['prices'] as Map<String, dynamic>?;
+              final retailRaw = prices == null
+                  ? ''
+                  : [
+                      prices['new'],
+                      prices['regular'],
+                      prices['home'],
+                    ]
+                      .map((v) => v?.toString() ?? '')
+                      .join(', ');
+              return PackageUiModel(
+                id: m['id']?.toString() ?? '',
+                description: desc,
+                size: size,
+                unit: unit,
+                marketPrice: marketPrice,
+                retailPricesRaw: retailRaw,
+                minLimit: m['min_limit'] as int?,
+                maxLimit: m['max_limit'] as int?,
+                barcode: m['barcode']?.toString(),
+                isActive: (m['is_active']?.toString() ?? '1') == '1',
+              );
+            }).toList());
+            if (noOfPackages.value.trim().isEmpty) {
+              noOfPackages.value = packages.length.toString();
+            }
+            if (productPackCount.value.trim().isEmpty) {
+              productPackCount.value = packages.length.toString();
+            }
+          }
+        } catch (e) {
+          debugPrint('[PRODUCT_FORM] Failed to parse packs JSON: $e');
+        }
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('[PRODUCT_FORM] Load error: $e');
+      if (showError) {
+        Get.snackbar(
+          'Error',
+          'Failed to load product details',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.redAccent,
+          colorText: Colors.white,
+        );
+      }
+      return false;
+    }
   }
 
   Future<void> _loadProduct() async {
+    final id = activeProductId.value;
+    if (id == null) return;
     try {
       isLoading.value = true;
-      final response = await http.get(
-        Uri.parse('${ApiConfig.products}/$productId/edit'),
-        headers: {'Accept': 'application/json'},
-      );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        if (data['success'] == true) {
-          final productJson = data['data'] as Map<String, dynamic>;
-          final product = Product.fromJson(productJson);
-
-          // Basic info
-          name.value = product.name;
-          code.value = product.code ?? '';
-          keywords.value = productJson['keywords']?.toString() ?? '';
-          description.value = productJson['description']?.toString() ?? '';
-          brand.value = productJson['brand']?.toString() ?? '';
-          ctypeId.value = productJson['ctype_id']?.toString() ?? 'vegetables_fruits';
-          seqNo.value = productJson['seq_no']?.toString() ?? '';
-
-          // Category & subcategory (product has cat_id, parent_cat_id)
-          final int catId = _intFromJson(productJson['cat_id']);
-          final int parentCatId = _intFromJson(productJson['parent_cat_id']);
-          if (parentCatId != 0) {
-            selectedCategoryId.value = parentCatId;
-            selectedSubcategoryId.value = catId;
-            loadSubcategoriesForCategory(parentCatId);
-          } else {
-            selectedCategoryId.value = catId;
-            selectedSubcategoryId.value = 0;
-            if (catId != 0) loadSubcategoriesForCategory(catId);
-          }
-
-          // Inventory
-          productType.value =
-              (productJson['inventory_type'] ?? product.productType).toString();
-          defaultUnit.value =
-              (productJson['inventory_unit_type'] ?? product.defaultUnit ?? '')
-                  .toString();
-          orderLimit.value = productJson['order_limit']?.toString() ?? '0';
-          bufferLimit.value = productJson['buffer_limit']?.toString() ?? '0';
-
-          // Tax & status
-          hsnCode.value = productJson['hsn_code']?.toString() ?? '';
-          isPublished.value =
-              (productJson['is_published']?.toString() ?? '0') == '1';
-          inStock.value = (productJson['in_stock']?.toString() ?? '0') == '1';
-
-            await _loadSelectedTaxesForProduct(product.id);
-
-          // Packs JSON, if present.
-          final packsRaw = productJson['packs'];
-          if (packsRaw is String && packsRaw.trim().isNotEmpty) {
-            try {
-              final decoded = jsonDecode(packsRaw);
-              if (decoded is List) {
-                packages.assignAll(decoded.map((e) {
-                  final m = e as Map<String, dynamic>;
-                  final desc = m['description']?.toString() ?? '';
-                  final size = (m['size'] as num?)?.toDouble() ?? 0.0;
-                  final unit = m['unit']?.toString() ?? '';
-                  final marketPrice =
-                      (m['market_price'] as num?)?.toDouble() ?? 0.0;
-                  final prices = m['prices'] as Map<String, dynamic>?;
-                  final retailRaw = prices == null
-                      ? ''
-                      : [
-                          prices['new'],
-                          prices['regular'],
-                          prices['home'],
-                        ]
-                          .map((v) => v?.toString() ?? '')
-                          .join(', ');
-                  return PackageUiModel(
-                    id: m['id']?.toString() ?? '',
-                    description: desc,
-                    size: size,
-                    unit: unit,
-                    marketPrice: marketPrice,
-                    retailPricesRaw: retailRaw,
-                    minLimit: m['min_limit'] as int?,
-                    maxLimit: m['max_limit'] as int?,
-                    barcode: m['barcode']?.toString(),
-                    isActive: (m['is_active']?.toString() ?? '1') == '1',
-                  );
-                }).toList());
-              }
-            } catch (e) {
-              debugPrint('[PRODUCT_FORM] Failed to parse packs JSON: $e');
-            }
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('[PRODUCT_FORM] Load error: $e');
-      Get.snackbar(
-        'Error',
-        'Failed to load product details',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.redAccent,
-        colorText: Colors.white,
-      );
+      await _loadProductById(id);
     } finally {
       isLoading.value = false;
     }
@@ -611,6 +827,19 @@ class ProductFormController extends GetxController {
             : defaultUnit.value.trim(),
         'order_limit': int.tryParse(orderLimit.value.trim()) ?? 0,
         'buffer_limit': int.tryParse(bufferLimit.value.trim()) ?? 0,
+        'product_pack_count':
+          int.tryParse(productPackCount.value.trim()) ??
+            int.tryParse(noOfPackages.value.trim()) ??
+            packages.length,
+        'nop':
+          int.tryParse(noOfPackages.value.trim()) ??
+            int.tryParse(productPackCount.value.trim()) ??
+            packages.length,
+        'pack_prd_wt': double.tryParse(packPrdWt.value.trim()),
+        'gross_wt_of_pack': double.tryParse(grossWtOfPack.value.trim()),
+        'gst_tax_type': gstTaxType.value.trim().isEmpty
+          ? null
+          : gstTaxType.value.trim(),
 
         // Tax & status
         'hsn_code': hsnCode.value.trim(),
@@ -626,8 +855,9 @@ class ProductFormController extends GetxController {
         payload['default_pack_id'] = packages.first.id;
       }
 
-      final url =
-          isEditMode ? '${ApiConfig.products}/$productId' : ApiConfig.products;
+        final url = isEditMode
+          ? '${ApiConfig.products}/${activeProductId.value}'
+          : ApiConfig.products;
 
       final response = isEditMode
           ? await http.put(
@@ -653,6 +883,8 @@ class ProductFormController extends GetxController {
         if (data['success'] == true) {
           final savedProductId = _extractSavedProductId(data);
           if (savedProductId != null) {
+            activeProductId.value = savedProductId;
+            currentProductSeq.value = savedProductId;
             final taxSyncOk = await _syncProductTaxes(savedProductId);
             if (!taxSyncOk) {
               Get.snackbar(

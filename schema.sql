@@ -631,6 +631,11 @@ CREATE TABLE `product` (
   `stock_ut_id` varchar(100) DEFAULT NULL,
   `order_limit` int unsigned NOT NULL DEFAULT '0',
   `buffer_limit` int unsigned NOT NULL DEFAULT '0',
+  `product_pack_count` int unsigned NOT NULL DEFAULT '0',
+  `nop` int unsigned NOT NULL DEFAULT '0',
+  `pack_prd_wt` decimal(12,3) DEFAULT NULL,
+  `gross_wt_of_pack` decimal(12,3) DEFAULT NULL,
+  `gst_tax_type` varchar(50) DEFAULT NULL,
   PRIMARY KEY (`product_id`),
   FULLTEXT KEY `prodNameFullText` (`name`,`keywords`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;

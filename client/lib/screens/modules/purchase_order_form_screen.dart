@@ -139,9 +139,10 @@ class _HeaderCard extends StatelessWidget {
           // Voucher number row – visible in both create and edit modes.
           Obx(() {
             final poNumber = controller.currentPoNumber.value;
+            final seqValue = controller.currentPoSeq.value;
             final labelText = controller.isEditMode
                 ? (poNumber.isEmpty ? 'Existing (no number)' : poNumber)
-                : (poNumber.isEmpty ? 'New (number after save)' : poNumber);
+                : (seqValue != null ? seqValue.toString() : '');
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
@@ -911,13 +912,14 @@ class _SummaryCard extends StatelessWidget {
         subtotalExclTax += row.lineTotalExclTax;
         totalInclTax += row.lineTotal;
       }
+      final grossAmount = subtotalExclTax;
       final taxAmount = totalInclTax - subtotalExclTax;
       return ContentCard(
         title: 'Summary',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _summaryRow('Subtotal (excl. tax)', '₹ ${subtotalExclTax.toStringAsFixed(2)}', false),
+            _summaryRow('Gross Amount', '₹ ${grossAmount.toStringAsFixed(2)}', false),
             if (taxAmount > 0) ...[
               const SizedBox(height: 6),
               _summaryRow('Tax', '₹ ${taxAmount.toStringAsFixed(2)}', false),

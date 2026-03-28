@@ -396,9 +396,8 @@ class _HeaderCard extends StatelessWidget {
           }),
           const SizedBox(height: 4),
           Obx(() {
-            final docNo = controller.docNoNumber.value.trim().isEmpty
-                ? ''
-                : '${controller.docNoPrefix.value}${controller.docNoNumber.value}';
+            final seq = controller.currentSeq.value;
+            final docNo = seq?.toString() ?? controller.docNoNumber.value.trim();
             if (docNo.isEmpty) return const SizedBox.shrink();
             return Row(
               mainAxisSize: MainAxisSize.min,
@@ -1393,6 +1392,12 @@ class _NetTotalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
+      double grossAmount = 0;
+      for (final row in controller.items) {
+        final qty = double.tryParse(row.quantity.value) ?? 0;
+        final price = double.tryParse(row.unitPrice.value) ?? 0;
+        grossAmount += qty * price;
+      }
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -1402,24 +1407,51 @@ class _NetTotalCard extends StatelessWidget {
             color: AppColors.primaryLight.withValues(alpha: 0.6),
           ),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            const Text(
-              'Net Total: ',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textDark,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                const Text(
+                  'Gross Amount: ',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textDark,
+                  ),
+                ),
+                Text(
+                  grossAmount.toStringAsFixed(3),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primaryDark,
+                  ),
+                ),
+              ],
             ),
-            Text(
-              controller.netTotal,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primaryDark,
-              ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                const Text(
+                  'Net Total: ',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textDark,
+                  ),
+                ),
+                Text(
+                  controller.netTotal,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryDark,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

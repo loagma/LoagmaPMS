@@ -418,28 +418,82 @@ class PurchaseVoucherController extends GetxController {
       final List list = data['data'] ?? [];
       if (list.isEmpty) {
         docNoNumber.value = '1';
+        currentSeq.value = 1;
         return;
       }
       final last = list.first as Map<String, dynamic>;
       // Prefer explicit doc_no_number, then numeric suffix of doc_no, then id.
-      int? base = int.tryParse(last['doc_no_number']?.toString() ?? '');
-      if (base == null) {
-        final rawDoc = last['doc_no']?.toString();
-        if (rawDoc != null && rawDoc.isNotEmpty) {
-          final match = RegExp(r'(\d+)$').firstMatch(rawDoc);
-          if (match != null) {
-            base = int.tryParse(match.group(1)!);
-          }
-        }
-      }
-      base ??= (last['id'] is int)
-          ? last['id'] as int
-          : int.tryParse(last['id']?.toString() ?? '');
+      final base = _sequenceFromVoucherSummary(last);
       final next = (base ?? 0) + 1;
       docNoNumber.value = next.toString();
+      currentSeq.value = next;
     } catch (e) {
       debugPrint('[PURCHASE_VOUCHER] Next doc no error: $e');
     }
+  }
+
+  int? _sequenceFromVoucherSummary(Map<String, dynamic> summary) {
+    int? base = int.tryParse(summary['doc_no_number']?.toString() ?? '');
+    if (base == null) {
+      final rawDoc = summary['doc_no']?.toString();
+      if (rawDoc != null && rawDoc.isNotEmpty) {
+        final match = RegExp(r'(\d+)$').firstMatch(rawDoc);
+        if (match != null) {
+          base = int.tryParse(match.group(1)!);
+        }
+      }
+    }
+    base ??= (summary['id'] is int)
+        ? summary['id'] as int
+        : int.tryParse(summary['id']?.toString() ?? '');
+    return base;
+  }
+
+  Future<int?> _fetchLatestVoucherSequence() async {
+    try {
+      final uri = Uri.parse(ApiConfig.purchaseVouchers).replace(
+        queryParameters: {
+          'limit': '1',
+        },
+      );
+      final response = await http
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return null;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) return null;
+      final List list = data['data'] ?? [];
+      if (list.isEmpty) return null;
+      final last = list.first as Map<String, dynamic>;
+      return _sequenceFromVoucherSummary(last);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _resetToNewVoucherForm() async {
+    docNoPrefix.value = '25-26/';
+    docNoNumber.value = '';
+    vendorId.value = null;
+    vendorName.value = '';
+    docDate.value = _formatDate(DateTime.now());
+    billNo.value = '';
+    narration.value = '';
+    doNotUpdateInventory.value = false;
+    purchaseType.value = 'Regular';
+    gstReverseCharge.value = 'N';
+    billDate.value = '';
+    purchaseAgentId.value = '';
+    linkedPurchaseOrderId.value = null;
+    linkedPoNumber.value = '';
+    _productTaxCache.clear();
+
+    items.clear();
+    charges.clear();
+    addItemRow();
+    addChargeRow();
+
+    await _loadNextDocNoNumberForNew();
   }
 
   /// Load products for the current vendor.
@@ -620,24 +674,24 @@ class PurchaseVoucherController extends GetxController {
           .get(uri, headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) {
-        _showError('Voucher $seq not found');
+        await _resetToNewVoucherForm();
         return;
       }
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       if (data['success'] != true) {
-        _showError('Voucher $seq not found');
+        await _resetToNewVoucherForm();
         return;
       }
       final List list = data['data'] ?? [];
       if (list.isEmpty) {
-        _showError('Voucher $seq not found');
+        await _resetToNewVoucherForm();
         return;
       }
       final summary = list.first as Map<String, dynamic>;
       final idVal = summary['id'];
       final id = idVal is int ? idVal : int.tryParse(idVal?.toString() ?? '');
       if (id == null) {
-        _showError('Voucher $seq not found');
+        await _resetToNewVoucherForm();
         return;
       }
 
@@ -647,19 +701,19 @@ class PurchaseVoucherController extends GetxController {
         headers: {'Accept': 'application/json'},
       );
       if (detailResp.statusCode != 200) {
-        _showError('Voucher $seq not found');
+        await _resetToNewVoucherForm();
         return;
       }
       final detailData = jsonDecode(detailResp.body) as Map<String, dynamic>;
       if (detailData['success'] != true) {
-        _showError('Voucher $seq not found');
+        await _resetToNewVoucherForm();
         return;
       }
       final vData = detailData['data'] as Map<String, dynamic>?;
       _applyVoucherData(vData);
     } catch (e) {
       debugPrint('[PURCHASE_VOUCHER] Load by sequence error: $e');
-      _showError('Failed to load voucher');
+      await _resetToNewVoucherForm();
     } finally {
       isLoading.value = false;
     }
@@ -674,6 +728,13 @@ class PurchaseVoucherController extends GetxController {
   Future<void> goToNextVoucher() async {
     final current = currentSeq.value;
     if (current == null) return;
+
+    final latest = await _fetchLatestVoucherSequence();
+    if (latest != null && current >= latest) {
+      await _resetToNewVoucherForm();
+      return;
+    }
+
     await loadVoucherBySequence(current + 1);
   }
 

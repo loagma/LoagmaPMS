@@ -353,6 +353,42 @@ class PurchaseOrderFormController extends GetxController {
     return (base ?? 0) + 1;
   }
 
+  /// Parse integer sequence from po_number suffix, falling back to id.
+  int? _sequenceFromRaw(String? poNumber, dynamic id) {
+    if (poNumber != null && poNumber.isNotEmpty) {
+      final match = RegExp(r'(\d+)$').firstMatch(poNumber);
+      if (match != null) {
+        final parsed = int.tryParse(match.group(1)!);
+        if (parsed != null) return parsed;
+      }
+    }
+    if (id is int) return id;
+    return int.tryParse(id?.toString() ?? '');
+  }
+
+  /// Returns latest voucher sequence from the most recent purchase order.
+  Future<int?> _fetchLatestSequence() async {
+    try {
+      final uri = Uri.parse(ApiConfig.purchaseOrders).replace(
+        queryParameters: {
+          'limit': '1',
+        },
+      );
+      final response = await http
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return null;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) return null;
+      final List list = data['data'] ?? [];
+      if (list.isEmpty) return null;
+      final last = list.first as Map<String, dynamic>;
+      return _sequenceFromRaw(last['po_number']?.toString(), last['id']);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _applyPurchaseOrderToState(PurchaseOrder po) async {
     financialYear.value = po.financialYear ?? '25-26';
     supplierId.value = po.supplierId;
@@ -393,6 +429,21 @@ class PurchaseOrderFormController extends GetxController {
     }
   }
 
+  /// Reset the form to a new purchase order state (when navigating to non-existent voucher).
+  Future<void> _resetToNewForm() async {
+    supplierId.value = null;
+    docDate.value = '';
+    expectedDate.value = '';
+    status.value = 'DRAFT';
+    narration.value = '';
+    currentPoNumber.value = '';
+    items.clear();
+    _setDefaultDocDate();
+    await _loadNextPoNumberForNew();
+    addItem();
+    viewOnly.value = false;
+  }
+
   /// Load a purchase order by a numeric sequence (voucher number).
   Future<void> loadBySequence(int seq) async {
     try {
@@ -407,24 +458,24 @@ class PurchaseOrderFormController extends GetxController {
           .get(uri, headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) {
-        _showError('Voucher $seq not found');
+        await _resetToNewForm();
         return;
       }
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       if (data['success'] != true) {
-        _showError('Voucher $seq not found');
+        await _resetToNewForm();
         return;
       }
       final List list = data['data'] ?? [];
       if (list.isEmpty) {
-        _showError('Voucher $seq not found');
+        await _resetToNewForm();
         return;
       }
       final summary = list.first as Map<String, dynamic>;
       final idVal = summary['id'];
       final id = idVal is int ? idVal : int.tryParse(idVal?.toString() ?? '');
       if (id == null) {
-        _showError('Voucher $seq not found');
+        await _resetToNewForm();
         return;
       }
 
@@ -434,12 +485,12 @@ class PurchaseOrderFormController extends GetxController {
         headers: {'Accept': 'application/json'},
       );
       if (detailResp.statusCode != 200) {
-        _showError('Voucher $seq not found');
+        await _resetToNewForm();
         return;
       }
       final detailData = jsonDecode(detailResp.body) as Map<String, dynamic>;
       if (detailData['success'] != true) {
-        _showError('Voucher $seq not found');
+        await _resetToNewForm();
         return;
       }
       final poData = detailData['data'] as Map<String, dynamic>;
@@ -449,7 +500,7 @@ class PurchaseOrderFormController extends GetxController {
       viewOnly.value = true;
     } catch (e) {
       debugPrint('[PO FORM] Load by sequence error: $e');
-      _showError('Failed to load voucher');
+      await _resetToNewForm();
     } finally {
       isLoading.value = false;
     }
@@ -464,6 +515,13 @@ class PurchaseOrderFormController extends GetxController {
   Future<void> goToNextVoucher() async {
     final current = currentPoSeq.value;
     if (current == null) return;
+
+    final latest = await _fetchLatestSequence();
+    if (latest != null && current >= latest) {
+      await _resetToNewForm();
+      return;
+    }
+
     await loadBySequence(current + 1);
   }
 

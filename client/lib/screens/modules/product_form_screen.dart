@@ -140,36 +140,36 @@ class ProductFormScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = Get.put(ProductFormController(productId: productId));
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: ModuleAppBar(
-        title: controller.isEditMode ? 'Edit Product' : 'Add Product',
-        subtitle: 'Product master',
-        onBackPressed: () => Get.back(),
-      ),
-      body: Obx(() {
-        if (controller.isLoading.value) {
-          return const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+    return Obx(() => Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: ModuleAppBar(
+            title: controller.isEditMode ? 'Edit Product' : 'Add Product',
+            subtitle: 'Product master',
+            onBackPressed: () => Get.back(),
+          ),
+          body: Obx(() {
+            if (controller.isLoading.value) {
+              return const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Loading product...',
+                      style: TextStyle(color: AppColors.textMuted, fontSize: 14),
+                    ),
+                  ],
                 ),
-                SizedBox(height: 16),
-                Text(
-                  'Loading product...',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 14),
-                ),
-              ],
-            ),
-          );
-        }
+              );
+            }
 
-        return Form(
-          key: controller.formKey,
-          child: Column(
-            children: [
+            return Form(
+              key: controller.formKey,
+              child: Column(
+                children: [
               // Step indicator
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -192,6 +192,59 @@ class ProductFormScreen extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Obx(() {
+                  final seq = controller.currentProductSeq.value;
+                  if (seq == null) return const SizedBox.shrink();
+                  return Row(
+                    children: [
+                      const Text(
+                        'Product No:',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          seq.toString(),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textDark,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (controller.isNavigating.value)
+                        const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.keyboard_arrow_up_rounded, size: 20),
+                        tooltip: 'Previous Product',
+                        onPressed: controller.isLoading.value ||
+                                controller.isNavigating.value
+                            ? null
+                            : () => controller.goToPreviousProduct(),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+                        tooltip: 'Next Product',
+                        onPressed: controller.isLoading.value ||
+                                controller.isNavigating.value
+                            ? null
+                            : () => controller.goToNextProduct(),
+                      ),
+                    ],
+                  );
+                }),
               ),
               const SizedBox(height: 4),
               Expanded(
@@ -255,11 +308,11 @@ class ProductFormScreen extends StatelessWidget {
                   ],
                 ),
               ),
-            ],
-          ),
-        );
-      }),
-    );
+                ],
+              ),
+            );
+          }),
+        ));
   }
 }
 
@@ -661,6 +714,76 @@ class _ProductStepOne extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Obx(
+                    () => TextFormField(
+                      initialValue: controller.productPackCount.value,
+                      decoration: AppInputDecoration.standard(
+                        labelText: 'ProductPack',
+                        hintText: 'Numeric pack count',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(),
+                      onChanged: (v) => controller.productPackCount.value = v,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Obx(
+                    () => TextFormField(
+                      initialValue: controller.noOfPackages.value,
+                      decoration: AppInputDecoration.standard(
+                        labelText: 'NoP (No. of Packages)',
+                        hintText: 'Enter number of packages',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(),
+                      onChanged: (v) => controller.noOfPackages.value = v,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Obx(
+                    () => TextFormField(
+                      initialValue: controller.packPrdWt.value,
+                      decoration: AppInputDecoration.standard(
+                        labelText: 'PackPrdWt',
+                        hintText: '0.000',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      onChanged: (v) => controller.packPrdWt.value = v,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Obx(
+                    () => TextFormField(
+                      initialValue: controller.grossWtOfPack.value,
+                      decoration: AppInputDecoration.standard(
+                        labelText: 'GrossWtofPack',
+                        hintText: '0.000',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      onChanged: (v) => controller.grossWtOfPack.value = v,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const SizedBox.shrink(),
           ],
         ),
       ),
@@ -714,6 +837,23 @@ class _ProductStepTwo extends StatelessWidget {
                     },
                   );
                 }),
+                const SizedBox(height: 16),
+                Obx(
+                  () => DropdownButtonFormField<String>(
+                    value: controller.gstTaxType.value.isEmpty
+                        ? null
+                        : controller.gstTaxType.value,
+                    decoration: AppInputDecoration.standard(
+                      labelText: 'GSTTaxType',
+                      hintText: 'Select GST tax type',
+                    ),
+                    items: ProductFormController.gstTaxTypeOptions
+                        .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                        .toList(),
+                    onChanged: (v) => controller.gstTaxType.value = v ?? '',
+                  ),
+                ),
+                const SizedBox(height: 16),
                 const SizedBox(height: 16),
                 Obx(
                   () {
