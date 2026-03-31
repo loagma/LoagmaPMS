@@ -90,9 +90,11 @@ class PurchaseOrderFormScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _HeaderCard(controller: controller),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
                       _ItemsCard(controller: controller),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
+                      _AddonCard(controller: controller),
+                      const SizedBox(height: 12),
                       _SummaryCard(controller: controller),
                     ],
                   ),
@@ -136,56 +138,79 @@ class _HeaderCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Voucher number row – visible in both create and edit modes.
-          Obx(() {
-            final poNumber = controller.currentPoNumber.value;
-            final seqValue = controller.currentPoSeq.value;
-            final labelText = controller.isEditMode
-                ? (poNumber.isEmpty ? 'Existing (no number)' : poNumber)
-                : (seqValue != null ? seqValue.toString() : '');
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                children: [
-                  const Text(
-                    'Voucher No:',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textMuted,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      labelText,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textDark,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                flex: 4,
+                child: Obx(() => TextFormField(
+                      enabled: !controller.isReadOnly,
+                      initialValue: controller.financialYear.value,
+                      decoration: AppInputDecoration.standard(
+                        labelText: 'Financial Year',
+                        hintText: 'e.g. 25-26',
                       ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    icon: const Icon(Icons.keyboard_arrow_up_rounded, size: 20),
-                    tooltip: 'Previous Voucher',
-                    onPressed: controller.isLoading.value
-                        ? null
-                        : () => controller.goToPreviousVoucher(),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
-                    tooltip: 'Next Voucher',
-                    onPressed: controller.isLoading.value
-                        ? null
-                        : () => controller.goToNextVoucher(),
-                  ),
-                ],
+                      onChanged: controller.setFinancialYear,
+                    )),
               ),
-            );
-          }),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 6,
+                child: Obx(() {
+                  final poNumber = controller.currentPoNumber.value;
+                  final seqValue = controller.currentPoSeq.value;
+                  final labelText = controller.isEditMode
+                      ? (poNumber.isEmpty ? 'Existing (no number)' : poNumber)
+                      : (seqValue != null ? seqValue.toString() : '');
+                  return InputDecorator(
+                    decoration: AppInputDecoration.standard(
+                      labelText: 'Voucher No',
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            labelText,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textDark,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        IconButton(
+                          constraints: const BoxConstraints.tightFor(
+                            width: 28,
+                            height: 28,
+                          ),
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.keyboard_arrow_left_rounded, size: 18),
+                          tooltip: 'Previous Voucher',
+                          onPressed: controller.isLoading.value
+                              ? null
+                              : () => controller.goToPreviousVoucher(),
+                        ),
+                        IconButton(
+                          constraints: const BoxConstraints.tightFor(
+                            width: 28,
+                            height: 28,
+                          ),
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.keyboard_arrow_right_rounded, size: 18),
+                          tooltip: 'Next Voucher',
+                          onPressed: controller.isLoading.value
+                              ? null
+                              : () => controller.goToNextVoucher(),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           Obx(() {
             final list = controller.suppliers;
             return DropdownButtonFormField<int>(
@@ -204,17 +229,7 @@ class _HeaderCard extends StatelessWidget {
               validator: (v) => v == null ? 'Please select supplier' : null,
             );
           }),
-          const SizedBox(height: 16),
-          Obx(() => TextFormField(
-                enabled: !controller.isReadOnly,
-                initialValue: controller.financialYear.value,
-                decoration: AppInputDecoration.standard(
-                  labelText: 'Financial Year',
-                  hintText: 'e.g. 25-26',
-                ),
-                onChanged: controller.setFinancialYear,
-              )),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -245,7 +260,7 @@ class _HeaderCard extends StatelessWidget {
             ],
           ),
           if (controller.isEditMode) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Obx(() => DropdownButtonFormField<String>(
                   value: controller.status.value,
                   decoration: AppInputDecoration.standard(labelText: 'Status'),
@@ -265,7 +280,7 @@ class _HeaderCard extends StatelessWidget {
                         },
                 )),
           ],
-          const SizedBox(height: 16),
+                  const SizedBox(height: 12),
           Obx(() => TextFormField(
                 enabled: !controller.isReadOnly,
                 initialValue: controller.narration.value,
@@ -290,7 +305,7 @@ class _ItemsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ContentCard(
-      title: 'Line Items',
+      title: 'Product Detail',
       child: Obx(() {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -312,13 +327,13 @@ class _ItemsCard extends StatelessWidget {
                 ),
               ),
             if (!controller.isReadOnly) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Align(
                 alignment: Alignment.centerLeft,
                 child: TextButton.icon(
                   onPressed: controller.addItem,
                   icon: const Icon(Icons.add_rounded, size: 20),
-                  label: const Text('Add Item'),
+                  label: const Text('Add Product +'),
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.primary,
                   ),
@@ -346,8 +361,8 @@ class _ItemRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.primaryLighter.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(12),
@@ -361,16 +376,26 @@ class _ItemRow extends StatelessWidget {
         children: [
           Row(
             children: [
+              const Text(
+                'Product Detail',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textDark,
+                  fontFamily: 'Times New Roman',
+                ),
+              ),
+              const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   'Item ${index + 1}',
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: AppColors.primaryDark,
                   ),
@@ -386,7 +411,7 @@ class _ItemRow extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           _ProductPicker(
             controller: controller,
             row: row,
@@ -412,31 +437,11 @@ class _ItemRow extends StatelessWidget {
               ),
             );
           }),
-          Obx(() {
-            if (row.productId.value == null || row.availableTaxKeys.isEmpty) {
-              return const SizedBox.shrink();
-            }
-            return Column(
-              children: [
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: row.availableTaxKeys
-                      .map((k) => SizedBox(
-                            width: 140,
-                            child: _taxField(row.taxFieldValues[k] ?? '', k),
-                          ))
-                      .toList(),
-                ),
-              ],
-            );
-          }),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
-                flex: 3,
+                flex: 2,
                 child: Obx(() => TextFormField(
                       enabled: !controller.isReadOnly,
                       initialValue: row.quantity.value,
@@ -457,7 +462,7 @@ class _ItemRow extends StatelessWidget {
                       onChanged: (v) => row.quantity.value = v,
                     )),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
                 flex: 2,
                 child: Obx(
@@ -466,9 +471,7 @@ class _ItemRow extends StatelessWidget {
                         ? ['KG', 'PCS', 'LTR', 'MTR', 'GM', 'ML']
                         : controller.unitTypes;
                     final current = row.unit.value;
-                    final value = units.contains(current)
-                        ? current
-                        : units.first;
+                    final value = units.contains(current) ? current : units.first;
                     if (value != current && !controller.isReadOnly) {
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         row.unit.value = value;
@@ -478,7 +481,6 @@ class _ItemRow extends StatelessWidget {
                       value: value,
                       decoration: AppInputDecoration.standard(labelText: 'Unit')
                           .copyWith(
-                            // Reduce horizontal padding so the dropdown can't overflow on small widths.
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 10,
                               vertical: 12,
@@ -508,19 +510,13 @@ class _ItemRow extends StatelessWidget {
                   },
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
+              const SizedBox(width: 8),
               Expanded(
                 child: Obx(() => TextFormField(
                       enabled: !controller.isReadOnly,
                       initialValue: row.price.value,
                       decoration: AppInputDecoration.standard(
-                        labelText: row.isInclusiveTax.value
-                            ? 'Unit Price (with tax) *'
-                            : 'Unit Price (without tax) *',
+                        labelText: 'Unit Price *',
                         hintText: '0.00',
                       ),
                       keyboardType:
@@ -539,123 +535,243 @@ class _ItemRow extends StatelessWidget {
                       onChanged: (v) => row.price.value = v,
                     )),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    enabled: false,
-                    initialValue: row.lineTotalExclTax.toStringAsFixed(2),
-                    decoration: AppInputDecoration.standard(
-                      labelText: 'Taxable',
-                    ),
-                    readOnly: true,
-                  ),
-                ),
-              ),
             ],
           ),
-          const SizedBox(height: 8),
-          Obx(
-            () => Row(
+          Obx(() {
+            if (row.productId.value == null || row.availableTaxKeys.isEmpty) {
+              return const SizedBox.shrink();
+            }
+            return Column(
               children: [
-                Expanded(
-                  child: RadioListTile<bool>(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text(
-                      'Without tax',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                    value: false,
-                    groupValue: row.isInclusiveTax.value,
-                    onChanged: controller.isReadOnly
-                        ? null
-                        : (v) {
-                            if (v != null) {
-                              row.isInclusiveTax.value = v;
-                            }
-                          },
-                  ),
-                ),
-                Expanded(
-                  child: RadioListTile<bool>(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text(
-                      'With tax',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                    value: true,
-                    groupValue: row.isInclusiveTax.value,
-                    onChanged: controller.isReadOnly
-                        ? null
-                        : (v) {
-                            if (v != null) {
-                              row.isInclusiveTax.value = v;
-                            }
-                          },
-                  ),
-                ),
+                const SizedBox(height: 8),
+                _buildTaxRows(row),
               ],
-            ),
-          ),
-          const SizedBox(height: 6),
-          Obx(() => Text(
-                'Price (incl. tax): ₹ ${row.priceInclTax.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-              )),
+            );
+          }),
           const SizedBox(height: 8),
-          Obx(() => Align(
-                alignment: Alignment.centerRight,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      'Line total (excl. tax): ₹ ${row.lineTotalExclTax.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Line total (incl. tax): ₹ ${row.lineTotal.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primaryDark,
-                      ),
-                    ),
-                  ],
-                ),
-              )),
+          _buildTaxTotals(row),
         ],
       ),
     );
   }
 
-  Widget _taxField(String value, String label) {
-    return TextFormField(
-      enabled: false,
-      key: ValueKey('${label}_$value'),
-      initialValue: value,
-      decoration: InputDecoration(
-        labelText: label,
-        isDense: true,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: AppColors.primaryLight),
+  Widget _buildTaxRows(POLineRow row) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.primaryLight.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: Text(
+                  'Tax',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  'Tax %',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  'Tax Amount',
+                  textAlign: TextAlign.right,
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
         ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 8,
-          vertical: 8,
+        const SizedBox(height: 4),
+        ...row.availableTaxKeys.map((key) {
+          final percent = double.tryParse(row.taxFieldValues[key] ?? '') ?? 0;
+          final taxable = row.lineTotalExclTax;
+          final amount = taxable * percent / 100;
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    key,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    '${percent.toStringAsFixed(2)}%',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    amount.toStringAsFixed(2),
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildTaxTotals(POLineRow row) {
+    return Row(
+      children: [
+        Expanded(
+          child: Obx(
+            () => TextFormField(
+              enabled: false,
+              initialValue: (row.lineTotal - row.lineTotalExclTax).toStringAsFixed(2),
+              decoration: AppInputDecoration.standard(
+                labelText: 'Total Tax Amount',
+              ),
+              readOnly: true,
+            ),
+          ),
         ),
-      ),
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      readOnly: true,
+        const SizedBox(width: 8),
+        Expanded(
+          child: Obx(() => TextFormField(
+                enabled: false,
+                initialValue: row.lineTotal.toStringAsFixed(2),
+                decoration: AppInputDecoration.standard(
+                  labelText: 'Total Product Amount',
+                ),
+                readOnly: true,
+              )),
+        ),
+      ],
+    );
+  }
+}
+
+class _AddonCard extends StatelessWidget {
+  final PurchaseOrderFormController controller;
+
+  const _AddonCard({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return ContentCard(
+      title: 'Addon',
+      child: Obx(() {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: controller.charges.length,
+              itemBuilder: (context, index) {
+                final charge = controller.charges[index];
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLighter.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.primaryLight.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: Obx(() => DropdownButtonFormField<String>(
+                              value: PurchaseOrderFormController.chargeTypeNames
+                                      .contains(charge.name.value)
+                                  ? charge.name.value
+                                  : PurchaseOrderFormController.chargeTypeNames.first,
+                              decoration: AppInputDecoration.standard(
+                                labelText: 'Name',
+                              ).copyWith(
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 8,
+                                ),
+                              ),
+                              isExpanded: true,
+                              isDense: true,
+                              items: PurchaseOrderFormController.chargeTypeNames
+                                  .map(
+                                    (name) => DropdownMenuItem(
+                                      value: name,
+                                      child: Text(
+                                        name,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: controller.isReadOnly
+                                  ? null
+                                  : (v) {
+                                      if (v != null) charge.name.value = v;
+                                    },
+                            )),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextFormField(
+                          enabled: !controller.isReadOnly,
+                          initialValue: charge.amount.value,
+                          decoration: AppInputDecoration.standard(
+                            labelText: 'Amount',
+                            hintText: '0.00',
+                          ),
+                          keyboardType:
+                              const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'^-?\d+\.?\d{0,2}'),
+                            ),
+                          ],
+                          onChanged: (v) => charge.amount.value = v,
+                        ),
+                      ),
+                      if (!controller.isReadOnly) ...[
+                        const SizedBox(width: 6),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded),
+                          color: Colors.redAccent,
+                          onPressed: () => controller.removeChargeRow(index),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              },
+            ),
+            if (!controller.isReadOnly)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: controller.addChargeRow,
+                  icon: const Icon(Icons.add_rounded, size: 20),
+                  label: const Text('Add'),
+                  style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+                ),
+              ),
+          ],
+        );
+      }),
     );
   }
 }
@@ -906,26 +1022,46 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      double subtotalExclTax = 0;
-      double totalInclTax = 0;
-      for (final row in controller.items) {
-        subtotalExclTax += row.lineTotalExclTax;
-        totalInclTax += row.lineTotal;
-      }
-      final grossAmount = subtotalExclTax;
-      final taxAmount = totalInclTax - subtotalExclTax;
+      final grossAmount = controller.itemsSubtotalExclTax;
+      final sgst = controller.sgstTotal;
+      final cgst = controller.cgstTotal;
+      final igst = controller.igstTotal;
+      final cess = controller.cessTotal;
+      final roundOffTax = controller.roffTotal;
+      final addOnTotal = controller.addOnTotal;
+      final totalInclTax = controller.grandTotal;
       return ContentCard(
         title: 'Summary',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _summaryRow('Gross Amount', '₹ ${grossAmount.toStringAsFixed(2)}', false),
-            if (taxAmount > 0) ...[
+            if (sgst > 0) ...[
               const SizedBox(height: 6),
-              _summaryRow('Tax', '₹ ${taxAmount.toStringAsFixed(2)}', false),
+              _summaryRow('SGST', '₹ ${sgst.toStringAsFixed(2)}', false),
+            ],
+            if (cgst > 0) ...[
+              const SizedBox(height: 6),
+              _summaryRow('CGST', '₹ ${cgst.toStringAsFixed(2)}', false),
+            ],
+            if (igst > 0) ...[
+              const SizedBox(height: 6),
+              _summaryRow('IGST', '₹ ${igst.toStringAsFixed(2)}', false),
+            ],
+            if (cess > 0) ...[
+              const SizedBox(height: 6),
+              _summaryRow('CESS', '₹ ${cess.toStringAsFixed(2)}', false),
+            ],
+            if (roundOffTax > 0) ...[
+              const SizedBox(height: 6),
+              _summaryRow('Round off Tax', '₹ ${roundOffTax.toStringAsFixed(2)}', false),
+            ],
+            if (addOnTotal != 0) ...[
+              const SizedBox(height: 6),
+              _summaryRow('Add on total', '₹ ${addOnTotal.toStringAsFixed(2)}', false),
             ],
             const SizedBox(height: 8),
-            _summaryRow('Total (incl. tax)', '₹ ${totalInclTax.toStringAsFixed(2)}', true),
+            _summaryRow('Total', '₹ ${totalInclTax.toStringAsFixed(2)}', true),
           ],
         ),
       );

@@ -15,6 +15,9 @@ class PurchaseOrder extends Model
         'status',
         'narration',
         'total_amount',
+        'charges_total',
+        'charges_json',
+        'total_with_charges',
         'created_by',
         'updated_by',
     ];
@@ -23,6 +26,9 @@ class PurchaseOrder extends Model
         'doc_date' => 'date',
         'expected_date' => 'date',
         'total_amount' => 'decimal:2',
+        'charges_total' => 'decimal:2',
+        'total_with_charges' => 'decimal:2',
+        'charges_json' => 'array',
     ];
 
     public function supplier()

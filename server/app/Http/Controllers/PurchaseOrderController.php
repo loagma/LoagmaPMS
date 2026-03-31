@@ -91,6 +91,10 @@ class PurchaseOrderController extends Controller
             'expected_date' => 'nullable|date',
             'status' => 'nullable|in:DRAFT,SENT,PARTIALLY_RECEIVED,CLOSED,CANCELLED',
             'narration' => 'nullable|string',
+            'charges' => 'nullable|array',
+            'charges.*.name' => 'required_with:charges|string|max:50',
+            'charges.*.amount' => 'nullable|numeric',
+            'charges.*.remarks' => 'nullable|string|max:255',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|integer|exists:product,product_id',
             'items.*.line_no' => 'required|integer|min:1',
@@ -116,9 +120,12 @@ class PurchaseOrderController extends Controller
                 'status' => $validated['status'] ?? 'DRAFT',
                 'narration' => $validated['narration'] ?? null,
                 'total_amount' => 0,
+                'charges_total' => 0,
+                'total_with_charges' => 0,
+                'charges_json' => [],
             ]);
 
-            $totalAmount = 0;
+            $itemsTotal = 0;
             foreach ($validated['items'] as $row) {
                 $qty = (float) $row['quantity'];
                 $price = (float) $row['price'];
@@ -138,10 +145,19 @@ class PurchaseOrderController extends Controller
                     'line_total' => $lineTotal,
                     'description' => $row['description'] ?? null,
                 ]);
-                $totalAmount += $lineTotal;
+                $itemsTotal += $lineTotal;
             }
 
-            $po->update(['total_amount' => round($totalAmount, 2)]);
+            [$normalizedCharges, $chargesTotal] = $this->normalizeCharges($validated['charges'] ?? []);
+            $itemsTotal = round($itemsTotal, 2);
+            $totalWithCharges = round($itemsTotal + $chargesTotal, 2);
+
+            $po->update([
+                'total_amount' => $itemsTotal,
+                'charges_total' => $chargesTotal,
+                'charges_json' => $normalizedCharges,
+                'total_with_charges' => $totalWithCharges,
+            ]);
 
             DB::commit();
 
@@ -171,6 +187,10 @@ class PurchaseOrderController extends Controller
             'expected_date' => 'nullable|date',
             'status' => 'nullable|in:DRAFT,SENT,PARTIALLY_RECEIVED,CLOSED,CANCELLED',
             'narration' => 'nullable|string',
+            'charges' => 'nullable|array',
+            'charges.*.name' => 'required_with:charges|string|max:50',
+            'charges.*.amount' => 'nullable|numeric',
+            'charges.*.remarks' => 'nullable|string|max:255',
             'items' => 'sometimes|array|min:1',
             'items.*.product_id' => 'required_with:items|integer|exists:product,product_id',
             'items.*.line_no' => 'required_with:items|integer|min:1',
@@ -203,9 +223,11 @@ class PurchaseOrderController extends Controller
             ], fn ($v) => $v !== null));
             $po->save();
 
+            $itemsTotal = (float) ($po->total_amount ?? 0);
+
             if (isset($validated['items'])) {
                 $po->items()->delete();
-                $totalAmount = 0;
+                $itemsTotal = 0;
                 foreach ($validated['items'] as $row) {
                     $qty = (float) $row['quantity'];
                     $price = (float) $row['price'];
@@ -225,10 +247,24 @@ class PurchaseOrderController extends Controller
                         'line_total' => $lineTotal,
                         'description' => $row['description'] ?? null,
                     ]);
-                    $totalAmount += $lineTotal;
+                    $itemsTotal += $lineTotal;
                 }
-                $po->update(['total_amount' => round($totalAmount, 2)]);
             }
+
+            $itemsTotal = round($itemsTotal, 2);
+
+            $chargesTotal = (float) ($po->charges_total ?? 0);
+            $chargesJson = $po->charges_json ?? [];
+            if (array_key_exists('charges', $validated)) {
+                [$chargesJson, $chargesTotal] = $this->normalizeCharges($validated['charges'] ?? []);
+            }
+
+            $po->update([
+                'total_amount' => $itemsTotal,
+                'charges_total' => $chargesTotal,
+                'charges_json' => $chargesJson,
+                'total_with_charges' => round($itemsTotal + $chargesTotal, 2),
+            ]);
 
             DB::commit();
 
@@ -272,6 +308,49 @@ class PurchaseOrderController extends Controller
                 'message' => 'Failed to delete purchase order',
             ], 500);
         }
+    }
+
+    /**
+     * @return array{0: array<int, array<string, mixed>>, 1: float}
+     */
+    private function normalizeCharges(array $rawCharges): array
+    {
+        $normalized = [];
+        $total = 0.0;
+
+        foreach ($rawCharges as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $name = trim((string) ($row['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+
+            $amount = isset($row['amount']) ? (float) $row['amount'] : 0.0;
+            $calculatedAmount = str_contains(strtolower($name), 'discount')
+                ? -abs($amount)
+                : $amount;
+
+            $charge = [
+                'name' => $name,
+                'amount' => round($amount, 2),
+                'calculated_amount' => round($calculatedAmount, 2),
+            ];
+
+            if (isset($row['remarks'])) {
+                $remarks = trim((string) $row['remarks']);
+                if ($remarks !== '') {
+                    $charge['remarks'] = $remarks;
+                }
+            }
+
+            $normalized[] = $charge;
+            $total += $calculatedAmount;
+        }
+
+        return [$normalized, round($total, 2)];
     }
 
     private function generatePoNumber(string $financialYear): string

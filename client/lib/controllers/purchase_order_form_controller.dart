@@ -7,7 +7,6 @@ import 'package:http/http.dart' as http;
 
 import '../api_config.dart';
 import '../models/purchase_order_model.dart';
-import '../theme/app_colors.dart';
 
 class PurchaseOrderFormController extends GetxController {
   final formKey = GlobalKey<FormState>();
@@ -30,11 +29,20 @@ class PurchaseOrderFormController extends GetxController {
   final expectedDate = ''.obs;
   final status = 'DRAFT'.obs;
   final narration = ''.obs;
+  final charges = <POChargeRow>[].obs;
 
   final items = <POLineRow>[].obs;
 
   final isLoading = false.obs;
   final isSaving = false.obs;
+
+  static const List<String> chargeTypeNames = [
+    'Hamali',
+    'Freight',
+    'Round off',
+    'Discount',
+    'Others',
+  ];
 
   PurchaseOrderFormController({this.poId, this.startInViewOnly = false});
 
@@ -42,6 +50,7 @@ class PurchaseOrderFormController extends GetxController {
   void onInit() {
     super.onInit();
     viewOnly.value = startInViewOnly;
+    _ensureDefaultCharges();
     _loadSuppliers();
     _loadUnitTypes();
     if (poId != null) {
@@ -239,8 +248,8 @@ class PurchaseOrderFormController extends GetxController {
     if (data['success'] != true) return [];
     final List list = data['data'] ?? [];
     return list
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e as Map))
+      .whereType<Map<dynamic, dynamic>>()
+      .map((e) => Map<String, dynamic>.from(e))
         .toList();
   }
 
@@ -404,6 +413,7 @@ class PurchaseOrderFormController extends GetxController {
         currentPoSeq.value = int.tryParse(match.group(1)!);
       }
     }
+    _loadChargesFromModel(po.chargesJson);
     items.clear();
     for (final item in po.items) {
       items.add(POLineRow(
@@ -437,6 +447,7 @@ class PurchaseOrderFormController extends GetxController {
     status.value = 'DRAFT';
     narration.value = '';
     currentPoNumber.value = '';
+    _ensureDefaultCharges(reset: true);
     items.clear();
     _setDefaultDocDate();
     await _loadNextPoNumberForNew();
@@ -545,6 +556,7 @@ class PurchaseOrderFormController extends GetxController {
           status.value = po.status;
           narration.value = po.narration ?? '';
           currentPoNumber.value = po.poNumber;
+          _loadChargesFromModel(po.chargesJson);
           items.clear();
           for (final item in po.items) {
             items.add(POLineRow(
@@ -593,6 +605,41 @@ class PurchaseOrderFormController extends GetxController {
 
   bool get isEditMode => poId != null;
   bool get isReadOnly => viewOnly.value || status.value != 'DRAFT';
+
+  double get itemsSubtotalExclTax {
+    double value = 0;
+    for (final row in items) {
+      value += row.lineTotalExclTax;
+    }
+    return value;
+  }
+
+  double get itemsTaxTotal {
+    double value = 0;
+    for (final row in items) {
+      value += (row.lineTotal - row.lineTotalExclTax);
+    }
+    return value;
+  }
+
+  double get sgstTotal => _sumTaxAmountByKey('SGST');
+  double get cgstTotal => _sumTaxAmountByKey('CGST');
+  double get igstTotal => _sumTaxAmountByKey('IGST');
+  double get cessTotal => _sumTaxAmountByKey('CESS');
+  double get roffTotal => _sumTaxAmountByKey('ROFF');
+
+  double get itemsTotalInclTax => itemsSubtotalExclTax + itemsTaxTotal;
+
+  double get addOnTotal {
+    double total = 0;
+    for (final charge in charges) {
+      final amount = double.tryParse(charge.amount.value) ?? 0;
+      total += amount;
+    }
+    return total;
+  }
+
+  double get grandTotal => itemsTotalInclTax + addOnTotal;
 
   bool validateForm() {
     if (!formKey.currentState!.validate()) return false;
@@ -645,6 +692,14 @@ class PurchaseOrderFormController extends GetxController {
         if (expectedDate.value.trim().isNotEmpty) 'expected_date': expectedDate.value.trim(),
         'status': status.value,
         if (narration.value.trim().isNotEmpty) 'narration': narration.value.trim(),
+        'charges': charges
+          .map((row) => {
+              'name': row.name.value,
+              'amount': double.tryParse(row.amount.value) ?? 0,
+              if (row.remarks.value.trim().isNotEmpty)
+              'remarks': row.remarks.value.trim(),
+            })
+          .toList(),
         'items': validItems.asMap().entries.map((e) {
           final r = e.value;
           final productId = r.productId.value!;
@@ -736,14 +791,54 @@ class PurchaseOrderFormController extends GetxController {
     );
   }
 
-  void _showSuccess(String message) {
-    Get.snackbar(
-      'Success',
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: AppColors.primary,
-      colorText: Colors.white,
+  void _loadChargesFromModel(List<PurchaseOrderCharge> source) {
+    if (source.isEmpty) {
+      _ensureDefaultCharges(reset: true);
+      return;
+    }
+    charges.assignAll(
+      source
+          .map(
+            (charge) => POChargeRow(
+              name: charge.name,
+              amount: charge.amount.toStringAsFixed(2),
+              remarks: charge.remarks ?? '',
+            ),
+          )
+          .toList(),
     );
+  }
+
+  void _ensureDefaultCharges({bool reset = false}) {
+    if (!reset && charges.isNotEmpty) return;
+    charges.assignAll([
+      POChargeRow(name: 'Hamali', amount: '0'),
+      POChargeRow(name: 'Freight', amount: '0'),
+      POChargeRow(name: 'Round off', amount: '0'),
+    ]);
+  }
+
+  void addChargeRow() {
+    charges.add(POChargeRow(name: chargeTypeNames.first, amount: '0'));
+  }
+
+  void removeChargeRow(int index) {
+    if (index >= 0 && index < charges.length) {
+      charges.removeAt(index);
+    }
+    if (charges.isEmpty) {
+      _ensureDefaultCharges(reset: true);
+    }
+  }
+
+  double _sumTaxAmountByKey(String key) {
+    double total = 0;
+    for (final row in items) {
+      final percent = double.tryParse(row.taxFieldValues[key] ?? '') ?? 0;
+      if (percent <= 0) continue;
+      total += row.lineTotalExclTax * percent / 100;
+    }
+    return total;
   }
 }
 
@@ -846,5 +941,21 @@ class POLineRow {
     final t = _effectiveTaxPercent;
     if (t <= 0) return pIncl;
     return pIncl / (1 + t / 100);
+  }
+}
+
+class POChargeRow {
+  final name = ''.obs;
+  final amount = '0'.obs;
+  final remarks = ''.obs;
+
+  POChargeRow({
+    required String name,
+    String? amount,
+    String? remarks,
+  }) {
+    if (name.isNotEmpty) this.name.value = name;
+    if (amount != null) this.amount.value = amount;
+    if (remarks != null) this.remarks.value = remarks;
   }
 }

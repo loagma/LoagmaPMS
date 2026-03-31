@@ -9,6 +9,9 @@ class PurchaseOrder {
   final String status;
   final String? narration;
   final double? totalAmount;
+  final double? chargesTotal;
+  final double? totalWithCharges;
+  final List<PurchaseOrderCharge> chargesJson;
   final List<PurchaseOrderItem> items;
 
   PurchaseOrder({
@@ -22,6 +25,9 @@ class PurchaseOrder {
     required this.status,
     this.narration,
     this.totalAmount,
+    this.chargesTotal,
+    this.totalWithCharges,
+    this.chargesJson = const [],
     this.items = const [],
   });
 
@@ -46,6 +52,13 @@ class PurchaseOrder {
       rawItems = const [];
     }
 
+    final List<dynamic> rawCharges;
+    if (json['charges_json'] is List) {
+      rawCharges = json['charges_json'] as List<dynamic>;
+    } else {
+      rawCharges = const [];
+    }
+
     final supplier = json['supplier'] is Map ? json['supplier'] as Map<String, dynamic> : null;
     final supplierName = supplier?['supplier_name']?.toString() ?? supplier?['name']?.toString() ?? json['supplier_name']?.toString();
 
@@ -60,6 +73,12 @@ class PurchaseOrder {
       status: json['status']?.toString() ?? 'DRAFT',
       narration: json['narration']?.toString(),
       totalAmount: parseDouble(json['total_amount']),
+        chargesTotal: parseDouble(json['charges_total']),
+        totalWithCharges: parseDouble(json['total_with_charges']),
+        chargesJson: rawCharges
+          .whereType<Map<String, dynamic>>()
+          .map(PurchaseOrderCharge.fromJson)
+          .toList(),
       items: rawItems
           .whereType<Map<String, dynamic>>()
           .map(PurchaseOrderItem.fromJson)
@@ -78,7 +97,51 @@ class PurchaseOrder {
       'status': status,
       if (narration != null) 'narration': narration,
       if (totalAmount != null) 'total_amount': totalAmount,
+      if (chargesTotal != null) 'charges_total': chargesTotal,
+      if (totalWithCharges != null) 'total_with_charges': totalWithCharges,
+      if (chargesJson.isNotEmpty)
+        'charges_json': chargesJson.map((e) => e.toJson()).toList(),
       if (items.isNotEmpty) 'items': items.map((e) => e.toJson()).toList(),
+    };
+  }
+}
+
+class PurchaseOrderCharge {
+  final String name;
+  final double amount;
+  final double? calculatedAmount;
+  final String? remarks;
+
+  const PurchaseOrderCharge({
+    required this.name,
+    required this.amount,
+    this.calculatedAmount,
+    this.remarks,
+  });
+
+  factory PurchaseOrderCharge.fromJson(Map<String, dynamic> json) {
+    double parseDouble(dynamic value) {
+      if (value == null) return 0;
+      if (value is num) return value.toDouble();
+      return double.tryParse(value.toString()) ?? 0;
+    }
+
+    return PurchaseOrderCharge(
+      name: json['name']?.toString() ?? 'Charge',
+      amount: parseDouble(json['amount']),
+      calculatedAmount: json['calculated_amount'] == null
+          ? null
+          : parseDouble(json['calculated_amount']),
+      remarks: json['remarks']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'amount': amount,
+      if (calculatedAmount != null) 'calculated_amount': calculatedAmount,
+      if (remarks != null && remarks!.isNotEmpty) 'remarks': remarks,
     };
   }
 }
