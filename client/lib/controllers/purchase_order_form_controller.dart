@@ -813,8 +813,6 @@ class PurchaseOrderFormController extends GetxController {
     if (!reset && charges.isNotEmpty) return;
     charges.assignAll([
       POChargeRow(name: 'Hamali', amount: '0'),
-      POChargeRow(name: 'Freight', amount: '0'),
-      POChargeRow(name: 'Round off', amount: '0'),
     ]);
   }
 

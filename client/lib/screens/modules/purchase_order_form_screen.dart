@@ -85,16 +85,16 @@ class PurchaseOrderFormScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _HeaderCard(controller: controller),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       _ItemsCard(controller: controller),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       _AddonCard(controller: controller),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       _SummaryCard(controller: controller),
                     ],
                   ),
@@ -142,75 +142,83 @@ class _HeaderCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                flex: 4,
-                child: Obx(() => TextFormField(
-                      enabled: !controller.isReadOnly,
-                      initialValue: controller.financialYear.value,
-                      decoration: AppInputDecoration.standard(
-                        labelText: 'Financial Year',
-                        hintText: 'e.g. 25-26',
-                      ),
-                      onChanged: controller.setFinancialYear,
-                    )),
+                flex: 2,
+                child: SizedBox(
+                  height: 56,
+                  child: Obx(() => TextFormField(
+                        enabled: !controller.isReadOnly,
+                        initialValue: controller.financialYear.value,
+                        decoration: AppInputDecoration.standard(
+                          labelText: 'Financial Year',
+                          hintText: 'e.g. 25-26',
+                        ),
+                        onChanged: controller.setFinancialYear,
+                      )),
+                ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 5),
               Expanded(
-                flex: 6,
-                child: Obx(() {
-                  final poNumber = controller.currentPoNumber.value;
-                  final seqValue = controller.currentPoSeq.value;
-                  final labelText = controller.isEditMode
-                      ? (poNumber.isEmpty ? 'Existing (no number)' : poNumber)
-                      : (seqValue != null ? seqValue.toString() : '');
-                  return InputDecorator(
-                    decoration: AppInputDecoration.standard(
-                      labelText: 'Voucher No',
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            labelText,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textDark,
+                flex: 2,
+                child: SizedBox(
+                  height: 56,
+                  child: Obx(() {
+                    final poNumber = controller.currentPoNumber.value;
+                    final seqValue = controller.currentPoSeq.value;
+                    final labelText = controller.isEditMode
+                        ? (poNumber.isEmpty ? 'Existing (no number)' : poNumber)
+                        : (seqValue != null ? seqValue.toString() : '');
+                    return InputDecorator(
+                      decoration: AppInputDecoration.standard(
+                        labelText: 'Voucher No',
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              labelText,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textDark,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        IconButton(
-                          constraints: const BoxConstraints.tightFor(
-                            width: 28,
-                            height: 28,
+                          IconButton(
+                            constraints: const BoxConstraints.tightFor(
+                              width: 28,
+                              height: 28,
+                            ),
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(Icons.keyboard_arrow_left_rounded, size: 18),
+                            tooltip: 'Previous Voucher',
+                            onPressed: controller.isLoading.value
+                                ? null
+                                : () => controller.goToPreviousVoucher(),
                           ),
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.keyboard_arrow_left_rounded, size: 18),
-                          tooltip: 'Previous Voucher',
-                          onPressed: controller.isLoading.value
-                              ? null
-                              : () => controller.goToPreviousVoucher(),
-                        ),
-                        IconButton(
-                          constraints: const BoxConstraints.tightFor(
-                            width: 28,
-                            height: 28,
+                          IconButton(
+                            constraints: const BoxConstraints.tightFor(
+                              width: 28,
+                              height: 28,
+                            ),
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(Icons.keyboard_arrow_right_rounded, size: 18),
+                            tooltip: 'Next Voucher',
+                            onPressed: controller.isLoading.value
+                                ? null
+                                : () => controller.goToNextVoucher(),
                           ),
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.keyboard_arrow_right_rounded, size: 18),
-                          tooltip: 'Next Voucher',
-                          onPressed: controller.isLoading.value
-                              ? null
-                              : () => controller.goToNextVoucher(),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
+                        ],
+                      ),
+                    );
+                  }),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Obx(() {
             final list = controller.suppliers;
             return DropdownButtonFormField<int>(
@@ -229,7 +237,7 @@ class _HeaderCard extends StatelessWidget {
               validator: (v) => v == null ? 'Please select supplier' : null,
             );
           }),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
@@ -245,7 +253,7 @@ class _HeaderCard extends StatelessWidget {
                       onChanged: controller.setDocDate,
                     )),
               ),
-              const SizedBox(width: 12),
+                    const SizedBox(width: 8),
               Expanded(
                 child: Obx(() => TextFormField(
                       enabled: !controller.isReadOnly,
@@ -260,7 +268,7 @@ class _HeaderCard extends StatelessWidget {
             ],
           ),
           if (controller.isEditMode) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Obx(() => DropdownButtonFormField<String>(
                   value: controller.status.value,
                   decoration: AppInputDecoration.standard(labelText: 'Status'),
@@ -280,15 +288,21 @@ class _HeaderCard extends StatelessWidget {
                         },
                 )),
           ],
-                  const SizedBox(height: 12),
+          const SizedBox(height: 4),
           Obx(() => TextFormField(
                 enabled: !controller.isReadOnly,
                 initialValue: controller.narration.value,
                 decoration: AppInputDecoration.standard(
                   labelText: 'Narration',
                   hintText: 'Optional notes...',
+                ).copyWith(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                 ),
-                maxLines: 3,
+                minLines: 2,
+                maxLines: 2,
                 onChanged: controller.setNarration,
               )),
         ],
@@ -324,18 +338,24 @@ class _ItemsCard extends StatelessWidget {
                   controller: controller,
                   index: index,
                   row: controller.items[index],
+                  isLast: index == controller.items.length - 1,
                 ),
               ),
             if (!controller.isReadOnly) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 1),
               Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
+                alignment: Alignment.topRight,
+                child: OutlinedButton.icon(
                   onPressed: controller.addItem,
                   icon: const Icon(Icons.add_rounded, size: 20),
-                  label: const Text('Add Product +'),
-                  style: TextButton.styleFrom(
+                  label: const Text('Add Product'),
+                  style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary, width: 1.2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   ),
                 ),
               ),
@@ -351,18 +371,20 @@ class _ItemRow extends StatelessWidget {
   final PurchaseOrderFormController controller;
   final int index;
   final POLineRow row;
+  final bool isLast;
 
   const _ItemRow({
     required this.controller,
     required this.index,
     required this.row,
+    required this.isLast,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      margin: EdgeInsets.only(bottom: isLast ? 2 : 6),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: AppColors.primaryLighter.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(12),
@@ -376,16 +398,8 @@ class _ItemRow extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Text(
-                'Product Detail',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textDark,
-                  fontFamily: 'Times New Roman',
-                ),
-              ),
-              const SizedBox(width: 8),
+              
+              const SizedBox(width: 4),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
@@ -411,7 +425,7 @@ class _ItemRow extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           _ProductPicker(
             controller: controller,
             row: row,
@@ -437,7 +451,7 @@ class _ItemRow extends StatelessWidget {
               ),
             );
           }),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Row(
             children: [
               Expanded(
@@ -462,7 +476,7 @@ class _ItemRow extends StatelessWidget {
                       onChanged: (v) => row.quantity.value = v,
                     )),
               ),
-              const SizedBox(width: 8),
+                    const SizedBox(width: 6),
               Expanded(
                 flex: 2,
                 child: Obx(
@@ -510,8 +524,9 @@ class _ItemRow extends StatelessWidget {
                   },
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
+                flex: 2,
                 child: Obx(() => TextFormField(
                       enabled: !controller.isReadOnly,
                       initialValue: row.price.value,
@@ -543,12 +558,12 @@ class _ItemRow extends StatelessWidget {
             }
             return Column(
               children: [
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 _buildTaxRows(row),
               ],
             );
           }),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           _buildTaxTotals(row),
         ],
       ),
@@ -559,7 +574,7 @@ class _ItemRow extends StatelessWidget {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
             color: AppColors.primaryLight.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(6),
@@ -591,7 +606,7 @@ class _ItemRow extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         ...row.availableTaxKeys.map((key) {
           final percent = double.tryParse(row.taxFieldValues[key] ?? '') ?? 0;
           final taxable = row.lineTotalExclTax;
@@ -645,7 +660,7 @@ class _ItemRow extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
         Expanded(
           child: Obx(() => TextFormField(
                 enabled: false,
@@ -681,8 +696,8 @@ class _AddonCard extends StatelessWidget {
               itemBuilder: (context, index) {
                 final charge = controller.charges[index];
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(10),
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                   decoration: BoxDecoration(
                     color: AppColors.primaryLighter.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
@@ -704,7 +719,7 @@ class _AddonCard extends StatelessWidget {
                               ).copyWith(
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 8,
-                                  vertical: 8,
+                                  vertical: 6,
                                 ),
                               ),
                               isExpanded: true,
@@ -727,7 +742,7 @@ class _AddonCard extends StatelessWidget {
                                     },
                             )),
                       ),
-                      const SizedBox(width: 8),
+                              const SizedBox(width: 6),
                       Expanded(
                         child: TextFormField(
                           enabled: !controller.isReadOnly,
@@ -747,10 +762,15 @@ class _AddonCard extends StatelessWidget {
                         ),
                       ),
                       if (!controller.isReadOnly) ...[
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 2),
                         IconButton(
                           icon: const Icon(Icons.delete_outline_rounded),
                           color: Colors.redAccent,
+                          constraints: const BoxConstraints.tightFor(
+                            width: 32,
+                            height: 32,
+                          ),
+                          padding: EdgeInsets.zero,
                           onPressed: () => controller.removeChargeRow(index),
                         ),
                       ],
@@ -765,7 +785,7 @@ class _AddonCard extends StatelessWidget {
                 child: TextButton.icon(
                   onPressed: controller.addChargeRow,
                   icon: const Icon(Icons.add_rounded, size: 20),
-                  label: const Text('Add'),
+                  label: const Text('Add Addon'),
                   style: TextButton.styleFrom(foregroundColor: AppColors.primary),
                 ),
               ),
@@ -1022,45 +1042,65 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
+      const epsilon = 0.000001;
+      Map<String, double> buildTaxTotalsByLabel() {
+        final totals = <String, double>{};
+
+        for (final row in controller.items) {
+          final base = row.lineTotalExclTax;
+
+          for (final label in row.availableTaxKeys) {
+            final percent = double.tryParse(row.taxFieldValues[label] ?? '') ?? 0;
+            totals[label] = (totals[label] ?? 0) + (base * percent / 100);
+          }
+
+          row.taxFieldValues.forEach((label, value) {
+            if (totals.containsKey(label)) return;
+            final percent = double.tryParse(value) ?? 0;
+            totals[label] = (totals[label] ?? 0) + (base * percent / 100);
+          });
+        }
+
+        return totals;
+      }
+
+      String displayTaxLabel(String label) {
+        final key = label.trim().toUpperCase();
+        if (key == 'ROFF') return 'Round off Tax';
+        return label;
+      }
+
       final grossAmount = controller.itemsSubtotalExclTax;
-      final sgst = controller.sgstTotal;
-      final cgst = controller.cgstTotal;
-      final igst = controller.igstTotal;
-      final cess = controller.cessTotal;
+      final taxTotals = buildTaxTotalsByLabel();
       final roundOffTax = controller.roffTotal;
       final addOnTotal = controller.addOnTotal;
       final totalInclTax = controller.grandTotal;
+      final visibleTaxEntries = taxTotals.entries
+          .where((e) => e.key.trim().toUpperCase() != 'ROFF')
+          .toList();
       return ContentCard(
         title: 'Summary',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _summaryRow('Gross Amount', '₹ ${grossAmount.toStringAsFixed(2)}', false),
-            if (sgst > 0) ...[
-              const SizedBox(height: 6),
-              _summaryRow('SGST', '₹ ${sgst.toStringAsFixed(2)}', false),
-            ],
-            if (cgst > 0) ...[
-              const SizedBox(height: 6),
-              _summaryRow('CGST', '₹ ${cgst.toStringAsFixed(2)}', false),
-            ],
-            if (igst > 0) ...[
-              const SizedBox(height: 6),
-              _summaryRow('IGST', '₹ ${igst.toStringAsFixed(2)}', false),
-            ],
-            if (cess > 0) ...[
-              const SizedBox(height: 6),
-              _summaryRow('CESS', '₹ ${cess.toStringAsFixed(2)}', false),
+            for (final entry in visibleTaxEntries) ...[
+              const SizedBox(height: 4),
+              _summaryRow(
+                displayTaxLabel(entry.key),
+                '₹ ${entry.value.toStringAsFixed(2)}',
+                false,
+              ),
             ],
             if (roundOffTax > 0) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               _summaryRow('Round off Tax', '₹ ${roundOffTax.toStringAsFixed(2)}', false),
             ],
             if (addOnTotal != 0) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               _summaryRow('Add on total', '₹ ${addOnTotal.toStringAsFixed(2)}', false),
             ],
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             _summaryRow('Total', '₹ ${totalInclTax.toStringAsFixed(2)}', true),
           ],
         ),
