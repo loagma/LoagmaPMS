@@ -69,7 +69,7 @@ class PurchaseOrderFormScreen extends StatelessWidget {
                 CircularProgressIndicator(
                   valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
                 ),
-                SizedBox(height: 16),
+                SizedBox(height: 12),
                 Text(
                   'Loading...',
                   style: TextStyle(color: AppColors.textMuted, fontSize: 14),
@@ -85,16 +85,16 @@ class PurchaseOrderFormScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _HeaderCard(controller: controller),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       _ItemsCard(controller: controller),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       _AddonCard(controller: controller),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       _SummaryCard(controller: controller),
                     ],
                   ),
@@ -144,7 +144,7 @@ class _HeaderCard extends StatelessWidget {
               Expanded(
                 flex: 2,
                 child: SizedBox(
-                  height: 56,
+                  height: 52,
                   child: Obx(() => TextFormField(
                         enabled: !controller.isReadOnly,
                         initialValue: controller.financialYear.value,
@@ -160,7 +160,7 @@ class _HeaderCard extends StatelessWidget {
               Expanded(
                 flex: 2,
                 child: SizedBox(
-                  height: 56,
+                  height: 52,
                   child: Obx(() {
                     final poNumber = controller.currentPoNumber.value;
                     final seqValue = controller.currentPoSeq.value;
@@ -168,10 +168,9 @@ class _HeaderCard extends StatelessWidget {
                         ? (poNumber.isEmpty ? 'Existing (no number)' : poNumber)
                         : (seqValue != null ? seqValue.toString() : '');
                     return InputDecorator(
-                      decoration: AppInputDecoration.standard(
-                        labelText: 'Voucher No',
-                      ),
+                      decoration: AppInputDecoration.standard(labelText: 'Voucher No'),
                       child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
                             child: Text(
@@ -185,10 +184,7 @@ class _HeaderCard extends StatelessWidget {
                             ),
                           ),
                           IconButton(
-                            constraints: const BoxConstraints.tightFor(
-                              width: 28,
-                              height: 28,
-                            ),
+                            constraints: const BoxConstraints.tightFor(width: 26, height: 26),
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             icon: const Icon(Icons.keyboard_arrow_left_rounded, size: 18),
@@ -198,10 +194,7 @@ class _HeaderCard extends StatelessWidget {
                                 : () => controller.goToPreviousVoucher(),
                           ),
                           IconButton(
-                            constraints: const BoxConstraints.tightFor(
-                              width: 28,
-                              height: 28,
-                            ),
+                            constraints: const BoxConstraints.tightFor(width: 26, height: 26),
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             icon: const Icon(Icons.keyboard_arrow_right_rounded, size: 18),
@@ -218,7 +211,7 @@ class _HeaderCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Obx(() {
             final list = controller.suppliers;
             return DropdownButtonFormField<int>(
@@ -237,7 +230,7 @@ class _HeaderCard extends StatelessWidget {
               validator: (v) => v == null ? 'Please select supplier' : null,
             );
           }),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Row(
             children: [
               Expanded(
@@ -253,7 +246,7 @@ class _HeaderCard extends StatelessWidget {
                       onChanged: controller.setDocDate,
                     )),
               ),
-                    const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
                 child: Obx(() => TextFormField(
                       enabled: !controller.isReadOnly,
@@ -268,7 +261,7 @@ class _HeaderCard extends StatelessWidget {
             ],
           ),
           if (controller.isEditMode) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Obx(() => DropdownButtonFormField<String>(
                   value: controller.status.value,
                   decoration: AppInputDecoration.standard(labelText: 'Status'),
@@ -288,7 +281,7 @@ class _HeaderCard extends StatelessWidget {
                         },
                 )),
           ],
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Obx(() => TextFormField(
                 enabled: !controller.isReadOnly,
                 initialValue: controller.narration.value,
@@ -297,8 +290,8 @@ class _HeaderCard extends StatelessWidget {
                   hintText: 'Optional notes...',
                 ).copyWith(
                   contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
+                    horizontal: 12,
+                    vertical: 8,
                   ),
                 ),
                 minLines: 2,
@@ -342,20 +335,21 @@ class _ItemsCard extends StatelessWidget {
                 ),
               ),
             if (!controller.isReadOnly) ...[
-              const SizedBox(height: 1),
+              const SizedBox(height: 4),
               Align(
                 alignment: Alignment.topRight,
                 child: OutlinedButton.icon(
                   onPressed: controller.addItem,
-                  icon: const Icon(Icons.add_rounded, size: 20),
+                  icon: const Icon(Icons.add_rounded, size: 18),
                   label: const Text('Add Product'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.primary,
                     side: const BorderSide(color: AppColors.primary, width: 1.2),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
               ),
@@ -383,11 +377,11 @@ class _ItemRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: EdgeInsets.only(bottom: isLast ? 2 : 6),
-      padding: const EdgeInsets.all(10),
+      margin: EdgeInsets.only(bottom: isLast ? 2 : 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
       decoration: BoxDecoration(
         color: AppColors.primaryLighter.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: AppColors.primaryLight.withValues(alpha: 0.5),
           width: 1,
@@ -398,18 +392,16 @@ class _ItemRow extends StatelessWidget {
         children: [
           Row(
             children: [
-              
-              const SizedBox(width: 4),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(5),
                 ),
                 child: Text(
                   'Item ${index + 1}',
                   style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.w600,
                     color: AppColors.primaryDark,
                   ),
@@ -417,15 +409,21 @@ class _ItemRow extends StatelessWidget {
               ),
               const Spacer(),
               if (!controller.isReadOnly)
-                IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, size: 20),
-                  color: Colors.redAccent,
-                  onPressed: () => controller.removeItem(index),
-                  tooltip: 'Remove',
+                SizedBox(
+                  width: 30,
+                  height: 30,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                    color: Colors.redAccent,
+                    onPressed: () => controller.removeItem(index),
+                    tooltip: 'Remove',
+                  ),
                 ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 5),
           _ProductPicker(
             controller: controller,
             row: row,
@@ -434,24 +432,24 @@ class _ItemRow extends StatelessWidget {
           Obx(() {
             if (!row.isTaxLoading.value) return const SizedBox.shrink();
             return const Padding(
-              padding: EdgeInsets.only(top: 8),
+              padding: EdgeInsets.only(top: 6),
               child: Row(
                 children: [
                   SizedBox(
-                    width: 14,
-                    height: 14,
+                    width: 12,
+                    height: 12,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                  SizedBox(width: 8),
+                  SizedBox(width: 6),
                   Text(
                     'Fetching taxes...',
-                    style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                    style: TextStyle(fontSize: 11, color: AppColors.textMuted),
                   ),
                 ],
               ),
             );
           }),
-          const SizedBox(height: 6),
+          const SizedBox(height: 5),
           Row(
             children: [
               Expanded(
@@ -460,7 +458,7 @@ class _ItemRow extends StatelessWidget {
                       enabled: !controller.isReadOnly,
                       initialValue: row.quantity.value,
                       decoration: AppInputDecoration.standard(
-                        labelText: 'Quantity *',
+                        labelText: 'Qty *',
                         hintText: '0.00',
                       ),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -476,7 +474,7 @@ class _ItemRow extends StatelessWidget {
                       onChanged: (v) => row.quantity.value = v,
                     )),
               ),
-                    const SizedBox(width: 6),
+              const SizedBox(width: 5),
               Expanded(
                 flex: 2,
                 child: Obx(
@@ -495,14 +493,14 @@ class _ItemRow extends StatelessWidget {
                       value: value,
                       decoration: AppInputDecoration.standard(labelText: 'Unit')
                           .copyWith(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 12,
-                            ),
-                          ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 10,
+                        ),
+                      ),
                       isDense: true,
                       isExpanded: true,
-                      iconSize: 18,
+                      iconSize: 16,
                       items: units
                           .map(
                             (u) => DropdownMenuItem(
@@ -524,7 +522,7 @@ class _ItemRow extends StatelessWidget {
                   },
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 5),
               Expanded(
                 flex: 2,
                 child: Obx(() => TextFormField(
@@ -534,17 +532,14 @@ class _ItemRow extends StatelessWidget {
                         labelText: 'Unit Price *',
                         hintText: '0.00',
                       ),
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [
-                        FilteringTextInputFormatter.allow(
-                          RegExp(r'^\d+\.?\d{0,2}'),
-                        ),
+                        FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                       ],
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return 'Required';
                         final p = double.tryParse(v);
-                        if (p == null || p < 0) return 'Must be ≥ 0';
+                        if (p == null || p < 0) return 'Must be >= 0';
                         return null;
                       },
                       onChanged: (v) => row.price.value = v,
@@ -558,12 +553,12 @@ class _ItemRow extends StatelessWidget {
             }
             return Column(
               children: [
-                const SizedBox(height: 6),
+                const SizedBox(height: 5),
                 _buildTaxRows(row),
               ],
             );
           }),
-          const SizedBox(height: 6),
+          const SizedBox(height: 5),
           _buildTaxTotals(row),
         ],
       ),
@@ -577,36 +572,30 @@ class _ItemRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
             color: AppColors.primaryLight.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(5),
           ),
           child: const Row(
             children: [
               Expanded(
                 flex: 3,
-                child: Text(
-                  'Tax',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                ),
+                child: Text('Tax',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
               ),
               Expanded(
                 flex: 2,
-                child: Text(
-                  'Tax %',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                ),
+                child: Text('Tax %',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
               ),
               Expanded(
                 flex: 2,
-                child: Text(
-                  'Tax Amount',
-                  textAlign: TextAlign.right,
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                ),
+                child: Text('Tax Amount',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 3),
+        const SizedBox(height: 2),
         ...row.availableTaxKeys.map((key) {
           final percent = double.tryParse(row.taxFieldValues[key] ?? '') ?? 0;
           final taxable = row.lineTotalExclTax;
@@ -615,28 +604,16 @@ class _ItemRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
             child: Row(
               children: [
+                Expanded(flex: 3, child: Text(key, style: const TextStyle(fontSize: 11))),
                 Expanded(
-                  flex: 3,
-                  child: Text(
-                    key,
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                ),
+                    flex: 2,
+                    child: Text('${percent.toStringAsFixed(2)}%',
+                        style: const TextStyle(fontSize: 11))),
                 Expanded(
-                  flex: 2,
-                  child: Text(
-                    '${percent.toStringAsFixed(2)}%',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    amount.toStringAsFixed(2),
-                    textAlign: TextAlign.right,
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                ),
+                    flex: 2,
+                    child: Text(amount.toStringAsFixed(2),
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(fontSize: 11))),
               ],
             ),
           );
@@ -649,29 +626,29 @@ class _ItemRow extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: Obx(
-            () => TextFormField(
-              enabled: false,
-              initialValue: (row.lineTotal - row.lineTotalExclTax).toStringAsFixed(2),
-              decoration: AppInputDecoration.standard(
-                labelText: 'Total Tax Amount',
-              ),
-              readOnly: true,
-            ),
-          ),
+          child: Obx(() => _readOnlyAmountField(
+                label: 'Total Tax',
+                value: (row.lineTotal - row.lineTotalExclTax).toStringAsFixed(2),
+              )),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 5),
         Expanded(
-          child: Obx(() => TextFormField(
-                enabled: false,
-                initialValue: row.lineTotal.toStringAsFixed(2),
-                decoration: AppInputDecoration.standard(
-                  labelText: 'Total Product Amount',
-                ),
-                readOnly: true,
+          child: Obx(() => _readOnlyAmountField(
+                label: 'Product Total',
+                value: row.lineTotal.toStringAsFixed(2),
               )),
         ),
       ],
+    );
+  }
+
+  Widget _readOnlyAmountField({required String label, required String value}) {
+    return InputDecorator(
+      decoration: AppInputDecoration.standard(labelText: label),
+      child: Text(
+        value,
+        style: const TextStyle(fontSize: 13),
+      ),
     );
   }
 }
@@ -696,8 +673,8 @@ class _AddonCard extends StatelessWidget {
               itemBuilder: (context, index) {
                 final charge = controller.charges[index];
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  margin: const EdgeInsets.only(bottom: 5),
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
                   decoration: BoxDecoration(
                     color: AppColors.primaryLighter.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
@@ -719,7 +696,7 @@ class _AddonCard extends StatelessWidget {
                               ).copyWith(
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 8,
-                                  vertical: 6,
+                                  vertical: 5,
                                 ),
                               ),
                               isExpanded: true,
@@ -728,10 +705,7 @@ class _AddonCard extends StatelessWidget {
                                   .map(
                                     (name) => DropdownMenuItem(
                                       value: name,
-                                      child: Text(
-                                        name,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
+                                      child: Text(name, overflow: TextOverflow.ellipsis),
                                     ),
                                   )
                                   .toList(),
@@ -742,7 +716,7 @@ class _AddonCard extends StatelessWidget {
                                     },
                             )),
                       ),
-                              const SizedBox(width: 6),
+                      const SizedBox(width: 5),
                       Expanded(
                         child: TextFormField(
                           enabled: !controller.isReadOnly,
@@ -751,27 +725,25 @@ class _AddonCard extends StatelessWidget {
                             labelText: 'Amount',
                             hintText: '0.00',
                           ),
-                          keyboardType:
-                              const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           inputFormatters: [
-                            FilteringTextInputFormatter.allow(
-                              RegExp(r'^-?\d+\.?\d{0,2}'),
-                            ),
+                            FilteringTextInputFormatter.allow(RegExp(r'^-?\d+\.?\d{0,2}')),
                           ],
                           onChanged: (v) => charge.amount.value = v,
                         ),
                       ),
                       if (!controller.isReadOnly) ...[
                         const SizedBox(width: 2),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline_rounded),
-                          color: Colors.redAccent,
-                          constraints: const BoxConstraints.tightFor(
-                            width: 32,
-                            height: 32,
+                        SizedBox(
+                          width: 30,
+                          height: 30,
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                            color: Colors.redAccent,
+                            onPressed: () => controller.removeChargeRow(index),
                           ),
-                          padding: EdgeInsets.zero,
-                          onPressed: () => controller.removeChargeRow(index),
                         ),
                       ],
                     ],
@@ -781,12 +753,21 @@ class _AddonCard extends StatelessWidget {
             ),
             if (!controller.isReadOnly)
               Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
+                alignment: Alignment.topRight,
+                child: OutlinedButton.icon(
                   onPressed: controller.addChargeRow,
-                  icon: const Icon(Icons.add_rounded, size: 20),
-                  label: const Text('Add Addon'),
-                  style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text(' Addons'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary, width: 1.2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  ),
                 ),
               ),
           ],
@@ -849,22 +830,20 @@ class _ProductPicker extends StatelessWidget {
                                 ? 'Tap to search...'
                                 : row.productName.value,
                             style: TextStyle(
-                              color: row.productId.value == null
-                                  ? Colors.grey
-                                  : null,
+                              color: row.productId.value == null ? Colors.grey : null,
                             ),
                             overflow: TextOverflow.ellipsis,
                           )),
                     ),
                     if (!readOnly)
-                      const Icon(Icons.search, color: AppColors.textMuted),
+                      const Icon(Icons.search, size: 18, color: AppColors.textMuted),
                   ],
                 ),
               ),
             ),
             if (state.hasError)
               Padding(
-                padding: const EdgeInsets.only(left: 12, top: 8),
+                padding: const EdgeInsets.only(left: 12, top: 4),
                 child: Text(
                   state.errorText!,
                   style: const TextStyle(color: Colors.red, fontSize: 12),
@@ -957,7 +936,7 @@ class _POProductSearchDialogState extends State<_POProductSearchDialog> {
                 });
               },
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Expanded(
               child: _results.isEmpty && !_searching
                   ? Center(
@@ -976,6 +955,7 @@ class _POProductSearchDialogState extends State<_POProductSearchDialog> {
                         final pid = p['product_id'] as int?;
                         final name = p['name']?.toString() ?? 'ID $pid';
                         return ListTile(
+                          dense: true,
                           title: Text(name, overflow: TextOverflow.ellipsis),
                           subtitle: pid != null ? Text('ID: $pid') : null,
                           onTap: () => Navigator.pop(context, p),
@@ -983,11 +963,10 @@ class _POProductSearchDialogState extends State<_POProductSearchDialog> {
                       },
                     ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Builder(
               builder: (context) {
-                final hasSupplier =
-                    widget.controller.supplierId.value != null;
+                final hasSupplier = widget.controller.supplierId.value != null;
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -996,18 +975,13 @@ class _POProductSearchDialogState extends State<_POProductSearchDialog> {
                         padding: EdgeInsets.only(bottom: 4),
                         child: Text(
                           'Select supplier to filter by assigned products.',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textMuted,
-                          ),
+                          style: TextStyle(fontSize: 11, color: AppColors.textMuted),
                         ),
                       ),
                     TextButton(
                       onPressed: hasSupplier
                           ? () {
-                              setState(() {
-                                _showAllProducts = !_showAllProducts;
-                              });
+                              setState(() => _showAllProducts = !_showAllProducts);
                               _runSearch(_searchController.text);
                             }
                           : null,
@@ -1042,25 +1016,20 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      const epsilon = 0.000001;
       Map<String, double> buildTaxTotalsByLabel() {
         final totals = <String, double>{};
-
         for (final row in controller.items) {
           final base = row.lineTotalExclTax;
-
           for (final label in row.availableTaxKeys) {
             final percent = double.tryParse(row.taxFieldValues[label] ?? '') ?? 0;
             totals[label] = (totals[label] ?? 0) + (base * percent / 100);
           }
-
           row.taxFieldValues.forEach((label, value) {
             if (totals.containsKey(label)) return;
             final percent = double.tryParse(value) ?? 0;
             totals[label] = (totals[label] ?? 0) + (base * percent / 100);
           });
         }
-
         return totals;
       }
 
@@ -1078,6 +1047,7 @@ class _SummaryCard extends StatelessWidget {
       final visibleTaxEntries = taxTotals.entries
           .where((e) => e.key.trim().toUpperCase() != 'ROFF')
           .toList();
+
       return ContentCard(
         title: 'Summary',
         child: Column(
@@ -1085,7 +1055,7 @@ class _SummaryCard extends StatelessWidget {
           children: [
             _summaryRow('Gross Amount', '₹ ${grossAmount.toStringAsFixed(2)}', false),
             for (final entry in visibleTaxEntries) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               _summaryRow(
                 displayTaxLabel(entry.key),
                 '₹ ${entry.value.toStringAsFixed(2)}',
@@ -1093,14 +1063,14 @@ class _SummaryCard extends StatelessWidget {
               ),
             ],
             if (roundOffTax > 0) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               _summaryRow('Round off Tax', '₹ ${roundOffTax.toStringAsFixed(2)}', false),
             ],
             if (addOnTotal != 0) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               _summaryRow('Add on total', '₹ ${addOnTotal.toStringAsFixed(2)}', false),
             ],
-            const SizedBox(height: 6),
+            const SizedBox(height: 5),
             _summaryRow('Total', '₹ ${totalInclTax.toStringAsFixed(2)}', true),
           ],
         ),
@@ -1115,7 +1085,7 @@ class _SummaryCard extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            fontSize: isTotal ? 15 : 14,
+            fontSize: isTotal ? 14 : 13,
             fontWeight: isTotal ? FontWeight.w600 : FontWeight.w500,
             color: AppColors.textMuted,
           ),
@@ -1123,7 +1093,7 @@ class _SummaryCard extends StatelessWidget {
         Text(
           value,
           style: TextStyle(
-            fontSize: isTotal ? 18 : 14,
+            fontSize: isTotal ? 16 : 13,
             fontWeight: isTotal ? FontWeight.bold : FontWeight.w500,
             color: AppColors.primaryDark,
           ),
