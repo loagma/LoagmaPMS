@@ -234,6 +234,66 @@ class _HeaderCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
+                child: Obx(() {
+                  final list = controller.salesmen;
+                  final current = controller.salesmanId.value;
+                  final hasValue = list
+                      .any((s) => s['id']?.toString() == current?.toString());
+                  final value = hasValue ? current : null;
+                  return DropdownButtonFormField<String>(
+                    value: value,
+                    decoration: AppInputDecoration.standard(
+                      labelText: 'Salesman',
+                    ),
+                    items: list
+                        .map((s) => DropdownMenuItem<String>(
+                              value: s['id']?.toString(),
+                              child: Text(
+                                s['name']?.toString() ?? 'Salesman',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ))
+                        .toList(),
+                    onChanged: controller.isReadOnly
+                        ? null
+                        : (v) => controller.setSalesmanId(v),
+                  );
+                }),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Obx(() {
+                  final list = controller.departments;
+                  final current = controller.departmentId.value;
+                  final hasValue = list
+                      .any((d) => d['id']?.toString() == current?.toString());
+                  final value = hasValue ? current : null;
+                  return DropdownButtonFormField<String>(
+                    value: value,
+                    decoration: AppInputDecoration.standard(
+                      labelText: 'Department',
+                    ),
+                    items: list
+                        .map((d) => DropdownMenuItem<String>(
+                              value: d['id']?.toString(),
+                              child: Text(
+                                d['name']?.toString() ?? 'Department',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ))
+                        .toList(),
+                    onChanged: controller.isReadOnly
+                        ? null
+                        : (v) => controller.setDepartmentId(v),
+                  );
+                }),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
                 child: Obx(() => TextFormField(
                       enabled: !controller.isReadOnly,
                       initialValue: controller.docDate.value,

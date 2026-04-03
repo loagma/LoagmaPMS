@@ -14,6 +14,8 @@ class PurchaseOrderFormController extends GetxController {
   final bool startInViewOnly;
 
   final suppliers = <Map<String, dynamic>>[].obs;
+  final salesmen = <Map<String, dynamic>>[].obs;
+  final departments = <Map<String, dynamic>>[].obs;
   final products = <Map<String, dynamic>>[].obs;
   final unitTypes = <String>[].obs;
   final viewOnly = false.obs;
@@ -25,6 +27,8 @@ class PurchaseOrderFormController extends GetxController {
 
   final financialYear = '25-26'.obs;
   final supplierId = Rxn<int>();
+  final salesmanId = Rxn<String>();
+  final departmentId = Rxn<String>();
   final docDate = ''.obs;
   final expectedDate = ''.obs;
   final status = 'DRAFT'.obs;
@@ -52,6 +56,8 @@ class PurchaseOrderFormController extends GetxController {
     viewOnly.value = startInViewOnly;
     _ensureDefaultCharges();
     _loadSuppliers();
+    _loadSalesmen();
+    _loadDepartments();
     _loadUnitTypes();
     if (poId != null) {
       _loadPurchaseOrder();
@@ -298,6 +304,64 @@ class PurchaseOrderFormController extends GetxController {
     }
   }
 
+  Future<void> _loadSalesmen() async {
+    try {
+      Future<List<Map<String, dynamic>>> fetch(Uri uri) async {
+        final response = await http.get(
+          uri,
+          headers: {'Accept': 'application/json'},
+        );
+        if (response.statusCode != 200) return [];
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        if (data['success'] != true) return [];
+        final List list = data['data'] ?? [];
+        return list
+            .map((e) => {
+                  'id': (e as Map)['id']?.toString(),
+                  'name': (e)['name']?.toString() ?? 'User ${(e)['id'] ?? ''}',
+                })
+            .where((e) => (e['id'] ?? '').toString().isNotEmpty)
+            .toList();
+      }
+
+      final filteredUri = Uri.parse(ApiConfig.users)
+          .replace(queryParameters: {'role': 'Salesman', 'limit': '500'});
+      var list = await fetch(filteredUri);
+      if (list.isEmpty) {
+        final fallbackUri = Uri.parse(ApiConfig.users)
+            .replace(queryParameters: {'limit': '500'});
+        list = await fetch(fallbackUri);
+      }
+      salesmen.value = list;
+    } catch (e) {
+      debugPrint('[PO FORM] Load salesmen error: $e');
+    }
+  }
+
+  Future<void> _loadDepartments() async {
+    try {
+      final response = await http.get(
+        Uri.parse(ApiConfig.departments),
+        headers: {'Accept': 'application/json'},
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        if (data['success'] == true) {
+          final List list = data['data'] ?? [];
+          departments.value = list
+              .map((e) => {
+                    'id': (e as Map)['id']?.toString(),
+                    'name': (e)['name']?.toString() ?? 'Department ${(e)['id'] ?? ''}',
+                  })
+              .where((e) => (e['id'] ?? '').toString().isNotEmpty)
+              .toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('[PO FORM] Load departments error: $e');
+    }
+  }
+
   Future<void> _loadUnitTypes() async {
     try {
       final response = await http.get(
@@ -401,6 +465,8 @@ class PurchaseOrderFormController extends GetxController {
   Future<void> _applyPurchaseOrderToState(PurchaseOrder po) async {
     financialYear.value = po.financialYear ?? '25-26';
     supplierId.value = po.supplierId;
+    salesmanId.value = po.salesmanId;
+    departmentId.value = po.departmentId;
     docDate.value = po.docDate;
     expectedDate.value = po.expectedDate ?? '';
     status.value = po.status;
@@ -442,6 +508,8 @@ class PurchaseOrderFormController extends GetxController {
   /// Reset the form to a new purchase order state (when navigating to non-existent voucher).
   Future<void> _resetToNewForm() async {
     supplierId.value = null;
+    salesmanId.value = null;
+    departmentId.value = null;
     docDate.value = '';
     expectedDate.value = '';
     status.value = 'DRAFT';
@@ -551,6 +619,8 @@ class PurchaseOrderFormController extends GetxController {
           final po = PurchaseOrder.fromJson(poData);
           financialYear.value = po.financialYear ?? '25-26';
           supplierId.value = po.supplierId;
+          salesmanId.value = po.salesmanId;
+          departmentId.value = po.departmentId;
           docDate.value = po.docDate;
           expectedDate.value = po.expectedDate ?? '';
           status.value = po.status;
@@ -584,6 +654,8 @@ class PurchaseOrderFormController extends GetxController {
 
   void setFinancialYear(String v) => financialYear.value = v;
   void setSupplierId(int? v) => supplierId.value = v;
+  void setSalesmanId(String? v) => salesmanId.value = v;
+  void setDepartmentId(String? v) => departmentId.value = v;
   void setDocDate(String v) => docDate.value = v;
   void setExpectedDate(String v) => expectedDate.value = v;
   void setStatus(String v) => status.value = v;
@@ -688,6 +760,10 @@ class PurchaseOrderFormController extends GetxController {
       final payload = {
         'financial_year': financialYear.value,
         'supplier_id': supplierId.value,
+        if (salesmanId.value != null && salesmanId.value!.trim().isNotEmpty)
+          'salesman_id': salesmanId.value,
+        if (departmentId.value != null && departmentId.value!.trim().isNotEmpty)
+          'department_id': departmentId.value,
         'doc_date': docDate.value,
         if (expectedDate.value.trim().isNotEmpty) 'expected_date': expectedDate.value.trim(),
         'status': status.value,

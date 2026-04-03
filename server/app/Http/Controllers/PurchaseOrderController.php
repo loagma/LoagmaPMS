@@ -87,6 +87,8 @@ class PurchaseOrderController extends Controller
         $validated = $request->validate([
             'financial_year' => 'required|string|max:10',
             'supplier_id' => 'required|integer|exists:suppliers,id',
+            'salesman_id' => 'nullable|string|max:191|exists:users,id',
+            'department_id' => 'nullable|string|max:10|exists:Department,id',
             'doc_date' => 'required|date',
             'expected_date' => 'nullable|date',
             'status' => 'nullable|in:DRAFT,SENT,PARTIALLY_RECEIVED,CLOSED,CANCELLED',
@@ -115,6 +117,8 @@ class PurchaseOrderController extends Controller
                 'po_number' => $poNumber,
                 'financial_year' => $validated['financial_year'],
                 'supplier_id' => $validated['supplier_id'],
+                'salesman_id' => $validated['salesman_id'] ?? null,
+                'department_id' => $validated['department_id'] ?? null,
                 'doc_date' => $validated['doc_date'],
                 'expected_date' => $validated['expected_date'] ?? null,
                 'status' => $validated['status'] ?? 'DRAFT',
@@ -183,6 +187,8 @@ class PurchaseOrderController extends Controller
         $validated = $request->validate([
             'financial_year' => 'sometimes|string|max:10',
             'supplier_id' => 'sometimes|integer|exists:suppliers,id',
+            'salesman_id' => 'nullable|string|max:191|exists:users,id',
+            'department_id' => 'nullable|string|max:10|exists:Department,id',
             'doc_date' => 'sometimes|date',
             'expected_date' => 'nullable|date',
             'status' => 'nullable|in:DRAFT,SENT,PARTIALLY_RECEIVED,CLOSED,CANCELLED',
@@ -216,6 +222,8 @@ class PurchaseOrderController extends Controller
             $po->fill(array_filter([
                 'financial_year' => $validated['financial_year'] ?? null,
                 'supplier_id' => $validated['supplier_id'] ?? null,
+                'salesman_id' => $validated['salesman_id'] ?? null,
+                'department_id' => $validated['department_id'] ?? null,
                 'doc_date' => $validated['doc_date'] ?? null,
                 'expected_date' => $validated['expected_date'] ?? null,
                 'status' => $validated['status'] ?? null,

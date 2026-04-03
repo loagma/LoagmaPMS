@@ -10,6 +10,8 @@ class PurchaseOrder extends Model
         'po_number',
         'financial_year',
         'supplier_id',
+        'salesman_id',
+        'department_id',
         'doc_date',
         'expected_date',
         'status',

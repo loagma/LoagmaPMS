@@ -19,6 +19,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\HsnCodeController;
 use App\Http\Controllers\ProductPackageController;
 use App\Http\Controllers\MasterDataController;
+use App\Http\Controllers\UserController;
 
 Route::get('/health', [HealthController::class, 'index']);
 Route::get('/products', [ProductController::class, 'index']);
@@ -75,6 +76,7 @@ Route::get('/suppliers/{id}/products', [SupplierController::class, 'getSupplierP
 // Master data routes (dropdown values)
 Route::get('/business-types', [MasterDataController::class, 'businessTypes']);
 Route::get('/departments', [MasterDataController::class, 'departments']);
+Route::get('/users', [UserController::class, 'index']);
 
 // Supplier Product routes (specific 'bulk' must be before {id})
 Route::get('/supplier-products', [SupplierProductController::class, 'index']);

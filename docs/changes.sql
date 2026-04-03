@@ -341,3 +341,8 @@ INSERT INTO roles (id, name) VALUES
 ('R003', 'Manager'),
 ('R004', 'Telecaller'),
 ('R005', 'Developer');
+
+-- 2026-04-01: Purchase orders - salesman and department
+ALTER TABLE purchase_orders
+    ADD COLUMN IF NOT EXISTS salesman_id VARCHAR(191) NULL AFTER supplier_id,
+    ADD COLUMN IF NOT EXISTS department_id VARCHAR(10) NULL AFTER salesman_id;

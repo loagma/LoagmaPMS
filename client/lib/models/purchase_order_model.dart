@@ -8,6 +8,8 @@ class PurchaseOrder {
   final String? expectedDate;
   final String status;
   final String? narration;
+  final String? salesmanId;
+  final String? departmentId;
   final double? totalAmount;
   final double? chargesTotal;
   final double? totalWithCharges;
@@ -24,6 +26,8 @@ class PurchaseOrder {
     this.expectedDate,
     required this.status,
     this.narration,
+    this.salesmanId,
+    this.departmentId,
     this.totalAmount,
     this.chargesTotal,
     this.totalWithCharges,
@@ -72,6 +76,8 @@ class PurchaseOrder {
       expectedDate: json['expected_date']?.toString(),
       status: json['status']?.toString() ?? 'DRAFT',
       narration: json['narration']?.toString(),
+      salesmanId: json['salesman_id']?.toString() ?? json['salesmanId']?.toString(),
+      departmentId: json['department_id']?.toString() ?? json['departmentId']?.toString(),
       totalAmount: parseDouble(json['total_amount']),
         chargesTotal: parseDouble(json['charges_total']),
         totalWithCharges: parseDouble(json['total_with_charges']),
@@ -96,6 +102,8 @@ class PurchaseOrder {
       if (expectedDate != null) 'expected_date': expectedDate,
       'status': status,
       if (narration != null) 'narration': narration,
+      if (salesmanId != null) 'salesman_id': salesmanId,
+      if (departmentId != null) 'department_id': departmentId,
       if (totalAmount != null) 'total_amount': totalAmount,
       if (chargesTotal != null) 'charges_total': chargesTotal,
       if (totalWithCharges != null) 'total_with_charges': totalWithCharges,
