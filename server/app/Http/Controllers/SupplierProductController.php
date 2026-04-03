@@ -22,14 +22,16 @@ class SupplierProductController extends Controller
                     'product.name as product_name'
                 );
 
-            // Search
-            if ($request->has('search')) {
-                $search = $request->input('search');
-                $query->where(function ($q) use ($search) {
-                    $q->where('suppliers.supplier_name', 'like', "%{$search}%")
-                      ->orWhere('product.name', 'like', "%{$search}%")
-                      ->orWhere('supplier_products.supplier_sku', 'like', "%{$search}%")
-                      ->orWhere('supplier_products.supplier_product_name', 'like', "%{$search}%");
+            // Search (name/code/SKU)
+            $search = trim((string) $request->input('search', ''));
+            if ($search !== '') {
+                $likeTerm = '%' . addcslashes($search, '\\%_') . '%';
+                $query->where(function ($q) use ($likeTerm) {
+                    $q->where('suppliers.supplier_name', 'like', $likeTerm)
+                      ->orWhere('product.name', 'like', $likeTerm)
+                      ->orWhere('supplier_products.supplier_sku', 'like', $likeTerm)
+                      ->orWhere('supplier_products.supplier_product_name', 'like', $likeTerm)
+                      ->orWhereRaw('CAST(supplier_products.product_id AS CHAR) LIKE ?', [$likeTerm]);
                 });
             }
 
@@ -59,8 +61,12 @@ class SupplierProductController extends Controller
             $query->orderBy($sortField, $sortOrder);
 
             // Pagination
-            $limit = $request->input('limit', 20);
-            $page = $request->input('page', 1);
+            $limit = (int) $request->input('limit', 20);
+            $limit = min(max($limit, 1), 100);
+            $page = (int) $request->input('page', 1);
+            if ($page < 1) {
+                $page = 1;
+            }
             
             $total = (clone $query)->count();
             $supplierProducts = $query->skip(($page - 1) * $limit)
@@ -74,7 +80,7 @@ class SupplierProductController extends Controller
                     'total' => $total,
                     'page' => (int) $page,
                     'limit' => (int) $limit,
-                    'pages' => ceil($total / $limit),
+                    'total_pages' => (int) ceil($total / $limit),
                 ],
             ]);
         } catch (\Exception $e) {

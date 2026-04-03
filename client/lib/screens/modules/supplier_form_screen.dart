@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -1353,6 +1355,8 @@ class _SearchProductDialogState extends State<_SearchProductDialog> {
   final TextEditingController _searchController = TextEditingController();
   List<Product> _filteredProducts = [];
   bool _isSearching = false;
+  Timer? _debounce;
+  static const _debounceDuration = Duration(milliseconds: 350);
 
   @override
   void initState() {
@@ -1362,26 +1366,42 @@ class _SearchProductDialogState extends State<_SearchProductDialog> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  void _onSearchChanged(String query) async {
-    if (query.isEmpty) {
+  void _onSearchChanged(String query) {
+    _debounce?.cancel();
+    _debounce = Timer(_debounceDuration, () {
+      if (!mounted) return;
+      final currentText = _searchController.text;
+      if (currentText != query) return;
+      _runSearch(query);
+    });
+  }
+
+  Future<void> _runSearch(String query) async {
+    final normalized = query.trim();
+    if (normalized.isEmpty) {
       setState(() => _filteredProducts = widget.items.take(50).toList());
       return;
     }
-    if (query.length < 2) return;
+    if (normalized.length < 2) return;
     setState(() => _isSearching = true);
     try {
-      await widget.controller.searchProducts(query);
+      await widget.controller.searchProducts(normalized);
+      if (!mounted || _searchController.text.trim() != normalized) return;
       setState(() {
         _filteredProducts = widget.controller.products
             .where((p) => !widget.excludeIds.contains(p.id))
+            .take(50)
             .toList();
       });
     } finally {
-      setState(() => _isSearching = false);
+      if (mounted && _searchController.text.trim() == normalized) {
+        setState(() => _isSearching = false);
+      }
     }
   }
 

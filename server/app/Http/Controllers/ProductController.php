@@ -49,9 +49,12 @@ class ProductController extends Controller
 
             if (!empty(trim($search))) {
                 $term = trim($search);
-                $query->where(function ($q) use ($term) {
-                    $q->where('name', 'LIKE', "%{$term}%")
-                        ->orWhere('product_id', 'LIKE', "%{$term}%");
+                $likeTerm = '%' . addcslashes($term, '\\%_') . '%';
+                $query->where(function ($q) use ($likeTerm) {
+                    $q->where('name', 'LIKE', $likeTerm)
+                        ->orWhereRaw('CAST(product_id AS CHAR) LIKE ?', [$likeTerm])
+                        ->orWhere('keywords', 'LIKE', $likeTerm)
+                        ->orWhere('cache_txt', 'LIKE', $likeTerm);
                 });
             }
 

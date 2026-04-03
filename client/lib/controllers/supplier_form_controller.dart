@@ -387,15 +387,20 @@ class SupplierFormController extends GetxController {
   }
 
   Future<void> searchProducts(String query) async {
-    if (query.length < 2) {
+    final trimmed = query.trim();
+    if (trimmed.length < 2) {
       await _loadProducts();
       return;
     }
     try {
-      final url =
-          '${ApiConfig.products}?search=${Uri.encodeComponent(query)}&limit=100';
+      final uri = Uri.parse(ApiConfig.products).replace(
+        queryParameters: {
+          'limit': '100',
+          'search': trimmed,
+        },
+      );
       final response = await http
-          .get(Uri.parse(url), headers: {'Accept': 'application/json'})
+          .get(uri, headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: 30));
       if (response.statusCode == 200) {
         products.value = _decodeProductsSafely(response.body);
@@ -411,8 +416,8 @@ class SupplierFormController extends GetxController {
       if (data['success'] != true) return const <Product>[];
       final List items = data['data'] ?? const [];
       return items
-          .whereType<Map>()
-          .map((e) => Product.fromJson(Map<String, dynamic>.from(e as Map)))
+          .whereType<Map<String, dynamic>>()
+          .map(Product.fromJson)
           .toList();
     } on FormatException catch (e) {
       debugPrint('[SUPPLIER_FORM] Products JSON malformed, using fallback parser: $e');
