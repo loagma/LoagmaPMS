@@ -760,12 +760,12 @@ class _ExtraGstCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Obx(() => DropdownButtonFormField<String>(
-                      value: controller.purchaseAgents
-                              .contains(controller.purchaseAgentId.value)
-                          ? controller.purchaseAgentId.value
-                          : (controller.purchaseAgents.isNotEmpty
-                              ? controller.purchaseAgents.first
-                              : ''),
+                      value: (() {
+                        final current = controller.purchaseAgentId.value.trim();
+                        final hasValue = controller.salesmen
+                            .any((s) => s['id']?.toString() == current);
+                        return hasValue ? current : null;
+                      })(),
                       decoration: AppInputDecoration.standard(
                         labelText: 'Salesman',
                       ).copyWith(
@@ -775,18 +775,16 @@ class _ExtraGstCard extends StatelessWidget {
                         ),
                       ),
                       isExpanded: true,
-                      items: controller.purchaseAgents
-                          .map((s) => DropdownMenuItem(
-                                value: s,
+                      items: controller.salesmen
+                          .map((s) => DropdownMenuItem<String>(
+                                value: s['id']?.toString(),
                                 child: Text(
-                                  s,
+                                  s['name']?.toString() ?? 'Salesman',
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ))
                           .toList(),
-                      onChanged: (v) {
-                        if (v != null) controller.setPurchaseAgentId(v);
-                      },
+                      onChanged: controller.setPurchaseAgentId,
                     )),
               ),
               const SizedBox(width: 12),

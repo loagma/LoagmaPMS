@@ -50,6 +50,12 @@ class PurchaseOrderFormController extends GetxController {
 
   PurchaseOrderFormController({this.poId, this.startInViewOnly = false});
 
+  int? _safeInt(dynamic raw) {
+    if (raw is int) return raw;
+    if (raw == null) return null;
+    return int.tryParse(raw.toString());
+  }
+
   @override
   void onInit() {
     super.onInit();
@@ -85,12 +91,17 @@ class PurchaseOrderFormController extends GetxController {
       if (data['success'] != true) return [];
       final List list = data['data'] ?? [];
       return list
-          .map((e) => {
-                'product_id': (e as Map)['product_id'] ?? (e)['id'],
-                'name': (e)['name']?.toString() ??
-                    (e)['product_name']?.toString() ??
-                    '',
-              })
+          .map((e) {
+            final map = e as Map<String, dynamic>;
+            final productId = _safeInt(map['product_id'] ?? map['id']);
+            final name = map['name']?.toString() ??
+                map['product_name']?.toString() ??
+                (productId != null ? 'Product $productId' : '');
+            return {
+              'product_id': productId,
+              'name': name,
+            };
+          })
           .toList();
     } catch (e) {
       debugPrint('[PO FORM] Search products error: $e');
@@ -125,15 +136,18 @@ class PurchaseOrderFormController extends GetxController {
         final List list = data['data'] ?? [];
         return list.map((e) {
           final map = e as Map<String, dynamic>;
-          final product = map['product'] as Map<String, dynamic>?;
-          final rawId =
-              map['product_id'] ?? product?['product_id'] ?? product?['id'];
+          final dynamic productRaw = map['product'];
+          final product =
+              productRaw is Map<String, dynamic> ? productRaw : null;
+          final productId = _safeInt(
+            map['product_id'] ?? product?['product_id'] ?? product?['id'],
+          );
           final name = product?['name']?.toString() ??
               map['product_name']?.toString() ??
               map['supplier_product_name']?.toString() ??
-              'Product ${rawId ?? ''}';
+              (productId != null ? 'Product $productId' : 'Product');
           return {
-            'product_id': rawId,
+            'product_id': productId,
             'name': name,
           };
         }).toList();

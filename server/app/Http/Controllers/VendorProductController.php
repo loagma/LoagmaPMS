@@ -22,7 +22,7 @@ class VendorProductController extends Controller
         try {
             $limit = (int) $request->query('limit', 10);
             $page = (int) $request->query('page', 1);
-            $search = $request->query('search', '');
+            $search = trim((string) $request->query('search', ''));
             
             // Validate limit
             if ($limit < 1 || $limit > 100) {
@@ -47,9 +47,19 @@ class VendorProductController extends Controller
                     'vp.created_at'
                 );
             
-            // Apply search filter
-            if (!empty($search)) {
-                $query->where('p.name', 'LIKE', '%' . $search . '%');
+            // Apply search filter (case-insensitive, multi-word AND logic)
+            if ($search !== '') {
+                $searchTerms = preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY);
+
+                if (!empty($searchTerms)) {
+                    foreach ($searchTerms as $term) {
+                        $likeTerm = '%' . addcslashes(strtolower($term), '\\%_') . '%';
+                        $query->where(function ($q) use ($likeTerm) {
+                            $q->whereRaw('LOWER(p.name) LIKE ?', [$likeTerm])
+                                ->orWhereRaw('CAST(vp.product_id AS CHAR) LIKE ?', [$likeTerm]);
+                        });
+                    }
+                }
             }
             
             // Get total count for pagination info

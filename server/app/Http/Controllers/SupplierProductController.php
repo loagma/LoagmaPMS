@@ -19,20 +19,29 @@ class SupplierProductController extends Controller
                 ->select(
                     'supplier_products.*',
                     'suppliers.supplier_name',
-                    'product.name as product_name'
-                );
+                    DB::raw("COALESCE(NULLIF(TRIM(product.name), ''), NULLIF(TRIM(supplier_products.supplier_product_name), '')) as product_name")
+                )
+                ->whereNotNull('product.name')
+                ->whereRaw("TRIM(product.name) != ''");
 
-            // Search (name/code/SKU)
+            // Search (name/code/SKU) - case-insensitive, multi-word support
             $search = trim((string) $request->input('search', ''));
             if ($search !== '') {
-                $likeTerm = '%' . addcslashes($search, '\\%_') . '%';
-                $query->where(function ($q) use ($likeTerm) {
-                    $q->where('suppliers.supplier_name', 'like', $likeTerm)
-                      ->orWhere('product.name', 'like', $likeTerm)
-                      ->orWhere('supplier_products.supplier_sku', 'like', $likeTerm)
-                      ->orWhere('supplier_products.supplier_product_name', 'like', $likeTerm)
-                      ->orWhereRaw('CAST(supplier_products.product_id AS CHAR) LIKE ?', [$likeTerm]);
-                });
+                $searchTerms = preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY);
+                
+                if (!empty($searchTerms)) {
+                    // All search terms must match (AND logic) - case-insensitive
+                    foreach ($searchTerms as $term) {
+                        $likeTerm = '%' . addcslashes(strtolower($term), '\\%_') . '%';
+                        $query->where(function ($q) use ($likeTerm) {
+                            $q->whereRaw("LOWER(suppliers.supplier_name) LIKE ?", [$likeTerm])
+                              ->orWhereRaw("LOWER(product.name) LIKE ?", [$likeTerm])
+                              ->orWhereRaw("LOWER(supplier_products.supplier_sku) LIKE ?", [$likeTerm])
+                              ->orWhereRaw("LOWER(supplier_products.supplier_product_name) LIKE ?", [$likeTerm])
+                              ->orWhereRaw("CAST(supplier_products.product_id AS CHAR) LIKE ?", [$likeTerm]);
+                        });
+                    }
+                }
             }
 
             // Filter by supplier
@@ -58,7 +67,8 @@ class SupplierProductController extends Controller
                 [$sortField, $sortOrder] = explode(':', $sortField);
             }
 
-            $query->orderBy($sortField, $sortOrder);
+            $query->orderBy($sortField, $sortOrder)
+                ->orderBy('supplier_products.id', 'desc');
 
             // Pagination
             $limit = (int) $request->input('limit', 20);

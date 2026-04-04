@@ -32,9 +32,9 @@ class PurchaseVoucherController extends GetxController {
 
   // Master data
   final suppliers = <Map<String, dynamic>>[].obs;
+  final salesmen = <Map<String, dynamic>>[].obs;
   final products = <Product>[].obs;
   final unitTypes = <String>[].obs;
-  final purchaseAgents = <String>['AA SalesMan', 'Default Agent'].obs;
   static const List<String> chargeTypeNames = [
     'Freight',
     'VATInputAmount',
@@ -64,11 +64,18 @@ class PurchaseVoucherController extends GetxController {
 
   PurchaseVoucherController({this.voucherId});
 
+  int? _safeInt(dynamic raw) {
+    if (raw is int) return raw;
+    if (raw == null) return null;
+    return int.tryParse(raw.toString());
+  }
+
   @override
   void onInit() {
     super.onInit();
     activeVoucherId.value = voucherId;
     _loadSuppliers();
+    _loadSalesmen();
     _loadUnitTypes();
     _loadProducts();
     if (voucherId == null) {
@@ -381,6 +388,40 @@ class PurchaseVoucherController extends GetxController {
     }
   }
 
+  Future<void> _loadSalesmen() async {
+    try {
+      Future<List<Map<String, dynamic>>> fetch(Uri uri) async {
+        final response = await http.get(
+          uri,
+          headers: {'Accept': 'application/json'},
+        );
+        if (response.statusCode != 200) return [];
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        if (data['success'] != true) return [];
+        final List list = data['data'] ?? [];
+        return list
+            .map((e) => {
+                  'id': (e as Map)['id']?.toString(),
+                  'name': (e)['name']?.toString() ?? 'User ${(e)['id'] ?? ''}',
+                })
+            .where((e) => (e['id'] ?? '').toString().isNotEmpty)
+            .toList();
+      }
+
+      final filteredUri = Uri.parse(ApiConfig.users)
+          .replace(queryParameters: {'role': 'Salesman', 'limit': '500'});
+      var list = await fetch(filteredUri);
+      if (list.isEmpty) {
+        final fallbackUri =
+            Uri.parse(ApiConfig.users).replace(queryParameters: {'limit': '500'});
+        list = await fetch(fallbackUri);
+      }
+      salesmen.value = list;
+    } catch (e) {
+      debugPrint('[PURCHASE_VOUCHER] Salesmen error: $e');
+    }
+  }
+
   Future<void> _loadProducts() async {
     try {
       final response = await http
@@ -532,25 +573,34 @@ class PurchaseVoucherController extends GetxController {
         final decoded = jsonDecode(response.body) as Map<String, dynamic>;
         if (decoded['success'] != true) return;
         final List data = decoded['data'] ?? [];
-        products.value = data.map((e) {
-          final map = e as Map<String, dynamic>;
-          final product = map['product'] as Map<String, dynamic>?;
-          final rawId =
-              map['product_id'] ?? product?['product_id'] ?? product?['id'];
-          final id = rawId is int ? rawId : int.parse(rawId.toString());
-          final name = product?['name']?.toString() ??
-              map['product_name']?.toString() ??
-              map['supplier_product_name']?.toString() ??
-              'Product $id';
-          return Product(
-            id: id,
-            name: name,
-            code: product?['product_code']?.toString(),
-            productType:
-                (product?['product_type'] ?? 'SINGLE').toString().toUpperCase(),
-            defaultUnit: product?['default_unit']?.toString(),
-          );
-        }).toList();
+        products.value = data
+            .map<Product?>((e) {
+              final map = e as Map<String, dynamic>;
+              final dynamic productRaw = map['product'];
+              final product =
+                  productRaw is Map<String, dynamic> ? productRaw : null;
+              final id = _safeInt(
+                map['product_id'] ?? product?['product_id'] ?? product?['id'],
+              );
+              if (id == null) return null;
+
+              final name = product?['name']?.toString() ??
+                  map['product_name']?.toString() ??
+                  map['supplier_product_name']?.toString() ??
+                  'Product $id';
+
+              return Product(
+                id: id,
+                name: name,
+                code: product?['product_code']?.toString(),
+                productType: (product?['product_type'] ?? 'SINGLE')
+                    .toString()
+                    .toUpperCase(),
+                defaultUnit: product?['default_unit']?.toString(),
+              );
+            })
+            .whereType<Product>()
+            .toList();
         return;
       } catch (e) {
         debugPrint('[PURCHASE_VOUCHER] Vendor products error: $e');
@@ -781,7 +831,7 @@ class PurchaseVoucherController extends GetxController {
   void setPurchaseType(String v) => purchaseType.value = v;
   void setGstReverseCharge(String v) => gstReverseCharge.value = v;
   void setBillDate(String v) => billDate.value = v;
-  void setPurchaseAgentId(String v) => purchaseAgentId.value = v;
+  void setPurchaseAgentId(String? v) => purchaseAgentId.value = (v ?? '').trim();
 
   void addItemRow() {
     final row = PVItemRow();

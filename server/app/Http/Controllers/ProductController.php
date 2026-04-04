@@ -48,14 +48,20 @@ class ProductController extends Controller
             }
 
             if (!empty(trim($search))) {
-                $term = trim($search);
-                $likeTerm = '%' . addcslashes($term, '\\%_') . '%';
-                $query->where(function ($q) use ($likeTerm) {
-                    $q->where('name', 'LIKE', $likeTerm)
-                        ->orWhereRaw('CAST(product_id AS CHAR) LIKE ?', [$likeTerm])
-                        ->orWhere('keywords', 'LIKE', $likeTerm)
-                        ->orWhere('cache_txt', 'LIKE', $likeTerm);
-                });
+                $searchTerms = preg_split('/\s+/', trim($search), -1, PREG_SPLIT_NO_EMPTY);
+                
+                if (!empty($searchTerms)) {
+                    // All search terms must match (AND logic) - case-insensitive
+                    foreach ($searchTerms as $term) {
+                        $likeTerm = '%' . addcslashes(strtolower($term), '\\%_') . '%';
+                        $query->where(function ($q) use ($likeTerm) {
+                            $q->whereRaw("LOWER(name) LIKE ?", [$likeTerm])
+                                ->orWhereRaw("CAST(product_id AS CHAR) LIKE ?", [$likeTerm])
+                                ->orWhereRaw("LOWER(keywords) LIKE ?", [$likeTerm])
+                                ->orWhereRaw("LOWER(cache_txt) LIKE ?", [$likeTerm]);
+                        });
+                    }
+                }
             }
 
             $queryForData = clone $query;
