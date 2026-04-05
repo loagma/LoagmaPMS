@@ -1177,6 +1177,7 @@ class _ProductPickerField extends StatelessWidget {
                   row.product.value = product;
                   row.productName.value = product.name;
                   row.productCode.value = product.code ?? '${product.id}';
+                  row.hsnCode.value = product.hsnCode ?? '';
                   row.alias.value = '${product.name} : ${row.unitType.value}';
                   final unit = product.defaultUnit?.toString();
                   if (unit != null && unit.isNotEmpty && controller.unitTypes.contains(unit)) {
@@ -1388,7 +1389,7 @@ class _PVProductSearchDialogState extends State<_PVProductSearchDialog> {
                           ),
                         ),
                       ),
-                    TextButton(
+                    ElevatedButton(
                       onPressed: hasVendor ? _toggleViewMode : null,
                       child: Text(
                         _showAllProducts

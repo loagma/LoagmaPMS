@@ -90,6 +90,27 @@ class PurchaseVoucherController extends GetxController {
 
   bool get isEditMode => activeVoucherId.value != null;
 
+  bool _isFixedTaxKey(String key) {
+    final normalized = key.trim().toUpperCase();
+    return normalized == 'SGST' ||
+        normalized == 'CGST' ||
+        normalized == 'IGST' ||
+        normalized == 'CESS' ||
+        normalized == 'ROFF';
+  }
+
+  double _customTaxTotalFromKeys(PVItemRow row, double taxable) {
+    if (taxable <= 0) return 0;
+    var total = 0.0;
+    for (final key in row.availableTaxKeys) {
+      if (_isFixedTaxKey(key)) continue;
+      final percent = double.tryParse(row.taxFieldValues[key] ?? '') ?? 0;
+      if (percent <= 0) continue;
+      total += taxable * percent / 100;
+    }
+    return total;
+  }
+
   String get netTotal {
     double itemsTotal = 0;
     for (var row in items) {
@@ -101,7 +122,8 @@ class PurchaseVoucherController extends GetxController {
       final igst = double.tryParse(row.igst.value) ?? 0;
       final cess = double.tryParse(row.cess.value) ?? 0;
       final roff = double.tryParse(row.roff.value) ?? 0;
-      itemsTotal += taxable + sgst + cgst + igst + cess + roff;
+      final customTaxes = _customTaxTotalFromKeys(row, taxable);
+      itemsTotal += taxable + sgst + cgst + igst + cess + roff + customTaxes;
     }
     double chargesTotal = 0;
     for (var row in charges) {
@@ -132,7 +154,8 @@ class PurchaseVoucherController extends GetxController {
     final igst = double.tryParse(row.igst.value) ?? 0;
     final cess = double.tryParse(row.cess.value) ?? 0;
     final roff = double.tryParse(row.roff.value) ?? 0;
-    final value = taxable + sgst + cgst + igst + cess + roff;
+    final customTaxes = _customTaxTotalFromKeys(row, taxable);
+    final value = taxable + sgst + cgst + igst + cess + roff + customTaxes;
     row.value.value = value.toStringAsFixed(2);
   }
 
@@ -211,10 +234,6 @@ class PurchaseVoucherController extends GetxController {
     List<Map<String, dynamic>> rows,
   ) {
     if (rows.isEmpty) return false;
-    final taxable = double.tryParse(row.taxableAmount.value) ??
-        ((double.tryParse(row.quantity.value) ?? 0) *
-            (double.tryParse(row.unitPrice.value) ?? 0));
-    if (taxable <= 0) return false;
 
     var applied = false;
     final fixedKeys = <String>{};
@@ -589,6 +608,15 @@ class PurchaseVoucherController extends GetxController {
                   map['supplier_product_name']?.toString() ??
                   'Product $id';
 
+                List<ProductTaxInfo> parseTaxes(dynamic raw) {
+                if (raw is! List) return const [];
+                return raw
+                  .whereType<Map>()
+                  .map((item) => ProductTaxInfo.fromJson(
+                    Map<String, dynamic>.from(item)))
+                  .toList();
+                }
+
               return Product(
                 id: id,
                 name: name,
@@ -600,6 +628,7 @@ class PurchaseVoucherController extends GetxController {
                     .toString()
                     .toUpperCase(),
                 defaultUnit: product?['default_unit']?.toString(),
+                taxes: parseTaxes(product?['taxes'] ?? map['taxes']),
               );
             })
             .whereType<Product>()
@@ -706,6 +735,7 @@ class PurchaseVoucherController extends GetxController {
         );
       }
       row.productCode.value = map['product_code']?.toString() ?? '';
+      row.hsnCode.value = map['hsn_code']?.toString() ?? map['hsn']?.toString() ?? '';
       row.productName.value = map['product_name']?.toString() ?? '';
       row.alias.value = map['alias']?.toString() ?? '';
       row.quantity.value = map['quantity']?.toString() ?? '';
@@ -992,6 +1022,7 @@ class PurchaseVoucherController extends GetxController {
         );
         row.productName.value = row.product.value!.name;
         row.productCode.value = '${item.productId}';
+        row.hsnCode.value = row.product.value?.hsnCode ?? '';
         row.alias.value = '${item.productName ?? ''} : ${item.unit ?? 'Nos'}';
         row.quantity.value = item.quantity.toStringAsFixed(2);
         row.unitType.value = item.unit ?? (unitTypes.isNotEmpty ? unitTypes.first : 'Nos');
@@ -1078,10 +1109,12 @@ class PurchaseVoucherController extends GetxController {
           final igst = double.tryParse(row.igst.value) ?? 0;
           final cess = double.tryParse(row.cess.value) ?? 0;
           final roff = double.tryParse(row.roff.value) ?? 0;
+          final customTaxes = _customTaxTotalFromKeys(row, taxable);
           return {
             'product_id': row.product.value!.id,
             'product_name': row.productName.value,
             'product_code': row.productCode.value,
+            if (row.hsnCode.value.trim().isNotEmpty) 'hsn_code': row.hsnCode.value,
             'alias': row.alias.value,
             'unit': row.unitType.value,
             'quantity': qty,
@@ -1092,7 +1125,7 @@ class PurchaseVoucherController extends GetxController {
             'igst': igst,
             'cess': cess,
             'roff': roff,
-            'value': taxable + sgst + cgst + igst + cess + roff,
+            'value': taxable + sgst + cgst + igst + cess + roff + customTaxes,
             'purchase_account': row.purchaseAccount.value,
             'gst_itc_eligibility': row.gstItcEligibility.value,
             if (row.sourcePurchaseOrderId.value != null)
@@ -1290,6 +1323,7 @@ class PVItemRow {
   final product = Rxn<Product>();
   final productCode = ''.obs;
   final productName = ''.obs;
+  final hsnCode = ''.obs;
   final alias = ''.obs;
   final quantity = ''.obs;
   final unitType = 'Nos'.obs;

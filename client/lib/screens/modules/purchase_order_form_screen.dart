@@ -189,14 +189,35 @@ class _HeaderCard extends StatelessWidget {
                 flex: 2,
                 child: SizedBox(
                   height: 52,
-                  child: Obx(() => TextFormField(
-                        enabled: !controller.isReadOnly,
-                        initialValue: controller.financialYear.value,
-                        decoration: _poInputDecoration(
-                          labelText: 'Financial Year',
-                        ),
-                        onChanged: controller.setFinancialYear,
-                      )),
+                  child: Obx(() {
+                    final fy = controller.financialYear.value.trim();
+                    final options = <String>{
+                      if (fy.isNotEmpty) fy,
+                      '25-26',
+                      '24-25',
+                    }.toList();
+                    return DropdownButtonFormField<String>(
+                      value: fy.isEmpty ? null : fy,
+                      decoration: _poInputDecoration(
+                        labelText: 'Financial Year',
+                      ),
+                      isExpanded: true,
+                      items: options
+                          .map((s) => DropdownMenuItem(
+                                value: s,
+                                child: Text(
+                                  s,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ))
+                          .toList(),
+                      onChanged: controller.isReadOnly
+                          ? null
+                          : (v) {
+                              if (v != null) controller.setFinancialYear(v);
+                            },
+                    );
+                  }),
                 ),
               ),
               const SizedBox(width: 5),
@@ -1090,7 +1111,7 @@ class _POProductSearchDialogState extends State<_POProductSearchDialog> {
                           style: TextStyle(fontSize: 11, color: AppColors.textMuted),
                         ),
                       ),
-                    TextButton(
+                    ElevatedButton(
                       onPressed: hasSupplier
                           ? () {
                               setState(() => _showAllProducts = !_showAllProducts);

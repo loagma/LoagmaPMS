@@ -3,19 +3,19 @@
     no of package: 
     product can be navigate
 
--purchase order form
-    gross amount
+✔ -purchase order form @done(26-04-05 20:27)
+    ✔ gross amount @done(26-04-05 20:27)
 
 - purchASE voucher
-        invoice type remove
-        gst reverse charge remove
-        do not update remove
-        link selected -> ok/cancel
-        link purchase order button ke niche hi vo inputs do ki kon kon se select hai
-        placeholder - 0 remove kro
-        tax product ke doneo caculate nai ho ra hai
-        Search product issue solve
-Or purchase  voucher piche issue
+        ✔ invoice type remove @done(26-04-05 20:17)
+        ✔ gst reverse charge remove @done(26-04-05 20:17)
+        ✔ do not update remove @done(26-04-05 20:17)
+        ✔ link selected -> ok/cancel @done(26-04-05 20:17)
+        ✔ link purchase order button ke niche hi vo inputs do ki kon kon se select hai @done(26-04-05 20:17)
+        ✔ placeholder - 0 remove kro @done(26-04-05 20:17)
+        ✔ tax product ke doneo caculate nai ho ra hai @done(26-04-05 20:27)
+        ✔ Search product issue solve @done(26-04-05 20:19)
+✔ Or purchase  voucher piche issue @done(26-04-05 20:19)
 Hsn code not coming
-Document date
-On click input label
+✔ Document date @done(26-04-05 20:19)
+✔ On click input label @done(26-04-05 20:19)
