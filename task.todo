@@ -5,3 +5,17 @@
 
 -purchase order form
     gross amount
+
+- purchASE voucher
+        invoice type remove
+        gst reverse charge remove
+        do not update remove
+        link selected -> ok/cancel
+        link purchase order button ke niche hi vo inputs do ki kon kon se select hai
+        placeholder - 0 remove kro
+        tax product ke doneo caculate nai ho ra hai
+        Search product issue solve
+Or purchase  voucher piche issue
+Hsn code not coming
+Document date
+On click input label

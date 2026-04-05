@@ -2,6 +2,7 @@ class Product {
   final int id;
   final String name;
   final String? code;
+  final String? hsnCode;
   final String productType; // 'FINISHED' or 'RAW'
   final String? defaultUnit; // 'WEIGHT', 'QUANTITY', 'LITRE', 'METER'
   final double? stock; // Available stock (optional, when include_stock=1)
@@ -12,6 +13,7 @@ class Product {
     required this.id,
     required this.name,
     this.code,
+    this.hsnCode,
     required this.productType,
     this.defaultUnit,
     this.stock,
@@ -68,10 +70,28 @@ class Product {
       }
     }
 
+    String? readHsn(dynamic value) {
+      final text = value?.toString().trim();
+      if (text == null || text.isEmpty) return null;
+      return text;
+    }
+
+    final nested = json['product'];
+    final nestedProduct = nested is Map<String, dynamic> ? nested : null;
+    final hsnCode = readHsn(
+      json['hsn_code'] ??
+          json['hsnCode'] ??
+          json['hsn'] ??
+          nestedProduct?['hsn_code'] ??
+          nestedProduct?['hsnCode'] ??
+          nestedProduct?['hsn'],
+    );
+
     return Product(
       id: id,
       name: productName.toString().trim(),
       code: json['product_code']?.toString(),
+      hsnCode: hsnCode,
       productType: productType.toString().toUpperCase(),
       defaultUnit: json['default_unit'] ?? json['inventory_unit_type'],
       stock: stock,
@@ -85,6 +105,7 @@ class Product {
       'product_id': id,
       'product_name': name,
       'product_code': code,
+      'hsn_code': hsnCode,
       'product_type': productType,
       'default_unit': defaultUnit,
       'gst_percent': gstPercent,

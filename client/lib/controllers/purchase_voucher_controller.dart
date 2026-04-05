@@ -593,6 +593,9 @@ class PurchaseVoucherController extends GetxController {
                 id: id,
                 name: name,
                 code: product?['product_code']?.toString(),
+                hsnCode: product?['hsn_code']?.toString() ??
+                    map['hsn_code']?.toString() ??
+                    map['hsn']?.toString(),
                 productType: (product?['product_type'] ?? 'SINGLE')
                     .toString()
                     .toUpperCase(),
@@ -698,6 +701,7 @@ class PurchaseVoucherController extends GetxController {
         row.product.value = Product(
           id: pid,
           name: map['product_name']?.toString() ?? '',
+          hsnCode: map['hsn_code']?.toString() ?? map['hsn']?.toString(),
           productType: 'SINGLE',
         );
       }
@@ -1216,7 +1220,10 @@ class PurchaseVoucherController extends GetxController {
 
   void _syncAvailableTaxKeysFromCurrentValues(PVItemRow row) {
     final keys = <String>[];
-    bool has(String value) => value.trim().isNotEmpty && value.trim() != '0' && value.trim() != '0.00';
+    bool has(String value) {
+      final parsed = double.tryParse(value.trim());
+      return parsed != null && parsed != 0;
+    }
 
     row.taxFieldValues.clear();
 

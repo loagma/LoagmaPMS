@@ -7,6 +7,50 @@ import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 import 'purchase_order_list_screen.dart';
 
+InputDecoration _poInputDecoration({
+  required String labelText,
+  String? hintText,
+  Widget? suffixIcon,
+  Widget? prefixIcon,
+}) {
+  return AppInputDecoration.standard(
+    labelText: labelText,
+    hintText: hintText,
+    suffixIcon: suffixIcon,
+    prefixIcon: prefixIcon,
+  ).copyWith(
+    floatingLabelBehavior: FloatingLabelBehavior.always,
+  );
+}
+
+Future<void> _pickPoDate(
+  BuildContext context, {
+  required String currentValue,
+  required ValueChanged<String> onPicked,
+}) async {
+  final now = DateTime.now();
+  DateTime initialDate = now;
+  final raw = currentValue.trim();
+  if (raw.isNotEmpty) {
+    final parsed = DateTime.tryParse(raw);
+    if (parsed != null) {
+      initialDate = parsed;
+    }
+  }
+
+  final picked = await showDatePicker(
+    context: context,
+    initialDate: initialDate,
+    firstDate: DateTime(2000),
+    lastDate: DateTime(2100),
+  );
+  if (picked == null) return;
+
+  final month = picked.month.toString().padLeft(2, '0');
+  final day = picked.day.toString().padLeft(2, '0');
+  onPicked('${picked.year}-$month-$day');
+}
+
 class PurchaseOrderFormScreen extends StatelessWidget {
   final int? poId;
   final bool startInViewOnly;
@@ -148,9 +192,8 @@ class _HeaderCard extends StatelessWidget {
                   child: Obx(() => TextFormField(
                         enabled: !controller.isReadOnly,
                         initialValue: controller.financialYear.value,
-                        decoration: AppInputDecoration.standard(
+                        decoration: _poInputDecoration(
                           labelText: 'Financial Year',
-                          hintText: 'e.g. 25-26',
                         ),
                         onChanged: controller.setFinancialYear,
                       )),
@@ -168,7 +211,7 @@ class _HeaderCard extends StatelessWidget {
                         ? (poNumber.isEmpty ? 'Existing (no number)' : poNumber)
                         : (seqValue != null ? seqValue.toString() : '');
                     return InputDecorator(
-                      decoration: AppInputDecoration.standard(labelText: 'Voucher No'),
+                      decoration: _poInputDecoration(labelText: 'Voucher No'),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -216,7 +259,7 @@ class _HeaderCard extends StatelessWidget {
             final list = controller.suppliers;
             return DropdownButtonFormField<int>(
               value: controller.supplierId.value,
-              decoration: AppInputDecoration.standard(labelText: 'Supplier *'),
+              decoration: _poInputDecoration(labelText: 'Supplier *'),
               items: list
                   .map((s) => DropdownMenuItem<int>(
                         value: s['id'] as int,
@@ -242,7 +285,7 @@ class _HeaderCard extends StatelessWidget {
                   final value = hasValue ? current : null;
                   return DropdownButtonFormField<String>(
                     value: value,
-                    decoration: AppInputDecoration.standard(
+                    decoration: _poInputDecoration(
                       labelText: 'Salesman',
                     ),
                     items: list
@@ -270,7 +313,7 @@ class _HeaderCard extends StatelessWidget {
                   final value = hasValue ? current : null;
                   return DropdownButtonFormField<String>(
                     value: value,
-                    decoration: AppInputDecoration.standard(
+                    decoration: _poInputDecoration(
                       labelText: 'Department',
                     ),
                     items: list
@@ -295,27 +338,43 @@ class _HeaderCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Obx(() => TextFormField(
+                      key: ValueKey('po-doc-date-${controller.docDate.value}'),
                       enabled: !controller.isReadOnly,
+                      readOnly: true,
                       initialValue: controller.docDate.value,
-                      decoration: AppInputDecoration.standard(
+                      decoration: _poInputDecoration(
                         labelText: 'Document Date *',
-                        hintText: 'YYYY-MM-DD',
+                        suffixIcon: const Icon(Icons.calendar_month_rounded),
                       ),
                       validator: (v) =>
                           v == null || v.trim().isEmpty ? 'Required' : null,
-                      onChanged: controller.setDocDate,
+                      onTap: controller.isReadOnly
+                          ? null
+                          : () => _pickPoDate(
+                                context,
+                                currentValue: controller.docDate.value,
+                                onPicked: controller.setDocDate,
+                              ),
                     )),
               ),
               const SizedBox(width: 6),
               Expanded(
                 child: Obx(() => TextFormField(
+                      key: ValueKey('po-expected-date-${controller.expectedDate.value}'),
                       enabled: !controller.isReadOnly,
+                      readOnly: true,
                       initialValue: controller.expectedDate.value,
-                      decoration: AppInputDecoration.standard(
+                      decoration: _poInputDecoration(
                         labelText: 'Expected Date',
-                        hintText: 'YYYY-MM-DD',
+                        suffixIcon: const Icon(Icons.calendar_month_rounded),
                       ),
-                      onChanged: controller.setExpectedDate,
+                      onTap: controller.isReadOnly
+                          ? null
+                          : () => _pickPoDate(
+                                context,
+                                currentValue: controller.expectedDate.value,
+                                onPicked: controller.setExpectedDate,
+                              ),
                     )),
               ),
             ],
@@ -324,7 +383,7 @@ class _HeaderCard extends StatelessWidget {
             const SizedBox(height: 6),
             Obx(() => DropdownButtonFormField<String>(
                   value: controller.status.value,
-                  decoration: AppInputDecoration.standard(labelText: 'Status'),
+                  decoration: _poInputDecoration(labelText: 'Status'),
                   items: const [
                     DropdownMenuItem(value: 'DRAFT', child: Text('Draft')),
                     DropdownMenuItem(value: 'SENT', child: Text('Sent')),
@@ -345,9 +404,8 @@ class _HeaderCard extends StatelessWidget {
           Obx(() => TextFormField(
                 enabled: !controller.isReadOnly,
                 initialValue: controller.narration.value,
-                decoration: AppInputDecoration.standard(
+                decoration: _poInputDecoration(
                   labelText: 'Narration',
-                  hintText: 'Optional notes...',
                 ).copyWith(
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -517,9 +575,8 @@ class _ItemRow extends StatelessWidget {
                 child: Obx(() => TextFormField(
                       enabled: !controller.isReadOnly,
                       initialValue: row.quantity.value,
-                      decoration: AppInputDecoration.standard(
+                      decoration: _poInputDecoration(
                         labelText: 'Qty *',
-                        hintText: '0.00',
                       ),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [
@@ -551,7 +608,7 @@ class _ItemRow extends StatelessWidget {
                     }
                     return DropdownButtonFormField<String>(
                       value: value,
-                      decoration: AppInputDecoration.standard(labelText: 'Unit')
+                      decoration: _poInputDecoration(labelText: 'Unit')
                           .copyWith(
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -588,9 +645,8 @@ class _ItemRow extends StatelessWidget {
                 child: Obx(() => TextFormField(
                       enabled: !controller.isReadOnly,
                       initialValue: row.price.value,
-                      decoration: AppInputDecoration.standard(
+                      decoration: _poInputDecoration(
                         labelText: 'Unit Price *',
-                        hintText: '0.00',
                       ),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [
@@ -704,7 +760,7 @@ class _ItemRow extends StatelessWidget {
 
   Widget _readOnlyAmountField({required String label, required String value}) {
     return InputDecorator(
-      decoration: AppInputDecoration.standard(labelText: label),
+      decoration: _poInputDecoration(labelText: label),
       child: Text(
         value,
         style: const TextStyle(fontSize: 13),
@@ -751,7 +807,7 @@ class _AddonCard extends StatelessWidget {
                                       .contains(charge.name.value)
                                   ? charge.name.value
                                   : PurchaseOrderFormController.chargeTypeNames.first,
-                              decoration: AppInputDecoration.standard(
+                              decoration: _poInputDecoration(
                                 labelText: 'Name',
                               ).copyWith(
                                 contentPadding: const EdgeInsets.symmetric(
@@ -781,9 +837,8 @@ class _AddonCard extends StatelessWidget {
                         child: TextFormField(
                           enabled: !controller.isReadOnly,
                           initialValue: charge.amount.value,
-                          decoration: AppInputDecoration.standard(
+                          decoration: _poInputDecoration(
                             labelText: 'Amount',
-                            hintText: '0.00',
                           ),
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           inputFormatters: [
@@ -878,9 +933,8 @@ class _ProductPicker extends StatelessWidget {
                       }
                     },
               child: InputDecorator(
-                decoration: AppInputDecoration.standard(
+                decoration: _poInputDecoration(
                   labelText: 'Product *',
-                  hintText: 'Tap to search and select product',
                 ),
                 child: Row(
                   children: [
@@ -974,11 +1028,9 @@ class _POProductSearchDialogState extends State<_POProductSearchDialog> {
           children: [
             TextField(
               controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Type name or ID to search...',
+              decoration: _poInputDecoration(
+                labelText: 'Search Product',
                 prefixIcon: const Icon(Icons.search),
-                border: const OutlineInputBorder(),
-                isDense: true,
                 suffixIcon: _searching
                     ? const Padding(
                         padding: EdgeInsets.all(12),

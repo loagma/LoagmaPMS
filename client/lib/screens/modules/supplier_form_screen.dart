@@ -976,197 +976,6 @@ class _SupplierProductRow extends StatelessWidget {
               },
             ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: row.supplierSku.value,
-                    decoration: AppInputDecoration.standard(
-                      labelText: 'Supplier SKU',
-                    ),
-                    onChanged: (value) => row.supplierSku.value = value,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: row.supplierProductName.value,
-                    decoration: AppInputDecoration.standard(
-                      labelText: 'Supplier Product Name',
-                    ),
-                    onChanged: (value) => row.supplierProductName.value = value,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: row.packSize.value,
-                    decoration: AppInputDecoration.standard(
-                      labelText: 'Pack Size',
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    onChanged: (value) => row.packSize.value = value,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: row.packUnit.value,
-                    decoration: AppInputDecoration.standard(
-                      labelText: 'Pack Unit',
-                    ),
-                    onChanged: (value) => row.packUnit.value = value,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: row.minOrderQty.value,
-                    decoration: AppInputDecoration.standard(
-                      labelText: 'Min Order Qty',
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    onChanged: (value) => row.minOrderQty.value = value,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: row.leadTimeDays.value,
-                    decoration: AppInputDecoration.standard(
-                      labelText: 'Lead Time (Days)',
-                    ),
-                    keyboardType: TextInputType.number,
-                    onChanged: (value) => row.leadTimeDays.value = value,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: row.price.value,
-                    decoration: AppInputDecoration.standard(labelText: 'Price'),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    onChanged: (value) => row.price.value = value,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: row.currency.value,
-                    decoration: AppInputDecoration.standard(
-                      labelText: 'Currency',
-                    ),
-                    onChanged: (value) => row.currency.value = value,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: row.taxPercent.value,
-                    decoration: AppInputDecoration.standard(labelText: 'Tax %'),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    onChanged: (value) => row.taxPercent.value = value,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Obx(
-                  () => TextFormField(
-                    initialValue: row.discountPercent.value,
-                    decoration: AppInputDecoration.standard(
-                      labelText: 'Discount %',
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    onChanged: (value) => row.discountPercent.value = value,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Obx(
-                  () => SwitchListTile.adaptive(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text(
-                      'Preferred',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primaryDark,
-                      ),
-                    ),
-                    value: row.isPreferred.value,
-                    onChanged: (value) => row.isPreferred.value = value,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Obx(
-                  () => SwitchListTile.adaptive(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text(
-                      'Active',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primaryDark,
-                      ),
-                    ),
-                    value: row.isActive.value,
-                    onChanged: (value) => row.isActive.value = value,
-                  ),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -1433,7 +1242,7 @@ class _SearchProductDialogState extends State<_SearchProductDialog> {
             TextField(
               controller: _searchController,
               decoration: AppInputDecoration.standard(
-                labelText: 'Search by name or ID',
+                labelText: 'Search by product name',
                 hintText: 'Type at least 2 characters...',
                 prefixIcon: const Icon(Icons.search),
               ),
@@ -1470,7 +1279,6 @@ class _SearchProductDialogState extends State<_SearchProductDialog> {
                               widget.currentSelection?.id == product.id;
                           return ListTile(
                             title: Text(product.name),
-                            subtitle: Text('ID: ${product.id}'),
                             selected: isSelected,
                             onTap: () => Navigator.pop(context, product),
                           );

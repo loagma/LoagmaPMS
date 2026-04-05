@@ -10,6 +10,49 @@ import '../../models/product_model.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 
+InputDecoration _pvInputDecoration({
+  required String labelText,
+  String? hintText,
+  Widget? suffixIcon,
+  Widget? prefixIcon,
+}) {
+  return AppInputDecoration.standard(
+    labelText: labelText,
+    hintText: hintText,
+    suffixIcon: suffixIcon,
+    prefixIcon: prefixIcon,
+  ).copyWith(
+    floatingLabelBehavior: FloatingLabelBehavior.always,
+  );
+}
+
+Future<void> _pickDocumentDate(
+  BuildContext context,
+  PurchaseVoucherController controller,
+) async {
+  final now = DateTime.now();
+  DateTime initialDate = now;
+  final raw = controller.docDate.value.trim();
+  if (raw.isNotEmpty) {
+    final parsed = DateTime.tryParse(raw);
+    if (parsed != null) {
+      initialDate = parsed;
+    }
+  }
+
+  final picked = await showDatePicker(
+    context: context,
+    initialDate: initialDate,
+    firstDate: DateTime(2000),
+    lastDate: DateTime(2100),
+  );
+  if (picked == null) return;
+
+  final month = picked.month.toString().padLeft(2, '0');
+  final day = picked.day.toString().padLeft(2, '0');
+  controller.setDocDate('${picked.year}-$month-$day');
+}
+
 class PurchaseVoucherScreen extends StatelessWidget {
   final int? voucherId;
 
@@ -317,9 +360,8 @@ class _LinkToPODialogState extends State<_LinkToPODialog> {
                 children: [
                   TextField(
                     controller: _searchController,
-                    decoration: AppInputDecoration.standard(
+                    decoration: _pvInputDecoration(
                       labelText: 'Search',
-                      hintText: 'Supplier name, PO no or ID',
                       prefixIcon: const Icon(Icons.search),
                     ),
                     onChanged: _onSearchChanged,
@@ -398,7 +440,7 @@ class _LinkToPODialogState extends State<_LinkToPODialog> {
           onPressed: _loading || _selectedPoIds.isEmpty
               ? null
               : () => _onLinkSelected(context),
-          child: const Text('Link Selected'),
+          child: const Text('Ok'),
         ),
         TextButton(
           onPressed: _loading ? null : widget.onClose,
@@ -418,79 +460,6 @@ class _HeaderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return ContentCard(
       title: 'Supplier & Dates',
-      titleAction: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Obx(() {
-            if (controller.linkedPurchaseOrderIds.isEmpty) {
-              return const SizedBox.shrink();
-            }
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.primary),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Linked Purchase Orders',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primaryDark,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: controller.linkedPoNumbers.isNotEmpty
-                        ? controller.linkedPoNumbers
-                            .map((poNo) => Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: AppColors.primaryLight),
-                                  ),
-                                  child: Text(
-                                    poNo,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.primaryDark,
-                                    ),
-                                  ),
-                                ))
-                            .toList()
-                        : controller.linkedPurchaseOrderIds
-                            .map((id) => Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: AppColors.primaryLight),
-                                  ),
-                                  child: Text(
-                                    'PO #$id',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.primaryDark,
-                                    ),
-                                  ),
-                                ))
-                            .toList(),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -502,7 +471,7 @@ class _HeaderCard extends StatelessWidget {
                   height: 52,
                   child: Obx(() => DropdownButtonFormField<String>(
                         value: controller.docNoPrefix.value,
-                        decoration: AppInputDecoration.standard(
+                        decoration: _pvInputDecoration(
                           labelText: 'Financial Year',
                         ),
                         isExpanded: true,
@@ -533,7 +502,7 @@ class _HeaderCard extends StatelessWidget {
                         ? docNo
                         : (seq != null ? seq.toString() : '');
                     return InputDecorator(
-                      decoration: AppInputDecoration.standard(
+                      decoration: _pvInputDecoration(
                         labelText: 'Voucher No',
                       ),
                       child: Row(
@@ -595,7 +564,7 @@ class _HeaderCard extends StatelessWidget {
             final list = controller.suppliers;
             return DropdownButtonFormField<int>(
               value: controller.vendorId.value,
-              decoration: AppInputDecoration.standard(labelText: 'Supplier *'),
+              decoration: _pvInputDecoration(labelText: 'Supplier *'),
               isExpanded: true,
               items: list
                   .map((s) => DropdownMenuItem<int>(
@@ -619,27 +588,70 @@ class _HeaderCard extends StatelessWidget {
             );
           }),
           const SizedBox(height: 6),
-          Obx(() => Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
+          Obx(() {
+            final linkedPoLabels = controller.linkedPoNumbers.isNotEmpty
+                ? controller.linkedPoNumbers.toList()
+                : controller.linkedPurchaseOrderIds
+                    .map((id) => 'PO #$id')
+                    .toList();
+
+            return Row(
+              children: [
+                OutlinedButton.icon(
                   onPressed: controller.vendorId.value == null
                       ? null
                       : () => _showLinkToPurchaseOrderDialog(context, controller),
                   icon: const Icon(Icons.link_rounded, size: 16),
                   label: const Text('Link Purchase Order'),
-                  style: TextButton.styleFrom(
+                  style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    minimumSize: const Size(0, 30),
+                    side: const BorderSide(color: AppColors.primary, width: 1.2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
-              )),
+                if (linkedPoLabels.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: linkedPoLabels
+                            .map(
+                              (poLabel) => Container(
+                                margin: const EdgeInsets.only(right: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryLight.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AppColors.primaryLight),
+                                ),
+                                child: Text(
+                                  poLabel,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.primaryDark,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            );
+          }),
           const SizedBox(height: 6),
           Obx(() => TextFormField(
                 initialValue: controller.narration.value,
-                decoration: AppInputDecoration.standard(
+                decoration: _pvInputDecoration(
                   labelText: 'Narration',
-                  hintText: 'Optional notes...',
                 ).copyWith(
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -656,84 +668,24 @@ class _HeaderCard extends StatelessWidget {
               Expanded(
                 child: Obx(() => TextFormField(
                       initialValue: controller.docDate.value,
-                      decoration: AppInputDecoration.standard(
+                      readOnly: true,
+                      decoration: _pvInputDecoration(
                         labelText: 'Document Date *',
-                        hintText: 'YYYY-MM-DD',
+                        suffixIcon: const Icon(Icons.calendar_month_rounded),
                       ),
                       validator: (v) =>
                           v == null || v.trim().isEmpty ? 'Required' : null,
-                      onChanged: controller.setDocDate,
+                      onTap: () => _pickDocumentDate(context, controller),
                     )),
               ),
                     const SizedBox(width: 6),
               Expanded(
                 child: Obx(() => TextFormField(
                       initialValue: controller.billNo.value,
-                      decoration: AppInputDecoration.standard(
+                      decoration: _pvInputDecoration(
                         labelText: 'Bill No',
-                        hintText: 'Supplier invoice no',
                       ),
                       onChanged: controller.setBillNo,
-                    )),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Obx(() => CheckboxListTile(
-                title: const Text(
-                  'Do not Update Inventory',
-                  style: TextStyle(fontSize: 14),
-                ),
-                value: controller.doNotUpdateInventory.value,
-                onChanged: (v) =>
-                    controller.setDoNotUpdateInventory(v ?? false),
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: EdgeInsets.zero,
-              )),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(
-                child: Obx(() => DropdownButtonFormField<String>(
-                      value: controller.purchaseType.value,
-                      decoration: AppInputDecoration.standard(
-                        labelText: 'Invoice Type',
-                      ),
-                      isExpanded: true,
-                      items: ['Regular', 'Return', 'Proforma']
-                          .map((s) => DropdownMenuItem(
-                                value: s,
-                                child: Text(
-                                  s,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ))
-                          .toList(),
-                      onChanged: (v) {
-                        if (v != null) controller.setPurchaseType(v);
-                      },
-                    )),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Obx(() => DropdownButtonFormField<String>(
-                      value: controller.gstReverseCharge.value,
-                      decoration: AppInputDecoration.standard(
-                        labelText: 'GST Reverse Charge',
-                      ),
-                      isExpanded: true,
-                      items: ['Y', 'N']
-                          .map((s) => DropdownMenuItem(
-                                value: s,
-                                child: Text(
-                                  s,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ))
-                          .toList(),
-                      onChanged: (v) {
-                        if (v != null) controller.setGstReverseCharge(v);
-                      },
                     )),
               ),
             ],
@@ -766,7 +718,7 @@ class _ExtraGstCard extends StatelessWidget {
                             .any((s) => s['id']?.toString() == current);
                         return hasValue ? current : null;
                       })(),
-                      decoration: AppInputDecoration.standard(
+                      decoration: _pvInputDecoration(
                         labelText: 'Salesman',
                       ).copyWith(
                         contentPadding: const EdgeInsets.symmetric(
@@ -787,37 +739,11 @@ class _ExtraGstCard extends StatelessWidget {
                       onChanged: controller.setPurchaseAgentId,
                     )),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Obx(() => TextFormField(
-                      initialValue: controller.billDate.value,
-                      decoration: AppInputDecoration.standard(
-                        labelText: 'Bill Date',
-                        hintText: 'YYYY-MM-DD',
-                      ),
-                      onChanged: controller.setBillDate,
-                    )),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  decoration: AppInputDecoration.standard(
-                    labelText: 'GST Type',
-                    hintText: 'e.g. OE',
-                  ),
-                  onChanged: (_) {},
-                ),
-              ),
               const SizedBox(width: 6),
               Expanded(
                 child: TextFormField(
-                  decoration: AppInputDecoration.standard(
+                  decoration: _pvInputDecoration(
                     labelText: 'Vehicle No',
-                    hintText: 'Optional',
                   ),
                   onChanged: (_) {},
                 ),
@@ -992,9 +918,8 @@ class _ItemRow extends StatelessWidget {
                 flex: 2,
                 child: Obx(() => TextFormField(
                       initialValue: row.quantity.value,
-                      decoration: AppInputDecoration.standard(
+                      decoration: _pvInputDecoration(
                         labelText: 'Qty *',
-                        hintText: '0.00',
                       ),
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
@@ -1029,7 +954,7 @@ class _ItemRow extends StatelessWidget {
                       : (units.isNotEmpty ? units.first : 'Nos');
                   return DropdownButtonFormField<String>(
                     value: value,
-                    decoration: AppInputDecoration.standard(
+                    decoration: _pvInputDecoration(
                       labelText: 'Unit',
                     ).copyWith(
                       contentPadding: const EdgeInsets.symmetric(
@@ -1065,9 +990,8 @@ class _ItemRow extends StatelessWidget {
                 flex: 2,
                 child: Obx(() => TextFormField(
                       initialValue: row.unitPrice.value,
-                      decoration: AppInputDecoration.standard(
+                      decoration: _pvInputDecoration(
                         labelText: 'Unit Price *',
-                        hintText: '0.00',
                       ),
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
@@ -1189,7 +1113,7 @@ class _ItemRow extends StatelessWidget {
             final tax = total - taxable;
             return _readOnlyAmountField(
               label: 'Total Tax',
-              value: tax.toStringAsFixed(2),
+              value: tax,
             );
           }),
         ),
@@ -1197,8 +1121,7 @@ class _ItemRow extends StatelessWidget {
         Expanded(
           child: Obx(() => _readOnlyAmountField(
                 label: 'Product Total',
-                value: (double.tryParse(row.value.value) ?? 0)
-                    .toStringAsFixed(2),
+                value: double.tryParse(row.value.value) ?? 0,
               )),
         ),
       ],
@@ -1207,12 +1130,13 @@ class _ItemRow extends StatelessWidget {
 
   Widget _readOnlyAmountField({
     required String label,
-    required String value,
+    required double value,
   }) {
+    final display = value.abs() < 0.000001 ? '' : value.toStringAsFixed(2);
     return InputDecorator(
-      decoration: AppInputDecoration.standard(labelText: label),
+      decoration: _pvInputDecoration(labelText: label),
       child: Text(
-        value,
+        display,
         style: const TextStyle(fontSize: 13),
       ),
     );
@@ -1266,9 +1190,8 @@ class _ProductPickerField extends StatelessWidget {
                 }
               },
               child: InputDecorator(
-                decoration: AppInputDecoration.standard(
+                decoration: _pvInputDecoration(
                   labelText: 'Product *',
-                  hintText: 'Tap to search and select product',
                 ),
                 child: Row(
                   children: [
@@ -1417,9 +1340,8 @@ class _PVProductSearchDialogState extends State<_PVProductSearchDialog> {
             const SizedBox(height: 16),
             TextField(
               controller: _searchController,
-              decoration: AppInputDecoration.standard(
+              decoration: _pvInputDecoration(
                 labelText: 'Name or code',
-                hintText: 'Type to search...',
               ),
               onChanged: _onSearch,
             ),
@@ -1436,9 +1358,12 @@ class _PVProductSearchDialogState extends State<_PVProductSearchDialog> {
                       itemCount: _filtered.length,
                       itemBuilder: (context, i) {
                         final p = _filtered[i];
+                        final subtitle = p.hsnCode?.trim().isNotEmpty == true
+                            ? 'ID: ${p.id}   HSN: ${p.hsnCode}'
+                            : 'ID: ${p.id}';
                         return ListTile(
                           title: Text(p.name),
-                          subtitle: Text('ID: ${p.id}'),
+                          subtitle: Text(subtitle),
                           onTap: () => Navigator.pop(context, p),
                         );
                       },
@@ -1520,7 +1445,7 @@ class _ChargesCard extends StatelessWidget {
                                       .contains(row.name.value)
                                   ? row.name.value
                                   : PurchaseVoucherController.chargeTypeNames.first,
-                              decoration: AppInputDecoration.standard(
+                              decoration: _pvInputDecoration(
                                 labelText: 'Name',
                               ).copyWith(
                                 contentPadding: const EdgeInsets.symmetric(
@@ -1550,9 +1475,8 @@ class _ChargesCard extends StatelessWidget {
                       Expanded(
                         child: Obx(() => TextFormField(
                               initialValue: row.amount.value,
-                              decoration: AppInputDecoration.standard(
+                              decoration: _pvInputDecoration(
                                 labelText: 'Amount',
-                                hintText: '0.00',
                               ),
                               keyboardType: const TextInputType.numberWithOptions(
                                 decimal: true,
@@ -1616,11 +1540,13 @@ class _SummaryCard extends StatelessWidget {
           final base = double.tryParse(row.taxableAmount.value) ?? 0;
           for (final label in row.availableTaxKeys) {
             final percent = double.tryParse(row.taxFieldValues[label] ?? '') ?? 0;
+            if (percent <= 0) continue;
             totals[label] = (totals[label] ?? 0) + (base * percent / 100);
           }
           row.taxFieldValues.forEach((label, value) {
             if (totals.containsKey(label)) return;
             final percent = double.tryParse(value) ?? 0;
+            if (percent <= 0) return;
             totals[label] = (totals[label] ?? 0) + (base * percent / 100);
           });
         }
@@ -1652,7 +1578,7 @@ class _SummaryCard extends StatelessWidget {
           .where((e) => e.key.trim().toUpperCase() == 'ROFF')
           .fold(0.0, (sum, e) => sum + e.value);
       final visibleTaxEntries = taxTotals.entries
-          .where((e) => e.key.trim().toUpperCase() != 'ROFF')
+          .where((e) => e.key.trim().toUpperCase() != 'ROFF' && e.value > 0)
           .toList();
       final totalInclTax = double.tryParse(controller.netTotal) ?? 0;
 
@@ -1726,3 +1652,4 @@ class _SummaryCard extends StatelessWidget {
     );
   }
 }
+
