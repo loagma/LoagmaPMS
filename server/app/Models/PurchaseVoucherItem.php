@@ -14,6 +14,7 @@ class PurchaseVoucherItem extends Model
         'line_no',
         'product_name',
         'product_code',
+        'hsn_code',
         'alias',
         'unit',
         'quantity',

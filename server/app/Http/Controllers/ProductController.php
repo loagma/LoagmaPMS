@@ -23,7 +23,7 @@ class ProductController extends Controller
             $includeStock = filter_var(request()->query('include_stock', false), FILTER_VALIDATE_BOOLEAN);
             $includeTaxes = filter_var(request()->query('include_taxes', false), FILTER_VALIDATE_BOOLEAN);
 
-            $selectCols = ['product_id', 'name', 'inventory_type', 'inventory_unit_type', 'gst_percent'];
+            $selectCols = ['product_id', 'name', 'hsn_code', 'inventory_type', 'inventory_unit_type', 'gst_percent'];
             if ($includeStock) {
                 $selectCols[] = 'stock';
             }
@@ -122,6 +122,7 @@ class ProductController extends Controller
                 $result = [
                     'product_id' => (int) $product->product_id,
                     'name' => $cleanName,
+                    'hsn_code' => isset($product->hsn_code) ? trim((string) $product->hsn_code) : null,
                     'inventory_type' => $inventoryType,
                     'inventory_unit_type' => $unitType,
                     'gst_percent' => isset($product->gst_percent) ? (float) $product->gst_percent : 0,

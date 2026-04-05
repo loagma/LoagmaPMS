@@ -97,9 +97,13 @@ class PurchaseOrderFormController extends GetxController {
             final name = map['name']?.toString() ??
                 map['product_name']?.toString() ??
                 (productId != null ? 'Product $productId' : '');
+            final hsnCode = map['hsn_code']?.toString() ??
+                map['hsn']?.toString() ??
+                map['hsnCode']?.toString();
             return {
               'product_id': productId,
               'name': name,
+              'hsn_code': hsnCode,
             };
           })
           .toList();
@@ -146,9 +150,16 @@ class PurchaseOrderFormController extends GetxController {
               map['product_name']?.toString() ??
               map['supplier_product_name']?.toString() ??
               (productId != null ? 'Product $productId' : 'Product');
+          final hsnCode = product?['hsn_code']?.toString() ??
+              product?['hsn']?.toString() ??
+              product?['hsnCode']?.toString() ??
+              map['hsn_code']?.toString() ??
+              map['hsn']?.toString() ??
+              map['hsnCode']?.toString();
           return {
             'product_id': productId,
             'name': name,
+            'hsn_code': hsnCode,
           };
         }).toList();
       } catch (e) {
@@ -499,6 +510,7 @@ class PurchaseOrderFormController extends GetxController {
       items.add(POLineRow(
         productId: item.productId,
         productName: item.productName,
+        hsnCode: item.hsnCode,
         quantity: item.quantity.toString(),
         price: item.price.toString(),
         discountPercent: item.discountPercent?.toString() ?? '',
@@ -646,6 +658,7 @@ class PurchaseOrderFormController extends GetxController {
             items.add(POLineRow(
               productId: item.productId,
               productName: item.productName,
+              hsnCode: item.hsnCode,
               quantity: item.quantity.toString(),
               price: item.price.toString(),
               discountPercent: item.discountPercent?.toString() ?? '',
@@ -808,6 +821,8 @@ class PurchaseOrderFormController extends GetxController {
           return {
             'product_id': productId,
             'line_no': e.key + 1,
+            if (r.hsnCode.value.trim().isNotEmpty)
+              'hsn_code': r.hsnCode.value.trim(),
             if (r.unit.value.trim().isNotEmpty) 'unit': r.unit.value.trim(),
             'quantity': qty,
             'price': price,
@@ -933,6 +948,7 @@ class PurchaseOrderFormController extends GetxController {
 class POLineRow {
   final productId = Rxn<int>();
   final productName = ''.obs;
+  final hsnCode = ''.obs;
   final quantity = '1'.obs;
   final price = '0'.obs;
   final discountPercent = ''.obs;
@@ -954,6 +970,7 @@ class POLineRow {
   POLineRow({
     int? productId,
     String? productName,
+    String? hsnCode,
     String? quantity,
     String? price,
     String? discountPercent,
@@ -963,6 +980,7 @@ class POLineRow {
   }) {
     if (productId != null) this.productId.value = productId;
     if (productName != null) this.productName.value = productName;
+    if (hsnCode != null) this.hsnCode.value = hsnCode;
     if (quantity != null) this.quantity.value = quantity;
     if (price != null) this.price.value = price;
     if (discountPercent != null) this.discountPercent.value = discountPercent;

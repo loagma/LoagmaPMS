@@ -19,6 +19,7 @@ class SupplierProductController extends Controller
                 ->select(
                     'supplier_products.*',
                     'suppliers.supplier_name',
+                    'product.hsn_code',
                     DB::raw("COALESCE(NULLIF(TRIM(product.name), ''), NULLIF(TRIM(supplier_products.supplier_product_name), '')) as product_name")
                 )
                 ->whereNotNull('product.name')

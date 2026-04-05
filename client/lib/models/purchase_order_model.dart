@@ -168,6 +168,7 @@ class PurchaseOrderItem {
   final int? purchaseOrderId;
   final int productId;
   final String? productName;
+  final String? hsnCode;
   final int? lineNo;
   final String? unit;
   final double quantity;
@@ -187,6 +188,7 @@ class PurchaseOrderItem {
     this.purchaseOrderId,
     required this.productId,
     this.productName,
+    this.hsnCode,
     this.lineNo,
     this.unit,
     required this.quantity,
@@ -234,6 +236,11 @@ class PurchaseOrderItem {
       purchaseOrderId: poId,
       productId: int.tryParse(json['product_id']?.toString() ?? '') ?? 0,
       productName: _productNameFromJson(json),
+      hsnCode: json['hsn_code']?.toString() ??
+          json['hsn']?.toString() ??
+          (json['product'] is Map<String, dynamic>
+              ? (json['product'] as Map<String, dynamic>)['hsn_code']?.toString()
+              : null),
       lineNo: int.tryParse(json['line_no']?.toString() ?? ''),
       unit: json['unit']?.toString(),
       quantity: qty,
@@ -253,6 +260,7 @@ class PurchaseOrderItem {
       if (purchaseOrderId != null) 'purchase_order_id': purchaseOrderId,
       'product_id': productId,
       if (productName != null) 'product_name': productName,
+      if (hsnCode != null) 'hsn_code': hsnCode,
       if (lineNo != null) 'line_no': lineNo,
       if (unit != null) 'unit': unit,
       'quantity': quantity,

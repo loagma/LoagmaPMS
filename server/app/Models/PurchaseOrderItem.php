@@ -11,6 +11,7 @@ class PurchaseOrderItem extends Model
         'product_id',
         'line_no',
         'unit',
+        'hsn_code',
         'quantity',
         'price',
         'discount_percent',

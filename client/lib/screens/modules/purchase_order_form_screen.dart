@@ -947,6 +947,11 @@ class _ProductPicker extends StatelessWidget {
                         if (pid != null) {
                           row.productId.value = pid;
                           row.productName.value = product['name']?.toString() ?? '';
+                          row.hsnCode.value =
+                              product['hsn_code']?.toString() ??
+                              product['hsn']?.toString() ??
+                              product['hsnCode']?.toString() ??
+                              '';
                           await controller.applyProductTaxesToRow(row, pid);
                           state.didChange(pid);
                           state.validate();
@@ -976,6 +981,21 @@ class _ProductPicker extends StatelessWidget {
                 ),
               ),
             ),
+            Obx(() {
+              if (row.productId.value == null) return const SizedBox.shrink();
+              final hsn = row.hsnCode.value.trim();
+              final display = hsn.isEmpty ? 'NA' : hsn;
+              return Padding(
+                padding: const EdgeInsets.only(left: 12, top: 4),
+                child: Text(
+                  'HSN: $display',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              );
+            }),
             if (state.hasError)
               Padding(
                 padding: const EdgeInsets.only(left: 12, top: 4),

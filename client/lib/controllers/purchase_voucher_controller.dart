@@ -1017,6 +1017,7 @@ class PurchaseVoucherController extends GetxController {
           name: item.productName?.trim().isEmpty == true
               ? 'Product ${item.productId}'
               : (item.productName ?? 'Product ${item.productId}'),
+          hsnCode: item.hsnCode,
           productType: 'SINGLE',
           defaultUnit: item.unit,
         );

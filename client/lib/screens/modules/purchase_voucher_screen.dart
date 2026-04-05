@@ -1218,6 +1218,21 @@ class _ProductPickerField extends StatelessWidget {
                 ),
               ),
             ),
+            Obx(() {
+              if (row.product.value == null) return const SizedBox.shrink();
+              final hsn = row.hsnCode.value.trim();
+              final display = hsn.isEmpty ? 'NA' : hsn;
+              return Padding(
+                padding: const EdgeInsets.only(left: 12, top: 4),
+                child: Text(
+                  'HSN: $display',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              );
+            }),
             if (state.hasError)
               Padding(
                 padding: const EdgeInsets.only(left: 12, top: 4),
@@ -1359,12 +1374,9 @@ class _PVProductSearchDialogState extends State<_PVProductSearchDialog> {
                       itemCount: _filtered.length,
                       itemBuilder: (context, i) {
                         final p = _filtered[i];
-                        final subtitle = p.hsnCode?.trim().isNotEmpty == true
-                            ? 'ID: ${p.id}   HSN: ${p.hsnCode}'
-                            : 'ID: ${p.id}';
                         return ListTile(
                           title: Text(p.name),
-                          subtitle: Text(subtitle),
+                          subtitle: Text('ID: ${p.id}'),
                           onTap: () => Navigator.pop(context, p),
                         );
                       },
