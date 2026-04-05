@@ -849,22 +849,26 @@ class _ItemRow extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: Text(
-                  'Item ${index + 1}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primaryDark,
+              Obx(() {
+                final hsn = row.hsnCode.value.trim();
+                final hsnText = hsn.isEmpty ? 'NA' : hsn;
+                return Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(5),
                   ),
-                ),
-              ),
+                  child: Text(
+                    'Item ${index + 1}  |  HSN: $hsnText',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryDark,
+                    ),
+                  ),
+                );
+              }),
               const Spacer(),
               SizedBox(
                 width: 30,
@@ -1218,21 +1222,6 @@ class _ProductPickerField extends StatelessWidget {
                 ),
               ),
             ),
-            Obx(() {
-              if (row.product.value == null) return const SizedBox.shrink();
-              final hsn = row.hsnCode.value.trim();
-              final display = hsn.isEmpty ? 'NA' : hsn;
-              return Padding(
-                padding: const EdgeInsets.only(left: 12, top: 4),
-                child: Text(
-                  'HSN: $display',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-              );
-            }),
             if (state.hasError)
               Padding(
                 padding: const EdgeInsets.only(left: 12, top: 4),
