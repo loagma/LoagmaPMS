@@ -8,6 +8,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class PurchaseOrderController extends Controller
@@ -84,11 +86,16 @@ class PurchaseOrderController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $departmentRules = ['nullable', 'string', 'max:10'];
+        if ($departmentTable = $this->resolveDepartmentTable()) {
+            $departmentRules[] = Rule::exists($departmentTable, 'id');
+        }
+
         $validated = $request->validate([
             'financial_year' => 'required|string|max:10',
             'supplier_id' => 'required|integer|exists:suppliers,id',
             'salesman_id' => 'nullable|string|max:191|exists:users,id',
-            'department_id' => 'nullable|string|max:10|exists:Department,id',
+            'department_id' => $departmentRules,
             'doc_date' => 'required|date',
             'expected_date' => 'nullable|date',
             'status' => 'nullable|in:DRAFT,SENT,PARTIALLY_RECEIVED,CLOSED,CANCELLED',
@@ -186,11 +193,16 @@ class PurchaseOrderController extends Controller
 
     public function update(Request $request, int $id): JsonResponse
     {
+        $departmentRules = ['nullable', 'string', 'max:10'];
+        if ($departmentTable = $this->resolveDepartmentTable()) {
+            $departmentRules[] = Rule::exists($departmentTable, 'id');
+        }
+
         $validated = $request->validate([
             'financial_year' => 'sometimes|string|max:10',
             'supplier_id' => 'sometimes|integer|exists:suppliers,id',
             'salesman_id' => 'nullable|string|max:191|exists:users,id',
-            'department_id' => 'nullable|string|max:10|exists:Department,id',
+            'department_id' => $departmentRules,
             'doc_date' => 'sometimes|date',
             'expected_date' => 'nullable|date',
             'status' => 'nullable|in:DRAFT,SENT,PARTIALLY_RECEIVED,CLOSED,CANCELLED',
@@ -363,6 +375,23 @@ class PurchaseOrderController extends Controller
         }
 
         return [$normalized, round($total, 2)];
+    }
+
+    private function resolveDepartmentTable(): ?string
+    {
+        if (Schema::hasTable('department_crm')) {
+            return 'department_crm';
+        }
+
+        if (Schema::hasTable('Department')) {
+            return 'Department';
+        }
+
+        if (Schema::hasTable('departments')) {
+            return 'departments';
+        }
+
+        return null;
     }
 
     private function generatePoNumber(string $financialYear): string

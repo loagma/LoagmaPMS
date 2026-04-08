@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 
 import '../../controllers/purchase_voucher_controller.dart';
 import '../../models/purchase_order_model.dart';
@@ -321,7 +322,21 @@ class _LinkToPODialogState extends State<_LinkToPODialog> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final horizontalInset = screenWidth < 600 ? 12.0 : 24.0;
+    final availableDialogWidth = screenWidth - (horizontalInset * 2);
+    final dialogWidth = availableDialogWidth > 520
+        ? 520.0
+        : (availableDialogWidth < 280 ? 280.0 : availableDialogWidth);
+    final dialogHeight = screenHeight < 720
+        ? 330.0
+        : (screenHeight * 0.52).clamp(330.0, 380.0);
+
     return AlertDialog(
+      insetPadding: EdgeInsets.symmetric(horizontal: horizontalInset, vertical: 24),
+      contentPadding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       title: Row(
         children: [
           const Icon(Icons.link_rounded, color: AppColors.primary, size: 24),
@@ -338,8 +353,8 @@ class _LinkToPODialogState extends State<_LinkToPODialog> {
         ],
       ),
       content: SizedBox(
-        width: 400,
-        height: 400,
+        width: dialogWidth,
+        height: dialogHeight,
         child: _loading
             ? const Center(
                 child: Column(
@@ -386,6 +401,7 @@ class _LinkToPODialogState extends State<_LinkToPODialog> {
                               final docDate = po['doc_date']?.toString() ?? '';
                               final status = po['status']?.toString() ?? '';
                               if (id == null) return const SizedBox.shrink();
+                              final formattedDate = _formatPurchaseOrderDate(docDate);
                               return ListTile(
                                 leading: CircleAvatar(
                                   backgroundColor: AppColors.primaryLight.withValues(alpha: 0.3),
@@ -396,7 +412,11 @@ class _LinkToPODialogState extends State<_LinkToPODialog> {
                                   style: const TextStyle(fontWeight: FontWeight.w600),
                                 ),
                                 subtitle: Text(
-                                  [if (supplier.isNotEmpty) supplier, if (docDate.isNotEmpty) docDate, status]
+                                  [
+                                    if (supplier.isNotEmpty) supplier,
+                                    if (formattedDate.isNotEmpty) formattedDate,
+                                    status,
+                                  ]
                                       .where((e) => e.isNotEmpty)
                                       .join(' · '),
                                   style: const TextStyle(fontSize: 12),
@@ -449,6 +469,21 @@ class _LinkToPODialogState extends State<_LinkToPODialog> {
       ],
     );
   }
+}
+
+String _formatPurchaseOrderDate(String rawValue) {
+  final raw = rawValue.trim();
+  if (raw.isEmpty) return '';
+
+  final parsed = DateTime.tryParse(raw);
+  if (parsed == null) {
+    if (raw.length >= 10 && raw.contains('T')) {
+      return raw.substring(0, 10);
+    }
+    return raw;
+  }
+
+  return DateFormat('dd MMM yyyy').format(parsed.toLocal());
 }
 
 class _HeaderCard extends StatelessWidget {
@@ -595,7 +630,8 @@ class _HeaderCard extends StatelessWidget {
                     .map((id) => 'PO #$id')
                     .toList();
 
-            return Row(
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 OutlinedButton.icon(
                   onPressed: controller.vendorId.value == null
@@ -614,33 +650,31 @@ class _HeaderCard extends StatelessWidget {
                   ),
                 ),
                 if (linkedPoLabels.isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: linkedPoLabels
-                            .map(
-                              (poLabel) => Container(
-                                margin: const EdgeInsets.only(right: 6),
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primaryLight.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: AppColors.primaryLight),
-                                ),
-                                child: Text(
-                                  poLabel,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.primaryDark,
-                                  ),
+                  const SizedBox(height: 8),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: linkedPoLabels
+                          .map(
+                            (poLabel) => Container(
+                              margin: const EdgeInsets.only(right: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryLight.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.primaryLight),
+                              ),
+                              child: Text(
+                                poLabel,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.primaryDark,
                                 ),
                               ),
-                            )
-                            .toList(),
-                      ),
+                            ),
+                          )
+                          .toList(),
                     ),
                   ),
                 ],
@@ -915,108 +949,117 @@ class _ItemRow extends StatelessWidget {
             row: row,
             excludeIds: excludeIds.toSet(),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
                 flex: 2,
-                child: Obx(() => TextFormField(
-                      initialValue: row.quantity.value,
-                      decoration: _pvInputDecoration(
-                        labelText: 'Qty *',
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(
-                            RegExp(r'^\d+\.?\d{0,4}')),
-                      ],
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Required';
-                        }
-                        final qty = double.tryParse(value);
-                        if (qty == null || qty <= 0) return 'Must be > 0';
-                        return null;
-                      },
-                      onChanged: (value) {
-                        row.quantity.value = value;
-                        controller.recalcItemRow(row);
-                      },
-                    )),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Obx(() => TextFormField(
+                        initialValue: row.quantity.value,
+                        decoration: _pvInputDecoration(
+                          labelText: 'Qty *',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d+\.?\d{0,4}')),
+                        ],
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Required';
+                          }
+                          final qty = double.tryParse(value);
+                          if (qty == null || qty <= 0) return 'Must be > 0';
+                          return null;
+                        },
+                        onChanged: (value) {
+                          row.quantity.value = value;
+                          controller.recalcItemRow(row);
+                        },
+                      )),
+                ),
               ),
-              const SizedBox(width: 5),
+              const SizedBox(width: 8),
               Expanded(
                 flex: 2,
-                child: Obx(() {
-                  final units = controller.unitTypes.isEmpty
-                      ? ['Nos', 'KG', 'PCS', 'LTR']
-                      : controller.unitTypes;
-                  final value = units.contains(row.unitType.value)
-                      ? row.unitType.value
-                      : (units.isNotEmpty ? units.first : 'Nos');
-                  return DropdownButtonFormField<String>(
-                    value: value,
-                    decoration: _pvInputDecoration(
-                      labelText: 'Unit',
-                    ).copyWith(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 10,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Obx(() {
+                    final units = controller.unitTypes.isEmpty
+                        ? ['Nos', 'KG', 'PCS', 'LTR']
+                        : controller.unitTypes;
+                    final value = units.contains(row.unitType.value)
+                        ? row.unitType.value
+                        : (units.isNotEmpty ? units.first : 'Nos');
+                    return DropdownButtonFormField<String>(
+                      value: value,
+                      decoration: _pvInputDecoration(
+                        labelText: 'Unit',
+                      ).copyWith(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 10,
+                        ),
                       ),
-                    ),
-                    isDense: true,
-                    isExpanded: true,
-                    iconSize: 16,
-                    items: units
-                        .map(
-                          (u) => DropdownMenuItem(
-                            value: u,
-                            child: Text(
-                              u,
-                              style: const TextStyle(fontSize: 13),
-                              overflow: TextOverflow.ellipsis,
+                      isDense: true,
+                      isExpanded: true,
+                      iconSize: 16,
+                      items: units
+                          .map(
+                            (u) => DropdownMenuItem(
+                              value: u,
+                              child: Text(
+                                u,
+                                style: const TextStyle(fontSize: 13),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (v) {
-                      if (v != null) {
-                        row.unitType.value = v;
-                      }
-                    },
-                  );
-                }),
+                          )
+                          .toList(),
+                      onChanged: (v) {
+                        if (v != null) {
+                          row.unitType.value = v;
+                        }
+                      },
+                    );
+                  }),
+                ),
               ),
-              const SizedBox(width: 5),
+              const SizedBox(width: 8),
               Expanded(
                 flex: 2,
-                child: Obx(() => TextFormField(
-                      initialValue: row.unitPrice.value,
-                      decoration: _pvInputDecoration(
-                        labelText: 'Unit Price *',
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(
-                            RegExp(r'^\d+\.?\d{0,2}')),
-                      ],
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Required';
-                        }
-                        final p = double.tryParse(value);
-                        if (p == null || p < 0) return 'Must be >= 0';
-                        return null;
-                      },
-                      onChanged: (value) {
-                        row.unitPrice.value = value;
-                        controller.recalcItemRow(row);
-                      },
-                    )),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Obx(() => TextFormField(
+                        initialValue: row.unitPrice.value,
+                        decoration: _pvInputDecoration(
+                          labelText: 'Unit Price *',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d+\.?\d{0,2}')),
+                        ],
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Required';
+                          }
+                          final p = double.tryParse(value);
+                          if (p == null || p < 0) return 'Must be >= 0';
+                          return null;
+                        },
+                        onChanged: (value) {
+                          row.unitPrice.value = value;
+                          controller.recalcItemRow(row);
+                        },
+                      )),
+                ),
               ),
             ],
           ),
@@ -1121,7 +1164,7 @@ class _ItemRow extends StatelessWidget {
             );
           }),
         ),
-        const SizedBox(width: 5),
+        const SizedBox(width: 8),
         Expanded(
           child: Obx(() => _readOnlyAmountField(
                 label: 'Product Total',

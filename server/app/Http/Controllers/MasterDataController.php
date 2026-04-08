@@ -6,6 +6,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class MasterDataController extends Controller
 {
@@ -40,7 +41,15 @@ class MasterDataController extends Controller
     public function departments(Request $request): JsonResponse
     {
         try {
-            $query = DB::table('Department')
+            $departmentTable = $this->resolveDepartmentTable();
+            if ($departmentTable === null) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [],
+                ]);
+            }
+
+            $query = DB::table($departmentTable)
                 ->select('id', 'name', 'createdAt')
                 ->orderBy('name');
 
@@ -63,5 +72,22 @@ class MasterDataController extends Controller
                 'message' => 'Failed to fetch departments',
             ], 500);
         }
+    }
+
+    private function resolveDepartmentTable(): ?string
+    {
+        if (Schema::hasTable('department_crm')) {
+            return 'department_crm';
+        }
+
+        if (Schema::hasTable('Department')) {
+            return 'Department';
+        }
+
+        if (Schema::hasTable('departments')) {
+            return 'departments';
+        }
+
+        return null;
     }
 }

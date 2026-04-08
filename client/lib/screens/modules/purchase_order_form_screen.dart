@@ -592,99 +592,108 @@ class _ItemRow extends StatelessWidget {
               ),
             );
           }),
-          const SizedBox(height: 5),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
                 flex: 2,
-                child: Obx(() => TextFormField(
-                      enabled: !controller.isReadOnly,
-                      initialValue: row.quantity.value,
-                      decoration: _poInputDecoration(
-                        labelText: 'Qty *',
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,3}')),
-                      ],
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Required';
-                        final q = double.tryParse(v);
-                        if (q == null || q <= 0) return 'Must be > 0';
-                        return null;
-                      },
-                      onChanged: (v) => row.quantity.value = v,
-                    )),
-              ),
-              const SizedBox(width: 5),
-              Expanded(
-                flex: 2,
-                child: Obx(
-                  () {
-                    final units = controller.unitTypes.isEmpty
-                        ? ['KG', 'PCS', 'LTR', 'MTR', 'GM', 'ML']
-                        : controller.unitTypes;
-                    final current = row.unit.value;
-                    final value = units.contains(current) ? current : units.first;
-                    if (value != current && !controller.isReadOnly) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        row.unit.value = value;
-                      });
-                    }
-                    return DropdownButtonFormField<String>(
-                      value: value,
-                      decoration: _poInputDecoration(labelText: 'Unit')
-                          .copyWith(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 10,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Obx(() => TextFormField(
+                        enabled: !controller.isReadOnly,
+                        initialValue: row.quantity.value,
+                        decoration: _poInputDecoration(
+                          labelText: 'Qty *',
                         ),
-                      ),
-                      isDense: true,
-                      isExpanded: true,
-                      iconSize: 16,
-                      items: units
-                          .map(
-                            (u) => DropdownMenuItem(
-                              value: u,
-                              child: Text(
-                                u,
-                                style: const TextStyle(fontSize: 13),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: controller.isReadOnly
-                          ? null
-                          : (v) {
-                              if (v != null) row.unit.value = v;
-                            },
-                    );
-                  },
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,3}')),
+                        ],
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Required';
+                          final q = double.tryParse(v);
+                          if (q == null || q <= 0) return 'Must be > 0';
+                          return null;
+                        },
+                        onChanged: (v) => row.quantity.value = v,
+                      )),
                 ),
               ),
-              const SizedBox(width: 5),
+              const SizedBox(width: 8),
               Expanded(
                 flex: 2,
-                child: Obx(() => TextFormField(
-                      enabled: !controller.isReadOnly,
-                      initialValue: row.price.value,
-                      decoration: _poInputDecoration(
-                        labelText: 'Unit Price *',
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                      ],
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Required';
-                        final p = double.tryParse(v);
-                        if (p == null || p < 0) return 'Must be >= 0';
-                        return null;
-                      },
-                      onChanged: (v) => row.price.value = v,
-                    )),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Obx(
+                    () {
+                      final units = controller.unitTypes.isEmpty
+                          ? ['KG', 'PCS', 'LTR', 'MTR', 'GM', 'ML']
+                          : controller.unitTypes;
+                      final current = row.unit.value;
+                      final value = units.contains(current) ? current : units.first;
+                      if (value != current && !controller.isReadOnly) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          row.unit.value = value;
+                        });
+                      }
+                      return DropdownButtonFormField<String>(
+                        value: value,
+                        decoration: _poInputDecoration(labelText: 'Unit')
+                            .copyWith(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 10,
+                          ),
+                        ),
+                        isDense: true,
+                        isExpanded: true,
+                        iconSize: 16,
+                        items: units
+                            .map(
+                              (u) => DropdownMenuItem(
+                                value: u,
+                                child: Text(
+                                  u,
+                                  style: const TextStyle(fontSize: 13),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: controller.isReadOnly
+                            ? null
+                            : (v) {
+                                if (v != null) row.unit.value = v;
+                              },
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Obx(() => TextFormField(
+                        enabled: !controller.isReadOnly,
+                        initialValue: row.price.value,
+                        decoration: _poInputDecoration(
+                          labelText: 'Unit Price *',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                        ],
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Required';
+                          final p = double.tryParse(v);
+                          if (p == null || p < 0) return 'Must be >= 0';
+                          return null;
+                        },
+                        onChanged: (v) => row.price.value = v,
+                      )),
+                ),
               ),
             ],
           ),
@@ -772,7 +781,7 @@ class _ItemRow extends StatelessWidget {
                 value: (row.lineTotal - row.lineTotalExclTax).toStringAsFixed(2),
               )),
         ),
-        const SizedBox(width: 5),
+        const SizedBox(width: 8),
         Expanded(
           child: Obx(() => _readOnlyAmountField(
                 label: 'Product Total',
