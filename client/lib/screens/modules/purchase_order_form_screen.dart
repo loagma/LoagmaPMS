@@ -24,6 +24,10 @@ InputDecoration _poInputDecoration({
   );
 }
 
+const double _fieldGap = 10;
+const double _fieldVerticalGap = 6;
+const double _sectionGap = 10;
+
 Future<void> _pickPoDate(
   BuildContext context, {
   required String currentValue,
@@ -284,7 +288,7 @@ class _PurchaseOrderReportView extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: _sectionGap),
           ContentCard(
             title: 'Items',
             child: SingleChildScrollView(
@@ -295,7 +299,6 @@ class _PurchaseOrderReportView extends StatelessWidget {
                   headingRowColor: WidgetStateProperty.all(
                     AppColors.primaryLighter.withValues(alpha: 0.25),
                   ),
-                  dataRowMinHeight: 44,
                   dataRowMaxHeight: 62,
                   columnSpacing: 16,
                   columns: const [
@@ -401,7 +404,7 @@ class _PurchaseOrderReportView extends StatelessWidget {
               ),
             ),
           ],
-          const SizedBox(height: 6),
+          const SizedBox(height: _sectionGap),
           _SummaryCard(controller: controller),
         ],
       );
@@ -424,7 +427,7 @@ class _PurchaseOrderReportView extends StatelessWidget {
 
   Widget _metaRow(String label, String value, {bool isLast = false}) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: _sectionGap),
       decoration: BoxDecoration(
         border: Border(
           bottom: isLast
@@ -512,7 +515,7 @@ class _HeaderCard extends StatelessWidget {
               Expanded(
                 flex: 2,
                 child: SizedBox(
-                  height: 52,
+                  height: 48,
                   child: Obx(() {
                     final fy = controller.financialYear.value.trim();
                     final options = <String>{
@@ -548,7 +551,7 @@ class _HeaderCard extends StatelessWidget {
               Expanded(
                 flex: 2,
                 child: SizedBox(
-                  height: 52,
+                  height: 48,
                   child: Obx(() {
                     final poNumber = controller.currentPoNumber.value;
                     final seqValue = controller.currentPoSeq.value;
@@ -599,7 +602,7 @@ class _HeaderCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: _sectionGap),
           Obx(() {
             final list = controller.suppliers;
             return DropdownButtonFormField<int>(
@@ -648,7 +651,7 @@ class _HeaderCard extends StatelessWidget {
                   );
                 }),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: _fieldGap),
               Expanded(
                 child: Obx(() {
                   final list = controller.departments;
@@ -678,7 +681,7 @@ class _HeaderCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: _sectionGap),
           Row(
             children: [
               Expanded(
@@ -702,7 +705,7 @@ class _HeaderCard extends StatelessWidget {
                               ),
                     )),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: _fieldGap),
               Expanded(
                 child: Obx(() => TextFormField(
                       key: ValueKey('po-expected-date-${controller.expectedDate.value}'),
@@ -725,7 +728,7 @@ class _HeaderCard extends StatelessWidget {
             ],
           ),
           if (controller.isEditMode) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: _sectionGap),
             Obx(() => DropdownButtonFormField<String>(
                   value: controller.status.value,
                   decoration: _poInputDecoration(labelText: 'Status'),
@@ -745,7 +748,7 @@ class _HeaderCard extends StatelessWidget {
                         },
                 )),
           ],
-          const SizedBox(height: 6),
+          const SizedBox(height: _sectionGap),
           Obx(() => TextFormField(
                 enabled: !controller.isReadOnly,
                 initialValue: controller.narration.value,
@@ -757,8 +760,8 @@ class _HeaderCard extends StatelessWidget {
                     vertical: 8,
                   ),
                 ),
-                minLines: 2,
-                maxLines: 2,
+                minLines: 1,
+                maxLines: 1,
                 onChanged: controller.setNarration,
               )),
         ],
@@ -811,7 +814,7 @@ class _ItemsCard extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: _fieldVerticalGap),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
@@ -922,7 +925,7 @@ class _ItemRow extends StatelessWidget {
               Expanded(
                 flex: 2,
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 2),
+                  padding: const EdgeInsets.symmetric(vertical: _fieldVerticalGap),
                   child: Obx(() => TextFormField(
                         enabled: !controller.isReadOnly,
                         initialValue: row.quantity.value,
@@ -943,11 +946,11 @@ class _ItemRow extends StatelessWidget {
                       )),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: _fieldGap),
               Expanded(
                 flex: 2,
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 2),
+                  padding: const EdgeInsets.symmetric(vertical: _fieldVerticalGap),
                   child: Obx(
                     () {
                       final units = controller.unitTypes.isEmpty
@@ -994,11 +997,11 @@ class _ItemRow extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: _fieldGap),
               Expanded(
                 flex: 2,
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 2),
+                  padding: const EdgeInsets.symmetric(vertical: _fieldVerticalGap),
                   child: Obx(() => TextFormField(
                         enabled: !controller.isReadOnly,
                         initialValue: row.price.value,
@@ -1105,7 +1108,7 @@ class _ItemRow extends StatelessWidget {
                 value: (row.lineTotal - row.lineTotalExclTax).toStringAsFixed(2),
               )),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: _fieldGap),
         Expanded(
           child: Obx(() => _readOnlyAmountField(
                 label: 'Product Total',
@@ -1147,8 +1150,8 @@ class _AddonCard extends StatelessWidget {
               itemBuilder: (context, index) {
                 final charge = controller.charges[index];
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 5),
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: _fieldVerticalGap),
                   decoration: BoxDecoration(
                     color: AppColors.primaryLighter.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
@@ -1170,7 +1173,7 @@ class _AddonCard extends StatelessWidget {
                               ).copyWith(
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 8,
-                                  vertical: 5,
+                                  vertical: _fieldVerticalGap,
                                 ),
                               ),
                               isExpanded: true,
@@ -1190,7 +1193,7 @@ class _AddonCard extends StatelessWidget {
                                     },
                             )),
                       ),
-                      const SizedBox(width: 5),
+                      const SizedBox(width: _fieldGap),
                       Expanded(
                         child: TextFormField(
                           enabled: !controller.isReadOnly,
@@ -1206,7 +1209,7 @@ class _AddonCard extends StatelessWidget {
                         ),
                       ),
                       if (!controller.isReadOnly) ...[
-                        const SizedBox(width: 2),
+                        const SizedBox(width: _fieldGap),
                         SizedBox(
                           width: 30,
                           height: 30,
@@ -1237,7 +1240,7 @@ class _AddonCard extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: _fieldVerticalGap),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     visualDensity: VisualDensity.compact,
                   ),

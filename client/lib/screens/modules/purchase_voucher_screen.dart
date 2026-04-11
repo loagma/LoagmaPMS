@@ -28,6 +28,10 @@ InputDecoration _pvInputDecoration({
   );
 }
 
+const double _fieldGap = 10;
+const double _fieldVerticalGap = 6;
+const double _sectionGap = 10;
+
 Future<void> _pickDocumentDate(
   BuildContext context,
   PurchaseVoucherController controller,
@@ -225,13 +229,13 @@ class PurchaseVoucherScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               _HeaderCard(controller: controller),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: _sectionGap),
                               _ExtraGstCard(controller: controller),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: _sectionGap),
                               _ItemsCard(controller: controller),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: _sectionGap),
                               _ChargesCard(controller: controller),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: _sectionGap),
                               _SummaryCard(controller: controller),
                             ],
                           ),
@@ -310,7 +314,7 @@ class _VoucherReportView extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: _sectionGap),
           ContentCard(
             title: 'Items',
             child: SingleChildScrollView(
@@ -410,7 +414,7 @@ class _VoucherReportView extends StatelessWidget {
             ),
           ),
           if (controller.charges.isNotEmpty) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: _sectionGap),
             ContentCard(
               title: 'Charges',
               child: Column(
@@ -427,7 +431,7 @@ class _VoucherReportView extends StatelessWidget {
               ),
             ),
           ],
-          const SizedBox(height: 6),
+          const SizedBox(height: _sectionGap),
           _SummaryCard(controller: controller),
         ],
       );
@@ -840,7 +844,7 @@ class _HeaderCard extends StatelessWidget {
                       )),
                 ),
               ),
-              const SizedBox(width: 5),
+              const SizedBox(width: _fieldGap),
               Expanded(
                 flex: 2,
                 child: SizedBox(
@@ -909,7 +913,7 @@ class _HeaderCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: _sectionGap),
           Obx(() {
             final list = controller.suppliers;
             return DropdownButtonFormField<int>(
@@ -937,7 +941,7 @@ class _HeaderCard extends StatelessWidget {
               validator: (v) => v == null ? 'Please select Vendor' : null,
             );
           }),
-          const SizedBox(height: 6),
+          const SizedBox(height: _sectionGap),
           Obx(() {
             final linkedPoLabels = controller.linkedPoNumbers.isNotEmpty
                 ? controller.linkedPoNumbers.toList()
@@ -965,7 +969,7 @@ class _HeaderCard extends StatelessWidget {
                   ),
                 ),
                 if (linkedPoLabels.isNotEmpty) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: _sectionGap),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
@@ -996,7 +1000,7 @@ class _HeaderCard extends StatelessWidget {
               ],
             );
           }),
-          const SizedBox(height: 10),
+          const SizedBox(height: _sectionGap),
           Obx(() => TextFormField(
                 initialValue: controller.narration.value,
                 decoration: _pvInputDecoration(
@@ -1011,7 +1015,7 @@ class _HeaderCard extends StatelessWidget {
                 maxLines: 1,
                 onChanged: controller.setNarration,
               )),
-          const SizedBox(height: 8),
+          const SizedBox(height: _sectionGap),
           Row(
             children: [
               Expanded(
@@ -1027,7 +1031,7 @@ class _HeaderCard extends StatelessWidget {
                       onTap: () => _pickDocumentDate(context, controller),
                     )),
               ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: _fieldGap),
               Expanded(
                 child: Obx(() => TextFormField(
                       initialValue: controller.billNo.value,
@@ -1092,7 +1096,7 @@ class _ExtraGstCard extends StatelessWidget {
                       onChanged: controller.setPurchaseAgentId,
                     )),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: _fieldGap),
               Expanded(
                 child: TextFormField(
                   textCapitalization: TextCapitalization.characters,
@@ -1301,19 +1305,19 @@ class _ItemRow extends StatelessWidget {
               ),
             );
           }),
-          const SizedBox(height: 5),
+          const SizedBox(height: _sectionGap),
           _ProductPickerField(
             controller: controller,
             row: row,
             excludeIds: excludeIds.toSet(),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: _sectionGap),
           Row(
             children: [
               Expanded(
                 flex: 2,
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 2),
+                  padding: const EdgeInsets.symmetric(vertical: _fieldVerticalGap),
                   child: TextFormField(
                     controller: row.quantityController,
                     focusNode: row.quantityFocusNode,
@@ -1350,11 +1354,11 @@ class _ItemRow extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: _fieldGap),
               Expanded(
                 flex: 2,
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 2),
+                  padding: const EdgeInsets.symmetric(vertical: _fieldVerticalGap),
                   child: Obx(() {
                     final units = controller.unitTypes.isEmpty
                         ? ['Nos', 'KG', 'PCS', 'LTR']
@@ -1396,11 +1400,11 @@ class _ItemRow extends StatelessWidget {
                   }),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: _fieldGap),
               Expanded(
                 flex: 2,
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 2),
+                  padding: const EdgeInsets.symmetric(vertical: _fieldVerticalGap),
                   child: Obx(() => TextFormField(
                         initialValue: row.unitPrice.value,
                         decoration: _pvInputDecoration(
@@ -1531,7 +1535,7 @@ class _ItemRow extends StatelessWidget {
             );
           }),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: _fieldGap),
         Expanded(
           child: Obx(() => _readOnlyAmountField(
                 label: 'Product Total',
@@ -1864,8 +1868,8 @@ class _ChargesCard extends StatelessWidget {
               itemBuilder: (context, index) {
                 final row = controller.charges[index];
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 5),
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                  margin: const EdgeInsets.only(bottom: _sectionGap),
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: _fieldVerticalGap),
                   decoration: BoxDecoration(
                     color: AppColors.primaryLighter.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
@@ -1887,7 +1891,7 @@ class _ChargesCard extends StatelessWidget {
                               ).copyWith(
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 8,
-                                  vertical: 5,
+                                  vertical: _fieldVerticalGap,
                                 ),
                               ),
                               isExpanded: true,
@@ -1908,7 +1912,7 @@ class _ChargesCard extends StatelessWidget {
                               },
                             )),
                       ),
-                      const SizedBox(width: 5),
+                      const SizedBox(width: _fieldGap),
                       Expanded(
                         child: Obx(() => TextFormField(
                               initialValue: row.amount.value,
@@ -1921,7 +1925,7 @@ class _ChargesCard extends StatelessWidget {
                               onChanged: (v) => row.amount.value = v,
                             )),
                       ),
-                      const SizedBox(width: 2),
+                      const SizedBox(width: _fieldGap),
                       SizedBox(
                         width: 30,
                         height: 30,
