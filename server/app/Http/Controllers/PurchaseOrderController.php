@@ -26,6 +26,9 @@ class PurchaseOrderController extends Controller
             if ($request->filled('supplier_id')) {
                 $query->where('supplier_id', $request->input('supplier_id'));
             }
+            if ($request->boolean('exclude_closed')) {
+                $query->where('status', '!=', 'CLOSED');
+            }
             if ($request->filled('status')) {
                 $query->where('status', $request->input('status'));
             }

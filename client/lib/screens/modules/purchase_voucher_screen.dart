@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../../controllers/purchase_voucher_controller.dart';
 import '../../models/purchase_order_model.dart';
 import '../../models/product_model.dart';
+import '../../services/report_export_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 
@@ -54,14 +55,52 @@ Future<void> _pickDocumentDate(
   controller.setDocDate('${picked.year}-$month-$day');
 }
 
+Future<void> _printVoucherReport(PurchaseVoucherController controller) async {
+  try {
+    await ReportExportService.printPurchaseVoucher(controller);
+  } catch (e) {
+    Get.snackbar(
+      'Print failed',
+      'Could not generate voucher PDF: $e',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.redAccent,
+      colorText: Colors.white,
+    );
+  }
+}
+
+Future<void> _shareVoucherReport(PurchaseVoucherController controller) async {
+  try {
+    await ReportExportService.sharePurchaseVoucher(controller);
+  } catch (e) {
+    Get.snackbar(
+      'Share failed',
+      'Could not share voucher PDF: $e',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.redAccent,
+      colorText: Colors.white,
+    );
+  }
+}
+
 class PurchaseVoucherScreen extends StatelessWidget {
   final int? voucherId;
+  final bool? startInReportMode;
 
-  const PurchaseVoucherScreen({super.key, this.voucherId});
+  const PurchaseVoucherScreen({
+    super.key,
+    this.voucherId,
+    this.startInReportMode,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(PurchaseVoucherController(voucherId: voucherId));
+    final controller = Get.put(
+      PurchaseVoucherController(
+        voucherId: voucherId,
+        startInReportMode: startInReportMode ?? false,
+      ),
+    );
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -70,6 +109,30 @@ class PurchaseVoucherScreen extends StatelessWidget {
         subtitle: 'Record purchase invoice',
         onBackPressed: () => Get.back(),
         actions: [
+          Obx(() {
+            if (!controller.isReportMode) return const SizedBox.shrink();
+            return IconButton(
+              icon: const Icon(Icons.print_outlined, color: Colors.white),
+              tooltip: 'Print/PDF',
+              onPressed: () async => _printVoucherReport(controller),
+            );
+          }),
+          Obx(() {
+            if (!controller.isReportMode) return const SizedBox.shrink();
+            return IconButton(
+              icon: const Icon(Icons.share_outlined, color: Colors.white),
+              tooltip: 'Share/Export',
+              onPressed: () async => _shareVoucherReport(controller),
+            );
+          }),
+          Obx(() {
+            if (!controller.canEditFromReport) return const SizedBox.shrink();
+            return IconButton(
+              icon: const Icon(Icons.edit_rounded, color: Colors.white),
+              tooltip: 'Edit',
+              onPressed: controller.enterEditMode,
+            );
+          }),
           IconButton(
             icon: const Icon(Icons.help_outline_rounded, color: Colors.white),
             tooltip: 'Help',
@@ -102,33 +165,73 @@ class PurchaseVoucherScreen extends StatelessWidget {
           );
         }
 
-        return Form(
-          key: controller.formKey,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final maxWidth = constraints.maxWidth > 600
-                  ? 600.0
-                  : constraints.maxWidth - 32;
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final maxWidth = constraints.maxWidth > 600
+                ? 600.0
+                : constraints.maxWidth - 32;
 
+            if (controller.isReportMode) {
               return Column(
                 children: [
                   Expanded(
                     child: Center(
                       child: SingleChildScrollView(
-                          padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(8),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: maxWidth),
+                          child: _VoucherReportView(controller: controller),
+                        ),
+                      ),
+                    ),
+                  ),
+                  ActionButtonBar(
+                    buttons: [
+                      ActionButton(
+                        label: 'Back',
+                        onPressed: () => Get.back(),
+                      ),
+                      ActionButton(
+                        label: 'Print/PDF',
+                        onPressed: () async => _printVoucherReport(controller),
+                      ),
+                      ActionButton(
+                        label: 'Share',
+                        onPressed: () async => _shareVoucherReport(controller),
+                      ),
+                      if (controller.canEditFromReport)
+                        ActionButton(
+                          label: 'Edit Draft',
+                          isPrimary: true,
+                          onPressed: controller.enterEditMode,
+                        ),
+                    ],
+                  ),
+                ],
+              );
+            }
+
+            return Form(
+              key: controller.formKey,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Center(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(8),
                         child: ConstrainedBox(
                           constraints: BoxConstraints(maxWidth: maxWidth),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               _HeaderCard(controller: controller),
-                                const SizedBox(height: 6),
+                              const SizedBox(height: 6),
                               _ExtraGstCard(controller: controller),
-                                const SizedBox(height: 6),
+                              const SizedBox(height: 6),
                               _ItemsCard(controller: controller),
-                                const SizedBox(height: 6),
+                              const SizedBox(height: 6),
                               _ChargesCard(controller: controller),
-                                const SizedBox(height: 6),
+                              const SizedBox(height: 6),
                               _SummaryCard(controller: controller),
                             ],
                           ),
@@ -166,13 +269,225 @@ class PurchaseVoucherScreen extends StatelessWidget {
                     ),
                   ),
                 ],
-              );
-            },
-          ),
+              ),
+            );
+          },
         );
       }),
     );
   }
+}
+
+class _VoucherReportView extends StatelessWidget {
+  final PurchaseVoucherController controller;
+
+  const _VoucherReportView({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final docNo =
+          '${controller.docNoPrefix.value}${controller.docNoNumber.value.trim()}';
+      final rows = controller.items;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ContentCard(
+            title: 'Purchase Voucher Invoice',
+            child: Column(
+              children: [
+                _metaRow('Voucher No', docNo.trim().isEmpty ? '-' : docNo),
+                _metaRow('Status', controller.status.value),
+                _metaRow('Supplier', controller.vendorName.value.trim().isEmpty ? '-' : controller.vendorName.value.trim()),
+                _metaRow('Document Date', _normalizeDate(controller.docDate.value)),
+                _metaRow('Bill No', controller.billNo.value.trim().isEmpty ? '-' : controller.billNo.value.trim()),
+                _metaRow('Bill Date', _normalizeDate(controller.billDate.value)),
+                _metaRow('Purchase Type', controller.purchaseType.value.trim().isEmpty ? '-' : controller.purchaseType.value.trim()),
+                _metaRow('GST Reverse Charge', controller.gstReverseCharge.value.trim().isEmpty ? '-' : controller.gstReverseCharge.value.trim()),
+                _metaRow('Purchase Agent', controller.purchaseAgentId.value.trim().isEmpty ? '-' : controller.purchaseAgentId.value.trim()),
+                _metaRow('Linked PO', controller.linkedPoNumbers.isEmpty ? '-' : controller.linkedPoNumbers.join(', ')),
+                _metaRow('Narration', controller.narration.value.trim().isEmpty ? '-' : controller.narration.value.trim(), isLast: true),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          ContentCard(
+            title: 'Items',
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 1220),
+                child: DataTable(
+                  headingRowColor: WidgetStateProperty.all(
+                    AppColors.primaryLighter.withValues(alpha: 0.25),
+                  ),
+                  dataRowMinHeight: 44,
+                  dataRowMaxHeight: 62,
+                  columnSpacing: 16,
+                  columns: const [
+                    DataColumn(label: Text('#')),
+                    DataColumn(label: Text('Product')),
+                    DataColumn(label: Text('HSN')),
+                    DataColumn(label: Text('Unit')),
+                    DataColumn(label: Text('Qty')),
+                    DataColumn(label: Text('Rate')),
+                    DataColumn(label: Text('Taxable')),
+                    DataColumn(label: Text('SGST')),
+                    DataColumn(label: Text('CGST')),
+                    DataColumn(label: Text('IGST')),
+                    DataColumn(label: Text('CESS')),
+                    DataColumn(label: Text('ROFF')),
+                    DataColumn(label: Text('PO')),
+                    DataColumn(label: Text('Used')),
+                    DataColumn(label: Text('Left')),
+                    DataColumn(label: Text('Over')),
+                    DataColumn(label: Text('Total')),
+                  ],
+                  rows: List<DataRow>.generate(rows.length, (i) {
+                    final row = rows[i];
+                    final qty = double.tryParse(row.quantity.value) ?? 0;
+                    final unitPrice = double.tryParse(row.unitPrice.value) ?? 0;
+                    final taxable = double.tryParse(row.taxableAmount.value) ?? (qty * unitPrice);
+                    final sgst = double.tryParse(row.sgst.value) ?? 0;
+                    final cgst = double.tryParse(row.cgst.value) ?? 0;
+                    final igst = double.tryParse(row.igst.value) ?? 0;
+                    final cess = double.tryParse(row.cess.value) ?? 0;
+                    final roff = double.tryParse(row.roff.value) ?? 0;
+                    final total = double.tryParse(row.value.value) ?? (taxable + sgst + cgst + igst + cess + roff);
+                    final used = double.tryParse(row.usedQty.value) ?? 0;
+                    final left = double.tryParse(row.leftQty.value) ?? 0;
+                    final overrun = double.tryParse(row.overrunQty.value) ?? 0;
+                    final overrunActive = overrun > 0.000001 || row.isOverrunApproved.value;
+
+                    return DataRow(
+                      color: overrunActive
+                          ? WidgetStateProperty.all(
+                              Colors.orange.withValues(alpha: 0.08),
+                            )
+                          : null,
+                      cells: [
+                        DataCell(Text('${i + 1}')),
+                        DataCell(SizedBox(width: 180, child: Text(row.productName.value.trim().isEmpty ? '-' : row.productName.value.trim(), maxLines: 2, overflow: TextOverflow.ellipsis))),
+                        DataCell(Text(row.hsnCode.value.trim().isEmpty ? '-' : row.hsnCode.value.trim())),
+                        DataCell(Text(row.unitType.value.trim().isEmpty ? '-' : row.unitType.value.trim())),
+                        DataCell(Text(qty.toStringAsFixed(1))),
+                        DataCell(Text(unitPrice.toStringAsFixed(2))),
+                        DataCell(Text(taxable.toStringAsFixed(2))),
+                        DataCell(Text(sgst.toStringAsFixed(2))),
+                        DataCell(Text(cgst.toStringAsFixed(2))),
+                        DataCell(Text(igst.toStringAsFixed(2))),
+                        DataCell(Text(cess.toStringAsFixed(2))),
+                        DataCell(Text(roff.toStringAsFixed(2))),
+                        DataCell(Text(row.sourcePoNumber.value.trim().isEmpty ? '-' : row.sourcePoNumber.value.trim())),
+                        DataCell(Text(used.toStringAsFixed(1))),
+                        DataCell(Text(left.toStringAsFixed(1))),
+                        DataCell(
+                          overrunActive
+                              ? Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.deepOrange.withValues(alpha: 0.14),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.deepOrange.withValues(alpha: 0.45)),
+                                  ),
+                                  child: Text(
+                                    '+${overrun.toStringAsFixed(1)}',
+                                    style: const TextStyle(
+                                      color: Colors.deepOrange,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                )
+                              : const Text('-'),
+                        ),
+                        DataCell(Text(total.toStringAsFixed(2))),
+                      ],
+                    );
+                  }),
+                ),
+              ),
+            ),
+          ),
+          if (controller.charges.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            ContentCard(
+              title: 'Charges',
+              child: Column(
+                children: controller.charges
+                    .map((row) => Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: _metaRow(
+                            row.name.value,
+                            (double.tryParse(row.amount.value) ?? 0)
+                                .toStringAsFixed(2),
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ),
+          ],
+          const SizedBox(height: 6),
+          _SummaryCard(controller: controller),
+        ],
+      );
+    });
+  }
+
+  String _normalizeDate(String raw) {
+    final text = raw.trim();
+    if (text.isEmpty) return '-';
+    final parsed = DateTime.tryParse(text);
+    if (parsed == null) {
+      if (text.length >= 10) return text.substring(0, 10);
+      return text;
+    }
+    final local = parsed.toLocal();
+    final m = local.month.toString().padLeft(2, '0');
+    final d = local.day.toString().padLeft(2, '0');
+    return '${local.year}-$m-$d';
+  }
+
+  Widget _metaRow(String label, String value, {bool isLast = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: isLast
+              ? BorderSide.none
+              : BorderSide(color: AppColors.primaryLight.withValues(alpha: 0.35)),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 122,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: AppColors.textDark,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  
 }
 
 Future<void> _showLinkToPurchaseOrderDialog(
@@ -719,6 +1034,10 @@ class _HeaderCard extends StatelessWidget {
                       decoration: _pvInputDecoration(
                         labelText: 'Bill No',
                       ),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
                       onChanged: controller.setBillNo,
                     )),
               ),
@@ -776,6 +1095,17 @@ class _ExtraGstCard extends StatelessWidget {
               const SizedBox(width: 6),
               Expanded(
                 child: TextFormField(
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: [
+                    TextInputFormatter.withFunction((oldValue, newValue) {
+                      final upper = newValue.text.toUpperCase();
+                      return newValue.copyWith(
+                        text: upper,
+                        selection: TextSelection.collapsed(offset: upper.length),
+                        composing: TextRange.empty,
+                      );
+                    }),
+                  ],
                   decoration: _pvInputDecoration(
                     labelText: 'Vehicle No',
                   ),

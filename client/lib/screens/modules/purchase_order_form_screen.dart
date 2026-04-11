@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/purchase_order_form_controller.dart';
+import '../../services/report_export_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 import 'purchase_order_list_screen.dart';
@@ -51,6 +52,34 @@ Future<void> _pickPoDate(
   onPicked('${picked.year}-$month-$day');
 }
 
+Future<void> _printPurchaseOrderReport(PurchaseOrderFormController controller) async {
+  try {
+    await ReportExportService.printPurchaseOrder(controller);
+  } catch (e) {
+    Get.snackbar(
+      'Print failed',
+      'Could not generate purchase order PDF: $e',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.redAccent,
+      colorText: Colors.white,
+    );
+  }
+}
+
+Future<void> _sharePurchaseOrderReport(PurchaseOrderFormController controller) async {
+  try {
+    await ReportExportService.sharePurchaseOrder(controller);
+  } catch (e) {
+    Get.snackbar(
+      'Share failed',
+      'Could not share purchase order PDF: $e',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.redAccent,
+      colorText: Colors.white,
+    );
+  }
+}
+
 class PurchaseOrderFormScreen extends StatelessWidget {
   final int? poId;
   final bool startInViewOnly;
@@ -77,6 +106,22 @@ class PurchaseOrderFormScreen extends StatelessWidget {
         subtitle: 'Loagma',
         onBackPressed: () => Get.back(),
         actions: [
+          Obx(() {
+            if (!controller.isReadOnly) return const SizedBox.shrink();
+            return IconButton(
+              icon: const Icon(Icons.print_outlined, color: Colors.white),
+              tooltip: 'Print/PDF',
+              onPressed: () async => _printPurchaseOrderReport(controller),
+            );
+          }),
+          Obx(() {
+            if (!controller.isReadOnly) return const SizedBox.shrink();
+            return IconButton(
+              icon: const Icon(Icons.share_outlined, color: Colors.white),
+              tooltip: 'Share/Export',
+              onPressed: () async => _sharePurchaseOrderReport(controller),
+            );
+          }),
           Obx(() {
             final canEdit = controller.viewOnly.value && controller.status.value == 'DRAFT';
             if (!canEdit) return const SizedBox.shrink();
@@ -123,6 +168,41 @@ class PurchaseOrderFormScreen extends StatelessWidget {
           );
         }
 
+        if (controller.isReadOnly) {
+          return Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(8),
+                  child: _PurchaseOrderReportView(controller: controller),
+                ),
+              ),
+              ActionButtonBar(
+                buttons: [
+                  ActionButton(
+                    label: 'Back',
+                    onPressed: () => Get.back(),
+                  ),
+                  ActionButton(
+                    label: 'Print/PDF',
+                    onPressed: () async => _printPurchaseOrderReport(controller),
+                  ),
+                  ActionButton(
+                    label: 'Share',
+                    onPressed: () async => _sharePurchaseOrderReport(controller),
+                  ),
+                  if (controller.status.value == 'DRAFT')
+                    ActionButton(
+                      label: 'Edit Draft',
+                      isPrimary: true,
+                      onPressed: () => controller.viewOnly.value = false,
+                    ),
+                ],
+              ),
+            ],
+          );
+        }
+
         return Form(
           key: controller.formKey,
           child: Column(
@@ -166,6 +246,250 @@ class PurchaseOrderFormScreen extends StatelessWidget {
           ),
         );
       }),
+    );
+  }
+}
+
+class _PurchaseOrderReportView extends StatelessWidget {
+  final PurchaseOrderFormController controller;
+
+  const _PurchaseOrderReportView({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final poNumber = controller.currentPoNumber.value.trim().isEmpty
+          ? (controller.currentPoSeq.value?.toString() ?? '-')
+          : controller.currentPoNumber.value.trim();
+      final supplier = controller.suppliers.firstWhere(
+        (s) => s['id'] == controller.supplierId.value,
+        orElse: () => <String, dynamic>{},
+      );
+      final supplierName = supplier['supplier_name']?.toString() ?? 'Supplier';
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ContentCard(
+            title: 'Purchase Order Invoice',
+            child: Column(
+              children: [
+                _metaRow('PO Number', poNumber),
+                _metaRow('Status', controller.status.value),
+                _metaRow('Supplier', supplierName),
+                _metaRow('Document Date', _normalizeDate(controller.docDate.value)),
+                _metaRow('Expected Date', _normalizeDate(controller.expectedDate.value)),
+                _metaRow('Financial Year', controller.financialYear.value.trim().isEmpty ? '-' : controller.financialYear.value.trim()),
+                _metaRow('Narration', controller.narration.value.trim().isEmpty ? '-' : controller.narration.value.trim(), isLast: true),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          ContentCard(
+            title: 'Items',
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 1240),
+                child: DataTable(
+                  headingRowColor: WidgetStateProperty.all(
+                    AppColors.primaryLighter.withValues(alpha: 0.25),
+                  ),
+                  dataRowMinHeight: 44,
+                  dataRowMaxHeight: 62,
+                  columnSpacing: 16,
+                  columns: const [
+                    DataColumn(label: Text('#')),
+                    DataColumn(label: Text('Product')),
+                    DataColumn(label: Text('HSN')),
+                    DataColumn(label: Text('Unit')),
+                    DataColumn(label: Text('Qty')),
+                    DataColumn(label: Text('Used')),
+                    DataColumn(label: Text('Left')),
+                    DataColumn(label: Text('Rate')),
+                    DataColumn(label: Text('Disc %')),
+                    DataColumn(label: Text('Tax %')),
+                    DataColumn(label: Text('Rate+Tax')),
+                    DataColumn(label: Text('Taxable')),
+                    DataColumn(label: Text('Total')),
+                    DataColumn(label: Text('Description')),
+                    DataColumn(label: Text('Flag')),
+                  ],
+                  rows: List<DataRow>.generate(controller.items.length, (i) {
+                    final row = controller.items[i];
+                    final qty = double.tryParse(row.quantity.value) ?? 0;
+                    final used = double.tryParse(row.usedQty.value) ?? 0;
+                    final left = double.tryParse(row.leftQty.value) ?? 0;
+                    final rate = double.tryParse(row.price.value) ?? 0;
+                    final disc = double.tryParse(row.discountPercent.value) ?? 0;
+                    final tax = double.tryParse(row.taxPercent.value) ?? 0;
+                    final overUsed = used > qty + 0.000001;
+
+                    return DataRow(
+                      color: overUsed
+                          ? WidgetStateProperty.all(
+                              Colors.orange.withValues(alpha: 0.08),
+                            )
+                          : null,
+                      cells: [
+                        DataCell(Text('${i + 1}')),
+                        DataCell(SizedBox(width: 170, child: Text(row.productName.value.trim().isEmpty ? '-' : row.productName.value.trim(), maxLines: 2, overflow: TextOverflow.ellipsis))),
+                        DataCell(Text(row.hsnCode.value.trim().isEmpty ? '-' : row.hsnCode.value.trim())),
+                        DataCell(Text(row.unit.value.trim().isEmpty ? '-' : row.unit.value.trim())),
+                        DataCell(Text(qty.toStringAsFixed(1))),
+                        DataCell(
+                          overUsed
+                              ? Text(
+                                  used.toStringAsFixed(1),
+                                  style: const TextStyle(
+                                    color: Colors.deepOrange,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                )
+                              : Text(used.toStringAsFixed(1)),
+                        ),
+                        DataCell(Text(left.toStringAsFixed(1))),
+                        DataCell(Text(rate.toStringAsFixed(2))),
+                        DataCell(Text(disc.toStringAsFixed(2))),
+                        DataCell(Text(tax.toStringAsFixed(2))),
+                        DataCell(Text(row.priceInclTax.toStringAsFixed(2))),
+                        DataCell(Text(row.lineTotalExclTax.toStringAsFixed(2))),
+                        DataCell(Text(row.lineTotal.toStringAsFixed(2))),
+                        DataCell(SizedBox(width: 160, child: Text(row.description.value.trim().isEmpty ? '-' : row.description.value.trim(), maxLines: 2, overflow: TextOverflow.ellipsis))),
+                        DataCell(
+                          overUsed
+                              ? Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.deepOrange.withValues(alpha: 0.14),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.deepOrange.withValues(alpha: 0.45)),
+                                  ),
+                                  child: const Text(
+                                    'EXTRA',
+                                    style: TextStyle(
+                                      color: Colors.deepOrange,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                )
+                              : const Text('-'),
+                        ),
+                      ],
+                    );
+                  }),
+                ),
+              ),
+            ),
+          ),
+          if (controller.charges.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            ContentCard(
+              title: 'Charges',
+              child: Column(
+                children: controller.charges
+                    .map((row) => Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: _reportMetaRow(
+                            row.name.value,
+                            (double.tryParse(row.amount.value) ?? 0)
+                                .toStringAsFixed(2),
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ),
+          ],
+          const SizedBox(height: 6),
+          _SummaryCard(controller: controller),
+        ],
+      );
+    });
+  }
+
+  String _normalizeDate(String raw) {
+    final text = raw.trim();
+    if (text.isEmpty) return '-';
+    final parsed = DateTime.tryParse(text);
+    if (parsed == null) {
+      if (text.length >= 10) return text.substring(0, 10);
+      return text;
+    }
+    final local = parsed.toLocal();
+    final m = local.month.toString().padLeft(2, '0');
+    final d = local.day.toString().padLeft(2, '0');
+    return '${local.year}-$m-$d';
+  }
+
+  Widget _metaRow(String label, String value, {bool isLast = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: isLast
+              ? BorderSide.none
+              : BorderSide(color: AppColors.primaryLight.withValues(alpha: 0.35)),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 122,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: AppColors.textDark,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  
+
+  Widget _reportMetaRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 120,
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              color: AppColors.textDark,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

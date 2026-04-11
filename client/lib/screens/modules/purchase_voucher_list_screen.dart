@@ -87,7 +87,10 @@ class PurchaseVoucherListScreen extends StatelessWidget {
                 voucher: voucher,
                 onTap: () async {
                   final result = await Get.to(
-                    () => PurchaseVoucherScreen(voucherId: voucher.id),
+                    () => PurchaseVoucherScreen(
+                      voucherId: voucher.id,
+                      startInReportMode: true,
+                    ),
                   );
                   if (result == true) {
                     controller.fetchVouchers();

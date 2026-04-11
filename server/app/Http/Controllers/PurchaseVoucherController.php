@@ -475,7 +475,7 @@ class PurchaseVoucherController extends Controller
             'vendor_id' => $vendorRule,
             'supplier_id' => $supplierRule,
             'doc_date' => $isUpdate ? 'sometimes|date' : 'required|date',
-            'bill_no' => $isUpdate ? 'sometimes|nullable|string|max:100' : 'nullable|string|max:100',
+            'bill_no' => $isUpdate ? 'sometimes|nullable|regex:/^\d+$/|max:100' : 'nullable|regex:/^\d+$/|max:100',
             'bill_date' => 'nullable|date',
             'narration' => 'nullable|string',
             'do_not_update_inventory' => 'nullable|boolean',

@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 
 import '../api_config.dart';
+import '../constants/charge_constants.dart';
 import '../models/purchase_order_model.dart';
 
 class PurchaseOrderFormController extends GetxController {
@@ -40,13 +41,7 @@ class PurchaseOrderFormController extends GetxController {
   final isLoading = false.obs;
   final isSaving = false.obs;
 
-  static const List<String> chargeTypeNames = [
-    'Hamali',
-    'Freight',
-    'Round off',
-    'Discount',
-    'Others',
-  ];
+  static const List<String> chargeTypeNames = addonChargeTypeNames;
 
   PurchaseOrderFormController({this.poId, this.startInViewOnly = false});
 
@@ -512,6 +507,8 @@ class PurchaseOrderFormController extends GetxController {
         productName: item.productName,
         hsnCode: item.hsnCode,
         quantity: item.quantity.toString(),
+        usedQty: item.usedQty.toString(),
+        leftQty: item.leftQty.toString(),
         price: item.price.toString(),
         discountPercent: item.discountPercent?.toString() ?? '',
         taxPercent: item.taxPercent?.toString() ?? '',
@@ -660,6 +657,8 @@ class PurchaseOrderFormController extends GetxController {
               productName: item.productName,
               hsnCode: item.hsnCode,
               quantity: item.quantity.toString(),
+              usedQty: item.usedQty.toString(),
+              leftQty: item.leftQty.toString(),
               price: item.price.toString(),
               discountPercent: item.discountPercent?.toString() ?? '',
               taxPercent: item.taxPercent?.toString() ?? '',
@@ -950,6 +949,8 @@ class POLineRow {
   final productName = ''.obs;
   final hsnCode = ''.obs;
   final quantity = '1'.obs;
+  final usedQty = '0'.obs;
+  final leftQty = '0'.obs;
   final price = '0'.obs;
   final discountPercent = ''.obs;
   final taxPercent = ''.obs;
@@ -972,6 +973,8 @@ class POLineRow {
     String? productName,
     String? hsnCode,
     String? quantity,
+    String? usedQty,
+    String? leftQty,
     String? price,
     String? discountPercent,
     String? taxPercent,
@@ -982,6 +985,8 @@ class POLineRow {
     if (productName != null) this.productName.value = productName;
     if (hsnCode != null) this.hsnCode.value = hsnCode;
     if (quantity != null) this.quantity.value = quantity;
+    if (usedQty != null) this.usedQty.value = usedQty;
+    if (leftQty != null) this.leftQty.value = leftQty;
     if (price != null) this.price.value = price;
     if (discountPercent != null) this.discountPercent.value = discountPercent;
     if (taxPercent != null) this.taxPercent.value = taxPercent;

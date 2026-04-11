@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 
 import '../api_config.dart';
+import '../constants/charge_constants.dart';
 import '../models/product_model.dart';
 import '../models/purchase_order_model.dart';
 import '../theme/app_colors.dart';
@@ -15,7 +16,10 @@ import 'purchase_voucher_list_controller.dart';
 class PurchaseVoucherController extends GetxController {
   final formKey = GlobalKey<FormState>();
   final int? voucherId;
+  final bool? startInReportMode;
   final activeVoucherId = RxnInt();
+  final status = 'DRAFT'.obs;
+  final viewOnly = false.obs;
 
   // Header
   final docNoPrefix = '25-26/'.obs;
@@ -36,13 +40,7 @@ class PurchaseVoucherController extends GetxController {
   final salesmen = <Map<String, dynamic>>[].obs;
   final products = <Product>[].obs;
   final unitTypes = <String>[].obs;
-  static const List<String> chargeTypeNames = [
-    'Freight',
-    'VATInputAmount',
-    'T.C.S',
-    'Others',
-    'Discount',
-  ];
+  static const List<String> chargeTypeNames = addonChargeTypeNames;
 
   final items = <PVItemRow>[].obs;
   final charges = <PVChargeRow>[].obs;
@@ -64,7 +62,7 @@ class PurchaseVoucherController extends GetxController {
   /// Parsed numeric sequence from docNoNumber/docNo used for navigation.
   final RxnInt currentSeq = RxnInt();
 
-  PurchaseVoucherController({this.voucherId});
+  PurchaseVoucherController({this.voucherId, this.startInReportMode});
 
   int? _safeInt(dynamic raw) {
     if (raw is int) return raw;
@@ -76,6 +74,7 @@ class PurchaseVoucherController extends GetxController {
   void onInit() {
     super.onInit();
     activeVoucherId.value = voucherId;
+    viewOnly.value = startInReportMode ?? false;
     _loadSuppliers();
     _loadSalesmen();
     _loadUnitTypes();
@@ -91,6 +90,12 @@ class PurchaseVoucherController extends GetxController {
   }
 
   bool get isEditMode => activeVoucherId.value != null;
+  bool get isReportMode => viewOnly.value;
+  bool get canEditFromReport => isReportMode && status.value.toUpperCase() == 'DRAFT';
+
+  void enterEditMode() {
+    viewOnly.value = false;
+  }
 
   bool _isFixedTaxKey(String key) {
     final normalized = key.trim().toUpperCase();
@@ -853,6 +858,7 @@ class PurchaseVoucherController extends GetxController {
       gstReverseCharge.value = v['gst_reverse_charge']?.toString() ?? 'N';
       billDate.value = v['bill_date']?.toString() ?? '';
       purchaseAgentId.value = v['purchase_agent_id']?.toString() ?? '';
+      status.value = v['status']?.toString() ?? 'DRAFT';
 
       final headerPoId = int.tryParse(v['purchase_order_id']?.toString() ?? '');
       if (headerPoId != null && !linkedPurchaseOrderIds.contains(headerPoId)) {
@@ -1050,6 +1056,12 @@ class PurchaseVoucherController extends GetxController {
     charges.add(PVChargeRow());
   }
 
+  bool _isPlaceholderChargeRow(PVChargeRow row) {
+    return row.name.value.trim().isEmpty &&
+        (double.tryParse(row.amount.value) ?? 0) == 0 &&
+        row.remarks.value.trim().isEmpty;
+  }
+
   void removeChargeRow(int index) {
     if (index >= 0 && index < charges.length) charges.removeAt(index);
   }
@@ -1105,6 +1117,7 @@ class PurchaseVoucherController extends GetxController {
       final uri = Uri.parse(ApiConfig.purchaseOrders).replace(
         queryParameters: {
           'limit': '50',
+          'exclude_closed': '1',
           if (supplierId != null) 'supplier_id': supplierId.toString(),
           if (search != null && search.trim().isNotEmpty)
             'search': search.trim(),
@@ -1119,13 +1132,16 @@ class PurchaseVoucherController extends GetxController {
       if (data['success'] != true) return [];
       final List list = data['data'] ?? [];
       return list
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .where((e) => (e['status']?.toString().toUpperCase() ?? '') != 'CLOSED')
           .map((e) => {
-                'id': (e as Map)['id'],
-                'supplier_id': (e)['supplier_id'],
-                'po_number': (e)['po_number']?.toString(),
-                'supplier_name': (e)['supplier_name']?.toString() ?? (e)['supplier']?['supplier_name']?.toString(),
-                'doc_date': (e)['doc_date']?.toString(),
-                'status': (e)['status']?.toString(),
+                'id': e['id'],
+                'supplier_id': e['supplier_id'],
+                'po_number': e['po_number']?.toString(),
+                'supplier_name': e['supplier_name']?.toString() ?? (e['supplier'] as Map?)?['supplier_name']?.toString(),
+                'doc_date': e['doc_date']?.toString(),
+                'status': e['status']?.toString(),
               })
           .toList();
     } catch (e) {
@@ -1165,6 +1181,8 @@ class PurchaseVoucherController extends GetxController {
     if (items.length == 1 && _isPlaceholderItemRow(items.first)) {
       items.clear();
     }
+
+    final importedCharges = <PVChargeRow>[];
 
     var addedCount = 0;
     for (final po in orders) {
@@ -1207,10 +1225,27 @@ class PurchaseVoucherController extends GetxController {
         items.add(row);
         addedCount++;
       }
+
+      for (final charge in po.chargesJson) {
+        importedCharges.add(
+          PVChargeRow()
+            ..name.value = charge.name.trim().isEmpty ? 'Others' : charge.name.trim()
+            ..amount.value = charge.amount.toStringAsFixed(2)
+            ..remarks.value = charge.remarks?.trim() ?? '',
+        );
+      }
     }
 
     if (items.isEmpty) {
       addItemRow();
+    }
+
+    charges
+      ..clear()
+      ..addAll(importedCharges);
+
+    if (charges.isEmpty) {
+      addChargeRow();
     }
 
     _showSuccess('Added $addedCount items from ${orders.length} purchase order(s)');
