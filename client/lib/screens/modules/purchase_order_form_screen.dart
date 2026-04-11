@@ -308,6 +308,7 @@ class _PurchaseOrderReportView extends StatelessWidget {
                     DataColumn(label: Text('Unit')),
                     DataColumn(label: Text('Qty')),
                     DataColumn(label: Text('Used')),
+                    DataColumn(label: Text('WO')),
                     DataColumn(label: Text('Left')),
                     DataColumn(label: Text('Rate')),
                     DataColumn(label: Text('Disc %')),
@@ -322,6 +323,7 @@ class _PurchaseOrderReportView extends StatelessWidget {
                     final row = controller.items[i];
                     final qty = double.tryParse(row.quantity.value) ?? 0;
                     final used = double.tryParse(row.usedQty.value) ?? 0;
+                    final writeoff = double.tryParse(row.writeoffQty.value) ?? 0;
                     final left = double.tryParse(row.leftQty.value) ?? 0;
                     final rate = double.tryParse(row.price.value) ?? 0;
                     final disc = double.tryParse(row.discountPercent.value) ?? 0;
@@ -351,6 +353,7 @@ class _PurchaseOrderReportView extends StatelessWidget {
                                 )
                               : Text(used.toStringAsFixed(1)),
                         ),
+                        DataCell(Text(writeoff.toStringAsFixed(1))),
                         DataCell(Text(left.toStringAsFixed(1))),
                         DataCell(Text(rate.toStringAsFixed(2))),
                         DataCell(Text(disc.toStringAsFixed(2))),

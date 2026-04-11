@@ -13,6 +13,7 @@ class PurchaseVoucherSummary {
   final String docDate;
   final String billNo;
   final String status;
+  final bool hasWriteoff;
 
   PurchaseVoucherSummary({
     required this.id,
@@ -21,6 +22,7 @@ class PurchaseVoucherSummary {
     required this.docDate,
     required this.billNo,
     required this.status,
+    required this.hasWriteoff,
   });
 }
 
@@ -81,6 +83,7 @@ class PurchaseVoucherListController extends GetxController {
                   item['doc_date']?.toString() ?? item['created_at']?.toString() ?? ''),
               billNo: item['bill_no']?.toString() ?? '',
               status: item['status']?.toString() ?? 'DRAFT',
+              hasWriteoff: item['has_writeoff'] == true,
             );
           }).toList();
         } else {

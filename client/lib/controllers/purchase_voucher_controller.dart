@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 
@@ -179,6 +180,114 @@ class PurchaseVoucherController extends GetxController {
     final qty = double.tryParse(row.quantity.value) ?? 0;
     final left = double.tryParse(row.leftQty.value) ?? 0;
     return qty > left + 0.0000001;
+  }
+
+  double _availableWriteoffQty(PVItemRow row) {
+    if (row.sourcePurchaseOrderItemId.value == null) return 0;
+    final left = double.tryParse(row.leftQty.value) ?? 0;
+    final qty = double.tryParse(row.quantity.value) ?? 0;
+    final remainingAfterReceipt = left - qty;
+    return remainingAfterReceipt > 0 ? remainingAfterReceipt : 0;
+  }
+
+  Future<void> openWriteOffDialog(PVItemRow row, {bool writeAll = false}) async {
+    if (row.sourcePurchaseOrderItemId.value == null) {
+      _showError('Write off is available only for linked PO lines');
+      return;
+    }
+
+    final maxQty = _availableWriteoffQty(row);
+    if (maxQty <= 0.0000001) {
+      _showError('No remaining quantity available for write off');
+      return;
+    }
+
+    if (writeAll) {
+      row.writeoffQty.value = maxQty.toStringAsFixed(3);
+      row.isWriteoff.value = maxQty > 0;
+      return;
+    }
+
+    final qtyController = TextEditingController(
+      text: (double.tryParse(row.writeoffQty.value) ?? 0) > 0
+          ? (double.tryParse(row.writeoffQty.value) ?? 0).toStringAsFixed(3)
+          : maxQty.toStringAsFixed(3),
+    );
+    final reasonController = TextEditingController(text: row.writeoffReason.value);
+
+    final result = await Get.dialog<Map<String, dynamic>>(
+      AlertDialog(
+        title: const Text('Write Off Quantity'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Remaining available: ${maxQty.toStringAsFixed(1)}',
+              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: qtyController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,3}')),
+              ],
+              decoration: const InputDecoration(labelText: 'Write Off Qty'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(labelText: 'Reason (optional)'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: {'clear': true}),
+            child: const Text('Clear'),
+          ),
+          TextButton(
+            onPressed: () => Get.back(result: {'qty': maxQty, 'reason': reasonController.text}),
+            child: const Text('Write Off All'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final qty = double.tryParse(qtyController.text.trim()) ?? 0;
+              Get.back(result: {'qty': qty, 'reason': reasonController.text});
+            },
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
+    );
+
+    qtyController.dispose();
+    reasonController.dispose();
+
+    if (result == null) return;
+    if (result['clear'] == true) {
+      row.writeoffQty.value = '0';
+      row.isWriteoff.value = false;
+      row.writeoffReason.value = '';
+      return;
+    }
+
+    final qty = ((result['qty'] as num?)?.toDouble()) ?? 0;
+    if (qty <= 0.0000001) {
+      row.writeoffQty.value = '0';
+      row.isWriteoff.value = false;
+      row.writeoffReason.value = '';
+      return;
+    }
+    if (qty > maxQty + 0.0000001) {
+      _showError('Write off cannot exceed ${maxQty.toStringAsFixed(3)} for this line');
+      return;
+    }
+
+    row.writeoffQty.value = qty.toStringAsFixed(3);
+    row.isWriteoff.value = true;
+    row.writeoffReason.value = (result['reason']?.toString() ?? '').trim();
   }
 
   Future<void> onQuantityEditCompleted(PVItemRow row) async {
@@ -909,6 +1018,9 @@ class PurchaseVoucherController extends GetxController {
       row.isOverrunApproved.value = map['is_overrun_approved'] == true;
       row.overrunQty.value = map['overrun_qty']?.toString() ?? '0';
       row.overrunReason.value = map['overrun_reason']?.toString() ?? '';
+      row.writeoffQty.value = map['writeoff_qty']?.toString() ?? '0';
+      row.isWriteoff.value = map['is_writeoff'] == true;
+      row.writeoffReason.value = map['writeoff_reason']?.toString() ?? '';
       row.taxableAmount.value = map['taxable_amount']?.toString() ?? '0';
       row.sgst.value = map['sgst']?.toString() ?? '0';
       row.cgst.value = map['cgst']?.toString() ?? '0';
@@ -1215,6 +1327,9 @@ class PurchaseVoucherController extends GetxController {
         row.orderedQty.value = item.quantity.toStringAsFixed(3);
         row.usedQty.value = item.usedQty.toStringAsFixed(3);
         row.leftQty.value = item.leftQty.toStringAsFixed(3);
+        row.writeoffQty.value = '0';
+        row.isWriteoff.value = false;
+        row.writeoffReason.value = '';
         row.unitType.value = item.unit ?? (unitTypes.isNotEmpty ? unitTypes.first : 'Nos');
         row.unitPrice.value = item.price.toStringAsFixed(2);
         row.taxableAmount.value = (item.quantity * item.price).toStringAsFixed(2);
@@ -1281,6 +1396,16 @@ class PurchaseVoucherController extends GetxController {
       }
       if (_isLinkedOverrun(row) && !row.isOverrunApproved.value) {
         _showError('Over quantity requires explicit acceptance on the line item');
+        return false;
+      }
+      final writeoff = double.tryParse(row.writeoffQty.value) ?? 0;
+      if (writeoff < 0) {
+        _showError('Write off quantity cannot be negative');
+        return false;
+      }
+      final maxWriteoff = _availableWriteoffQty(row);
+      if (writeoff > maxWriteoff + 0.0000001) {
+        _showError('Write off exceeds remaining quantity for a linked PO item');
         return false;
       }
       final price = double.tryParse(row.unitPrice.value);
@@ -1357,8 +1482,12 @@ class PurchaseVoucherController extends GetxController {
               'left_qty': double.tryParse(row.leftQty.value) ?? 0,
             'is_overrun_approved': row.isOverrunApproved.value,
             'overrun_qty': double.tryParse(row.overrunQty.value) ?? 0,
+            'is_writeoff': row.isWriteoff.value,
+            'writeoff_qty': double.tryParse(row.writeoffQty.value) ?? 0,
             if (row.overrunReason.value.trim().isNotEmpty)
               'overrun_reason': row.overrunReason.value.trim(),
+            if (row.writeoffReason.value.trim().isNotEmpty)
+              'writeoff_reason': row.writeoffReason.value.trim(),
             'unit_price': price,
             'taxable_amount': taxable,
             'sgst': sgst,
@@ -1607,6 +1736,9 @@ class PVItemRow {
   final isOverrunApproved = false.obs;
   final overrunQty = '0'.obs;
   final overrunReason = ''.obs;
+  final writeoffQty = '0'.obs;
+  final isWriteoff = false.obs;
+  final writeoffReason = ''.obs;
   final lastAcceptedQuantity = ''.obs;
   final product = Rxn<Product>();
   final productCode = ''.obs;

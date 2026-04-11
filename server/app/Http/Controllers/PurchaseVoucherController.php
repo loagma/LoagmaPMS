@@ -20,7 +20,12 @@ class PurchaseVoucherController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = PurchaseVoucher::query()->with('vendor:id,supplier_code,supplier_name');
+            $query = PurchaseVoucher::query()->with('vendor:id,supplier_code,supplier_name')
+                ->withExists([
+                    'items as has_writeoff' => function ($q) {
+                        $q->where('writeoff_qty', '>', 0);
+                    },
+                ]);
 
             if ($request->filled('search')) {
                 $search = trim((string) $request->input('search'));
@@ -80,6 +85,7 @@ class PurchaseVoucherController extends Controller
                     'doc_date' => optional($voucher->doc_date)->format('Y-m-d'),
                     'bill_no' => $voucher->bill_no,
                     'status' => $voucher->status,
+                    'has_writeoff' => (bool) ($voucher->has_writeoff ?? false),
                     'net_total' => (float) $voucher->net_total,
                     'created_at' => optional($voucher->created_at)->toDateTimeString(),
                     'updated_at' => optional($voucher->updated_at)->toDateTimeString(),
@@ -149,12 +155,16 @@ class PurchaseVoucherController extends Controller
                             'unit' => $item->unit,
                             'quantity' => (float) $item->quantity,
                             'overrun_qty' => (float) ($item->overrun_qty ?? 0),
+                            'writeoff_qty' => (float) ($item->writeoff_qty ?? 0),
                             'is_overrun_approved' => (bool) ($item->is_overrun_approved ?? false),
+                            'is_writeoff' => (bool) ($item->is_writeoff ?? false),
                             'overrun_reason' => $item->overrun_reason,
+                            'writeoff_reason' => $item->writeoff_reason,
                             'overrun_approved_by' => $item->overrun_approved_by,
                             'overrun_approved_at' => optional($item->overrun_approved_at)->toDateTimeString(),
                             'ordered_qty' => (float) ($item->purchaseOrderItem?->quantity ?? 0),
                             'used_qty' => (float) ($item->purchaseOrderItem?->consumed_quantity ?? 0),
+                            'writeoff_po_qty' => (float) ($item->purchaseOrderItem?->written_off_quantity ?? 0),
                             'left_qty' => (float) ($item->purchaseOrderItem?->remaining_quantity ?? 0),
                             'unit_price' => (float) $item->unit_price,
                             'taxable_amount' => (float) $item->taxable_amount,
@@ -296,8 +306,11 @@ class PurchaseVoucherController extends Controller
                     'unit' => $i->unit,
                     'quantity' => $i->quantity,
                     'overrun_qty' => $i->overrun_qty,
+                    'writeoff_qty' => $i->writeoff_qty,
                     'is_overrun_approved' => $i->is_overrun_approved,
+                    'is_writeoff' => $i->is_writeoff,
                     'overrun_reason' => $i->overrun_reason,
+                    'writeoff_reason' => $i->writeoff_reason,
                     'overrun_approved_by' => $i->overrun_approved_by,
                     'overrun_approved_at' => optional($i->overrun_approved_at)->toDateTimeString(),
                     'unit_price' => $i->unit_price,
@@ -404,8 +417,11 @@ class PurchaseVoucherController extends Controller
                 'unit' => $row['unit'] ?? null,
                 'quantity' => (float) ($row['quantity'] ?? 0),
                 'overrun_qty' => (float) ($row['overrun_qty'] ?? 0),
+                'writeoff_qty' => (float) ($row['writeoff_qty'] ?? 0),
                 'is_overrun_approved' => (bool) ($row['is_overrun_approved'] ?? false),
+                'is_writeoff' => (bool) ($row['is_writeoff'] ?? false),
                 'overrun_reason' => isset($row['overrun_reason']) ? trim((string) $row['overrun_reason']) : null,
+                'writeoff_reason' => isset($row['writeoff_reason']) ? trim((string) $row['writeoff_reason']) : null,
                 'overrun_approved_by' => isset($row['overrun_approved_by']) ? (int) $row['overrun_approved_by'] : null,
                 'overrun_approved_at' => $row['overrun_approved_at'] ?? null,
                 'unit_price' => (float) ($row['unit_price'] ?? 0),
@@ -507,8 +523,11 @@ class PurchaseVoucherController extends Controller
             'items.*.source_purchase_order_item_id' => 'nullable|integer|exists:purchase_order_items,id',
             'items.*.source_po_number' => 'nullable|string|max:100',
             'items.*.overrun_qty' => 'nullable|numeric|min:0',
+            'items.*.writeoff_qty' => 'nullable|numeric|min:0',
             'items.*.is_overrun_approved' => 'nullable|boolean',
+            'items.*.is_writeoff' => 'nullable|boolean',
             'items.*.overrun_reason' => 'nullable|string|max:255',
+            'items.*.writeoff_reason' => 'nullable|string|max:255',
             'items.*.overrun_approved_by' => 'nullable|integer',
             'items.*.overrun_approved_at' => 'nullable|date',
 

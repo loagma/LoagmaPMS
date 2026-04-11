@@ -344,6 +344,7 @@ class _VoucherReportView extends StatelessWidget {
                     DataColumn(label: Text('PO')),
                     DataColumn(label: Text('Used')),
                     DataColumn(label: Text('Left')),
+                    DataColumn(label: Text('WO')),
                     DataColumn(label: Text('Over')),
                     DataColumn(label: Text('Total')),
                   ],
@@ -360,6 +361,7 @@ class _VoucherReportView extends StatelessWidget {
                     final total = double.tryParse(row.value.value) ?? (taxable + sgst + cgst + igst + cess + roff);
                     final used = double.tryParse(row.usedQty.value) ?? 0;
                     final left = double.tryParse(row.leftQty.value) ?? 0;
+                    final writeoff = double.tryParse(row.writeoffQty.value) ?? 0;
                     final overrun = double.tryParse(row.overrunQty.value) ?? 0;
                     final overrunActive = overrun > 0.000001 || row.isOverrunApproved.value;
 
@@ -385,6 +387,7 @@ class _VoucherReportView extends StatelessWidget {
                         DataCell(Text(row.sourcePoNumber.value.trim().isEmpty ? '-' : row.sourcePoNumber.value.trim())),
                         DataCell(Text(used.toStringAsFixed(1))),
                         DataCell(Text(left.toStringAsFixed(1))),
+                        DataCell(Text(writeoff.toStringAsFixed(1))),
                         DataCell(
                           overrunActive
                               ? Container(
@@ -1244,6 +1247,25 @@ class _ItemRow extends StatelessWidget {
                 );
               }),
               const Spacer(),
+              Obx(() {
+                final left = double.tryParse(row.leftQty.value) ?? 0;
+                final qty = double.tryParse(row.quantity.value) ?? 0;
+                final canWriteOff = row.sourcePurchaseOrderItemId.value != null &&
+                    (left - qty) > 0.0000001;
+                if (!canWriteOff) return const SizedBox.shrink();
+                return SizedBox(
+                  width: 30,
+                  height: 30,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: const Icon(Icons.rule_rounded, size: 18),
+                    color: Colors.orange.shade700,
+                    onPressed: () => controller.openWriteOffDialog(row),
+                    tooltip: 'Write Off',
+                  ),
+                );
+              }),
               SizedBox(
                 width: 30,
                 height: 30,
@@ -1263,6 +1285,7 @@ class _ItemRow extends StatelessWidget {
             if (sourcePo.isEmpty) return const SizedBox.shrink();
             final used = _formatQtyDisplay(row.usedQty.value);
             final left = _formatQtyDisplay(row.leftQty.value);
+            final writeoff = _formatQtyDisplay(row.writeoffQty.value);
             final overrun = _formatQtyDisplay(row.overrunQty.value);
             return Padding(
               padding: const EdgeInsets.only(top: 6),
@@ -1293,6 +1316,13 @@ class _ItemRow extends StatelessWidget {
                       textColor: AppColors.textMuted,
                       bg: Colors.white,
                     ),
+                    if ((double.tryParse(row.writeoffQty.value) ?? 0) > 0)
+                      _infoChip(
+                        'WO $writeoff',
+                        textColor: Colors.orange.shade800,
+                        bg: Colors.orange.withValues(alpha: 0.14),
+                        borderColor: Colors.orange,
+                      ),
                     if (row.isOverrunApproved.value)
                       _infoChip(
                         'Over +$overrun',

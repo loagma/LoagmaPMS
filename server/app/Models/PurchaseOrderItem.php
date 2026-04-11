@@ -14,6 +14,7 @@ class PurchaseOrderItem extends Model
         'hsn_code',
         'quantity',
         'consumed_quantity',
+        'written_off_quantity',
         'remaining_quantity',
         'price',
         'discount_percent',
@@ -25,6 +26,7 @@ class PurchaseOrderItem extends Model
     protected $casts = [
         'quantity' => 'decimal:3',
         'consumed_quantity' => 'decimal:3',
+        'written_off_quantity' => 'decimal:3',
         'remaining_quantity' => 'decimal:3',
         'price' => 'decimal:2',
         'discount_percent' => 'decimal:2',
@@ -33,7 +35,7 @@ class PurchaseOrderItem extends Model
     ];
 
     /** Price is stored as excluding tax. Append computed price incl. tax and line total excl. tax. */
-    protected $appends = ['price_incl_tax', 'line_total_excl_tax', 'used_qty', 'left_qty'];
+    protected $appends = ['price_incl_tax', 'line_total_excl_tax', 'used_qty', 'writeoff_qty', 'left_qty'];
 
     public function getPriceInclTaxAttribute(): float
     {
@@ -68,6 +70,11 @@ class PurchaseOrderItem extends Model
     public function getUsedQtyAttribute(): float
     {
         return round((float) ($this->attributes['consumed_quantity'] ?? 0), 3);
+    }
+
+    public function getWriteoffQtyAttribute(): float
+    {
+        return round((float) ($this->attributes['written_off_quantity'] ?? 0), 3);
     }
 
     public function getLeftQtyAttribute(): float

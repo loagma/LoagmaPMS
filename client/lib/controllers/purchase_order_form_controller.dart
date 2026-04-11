@@ -508,6 +508,7 @@ class PurchaseOrderFormController extends GetxController {
         hsnCode: item.hsnCode,
         quantity: item.quantity.toString(),
         usedQty: item.usedQty.toString(),
+        writeoffQty: item.writeoffQty.toString(),
         leftQty: item.leftQty.toString(),
         price: item.price.toString(),
         discountPercent: item.discountPercent?.toString() ?? '',
@@ -658,6 +659,7 @@ class PurchaseOrderFormController extends GetxController {
               hsnCode: item.hsnCode,
               quantity: item.quantity.toString(),
               usedQty: item.usedQty.toString(),
+              writeoffQty: item.writeoffQty.toString(),
               leftQty: item.leftQty.toString(),
               price: item.price.toString(),
               discountPercent: item.discountPercent?.toString() ?? '',
@@ -950,6 +952,7 @@ class POLineRow {
   final hsnCode = ''.obs;
   final quantity = '1'.obs;
   final usedQty = '0'.obs;
+  final writeoffQty = '0'.obs;
   final leftQty = '0'.obs;
   final price = '0'.obs;
   final discountPercent = ''.obs;
@@ -974,6 +977,7 @@ class POLineRow {
     String? hsnCode,
     String? quantity,
     String? usedQty,
+    String? writeoffQty,
     String? leftQty,
     String? price,
     String? discountPercent,
@@ -986,6 +990,7 @@ class POLineRow {
     if (hsnCode != null) this.hsnCode.value = hsnCode;
     if (quantity != null) this.quantity.value = quantity;
     if (usedQty != null) this.usedQty.value = usedQty;
+    if (writeoffQty != null) this.writeoffQty.value = writeoffQty;
     if (leftQty != null) this.leftQty.value = leftQty;
     if (price != null) this.price.value = price;
     if (discountPercent != null) this.discountPercent.value = discountPercent;

@@ -87,8 +87,11 @@ class PurchaseVoucherItemRow {
   final double? usedQty;
   final double? leftQty;
   final double? overrunQty;
+  final double? writeoffQty;
   final bool isOverrunApproved;
+  final bool isWriteoff;
   final String? overrunReason;
+  final String? writeoffReason;
   final int? overrunApprovedBy;
   final String? overrunApprovedAt;
   final int? productId;
@@ -116,8 +119,11 @@ class PurchaseVoucherItemRow {
     this.usedQty,
     this.leftQty,
     this.overrunQty,
+    this.writeoffQty,
     this.isOverrunApproved = false,
+    this.isWriteoff = false,
     this.overrunReason,
+    this.writeoffReason,
     this.overrunApprovedBy,
     this.overrunApprovedAt,
     this.productId,
@@ -164,8 +170,12 @@ class PurchaseVoucherItemRow {
       leftQty: json['left_qty'] == null ? null : d(json['left_qty']),
       overrunQty:
         json['overrun_qty'] == null ? null : d(json['overrun_qty']),
+      writeoffQty:
+        json['writeoff_qty'] == null ? null : d(json['writeoff_qty']),
       isOverrunApproved: json['is_overrun_approved'] == true,
+      isWriteoff: json['is_writeoff'] == true,
       overrunReason: json['overrun_reason']?.toString(),
+      writeoffReason: json['writeoff_reason']?.toString(),
       overrunApprovedBy: _pvIntOrNull(json['overrun_approved_by']),
       overrunApprovedAt: json['overrun_approved_at']?.toString(),
       productId: _pvIntOrNull(json['product_id']),
@@ -198,8 +208,11 @@ class PurchaseVoucherItemRow {
       if (usedQty != null) 'used_qty': usedQty,
       if (leftQty != null) 'left_qty': leftQty,
       if (overrunQty != null) 'overrun_qty': overrunQty,
+      if (writeoffQty != null) 'writeoff_qty': writeoffQty,
       'is_overrun_approved': isOverrunApproved,
+      'is_writeoff': isWriteoff,
       if (overrunReason != null) 'overrun_reason': overrunReason,
+      if (writeoffReason != null) 'writeoff_reason': writeoffReason,
       if (overrunApprovedBy != null) 'overrun_approved_by': overrunApprovedBy,
       if (overrunApprovedAt != null) 'overrun_approved_at': overrunApprovedAt,
       if (productId != null) 'product_id': productId,

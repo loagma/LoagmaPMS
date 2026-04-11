@@ -61,8 +61,11 @@ class PurchaseOrderAllocationService
 
         if ($sourcePoId === null && $sourcePoItemId === null) {
             $row['overrun_qty'] = 0;
+            $row['writeoff_qty'] = 0;
             $row['is_overrun_approved'] = false;
+            $row['is_writeoff'] = false;
             $row['overrun_reason'] = $row['overrun_reason'] ?? null;
+            $row['writeoff_reason'] = $row['writeoff_reason'] ?? null;
             $row['overrun_approved_by'] = null;
             $row['overrun_approved_at'] = null;
             return $row;
@@ -103,8 +106,25 @@ class PurchaseOrderAllocationService
         $enteredQty = (float) ($row['quantity'] ?? 0);
         $orderedQty = (float) $poItem->quantity;
         $consumedQty = $this->consumedQtyForPoItem($poItem->id, $currentVoucherId);
-        $leftQty = max(0, $orderedQty - $consumedQty);
+        $writtenOffQty = $this->writtenOffQtyForPoItem($poItem->id, $currentVoucherId);
+        $leftQty = max(0, $orderedQty - $consumedQty - $writtenOffQty);
         $overrunQty = max(0, $enteredQty - $leftQty);
+        $maxWriteoffQty = max(0, $leftQty - min($enteredQty, $leftQty));
+        $writeoffQty = max(0, (float) ($row['writeoff_qty'] ?? 0));
+        $isWriteoff = $writeoffQty > 0.0000001;
+
+        if ($writeoffQty > $maxWriteoffQty + 0.0000001) {
+            throw ValidationException::withMessages([
+                "items.$index.writeoff_qty" => [
+                    sprintf(
+                        'Line %d write off exceeds remaining PO quantity after receipt. Max %.3f, entered %.3f.',
+                        $line,
+                        $maxWriteoffQty,
+                        $writeoffQty
+                    ),
+                ],
+            ]);
+        }
 
         $isApproved = filter_var($row['is_overrun_approved'] ?? false, FILTER_VALIDATE_BOOL);
 
@@ -127,9 +147,14 @@ class PurchaseOrderAllocationService
         $row['source_purchase_order_item_id'] = $sourcePoItemId;
         $row['source_po_number'] = $po->po_number;
         $row['overrun_qty'] = round($overrunQty, 3);
+        $row['writeoff_qty'] = round($writeoffQty, 3);
         $row['is_overrun_approved'] = $overrunQty > 0 ? $isApproved : false;
+        $row['is_writeoff'] = $isWriteoff;
         $row['overrun_reason'] = isset($row['overrun_reason'])
             ? trim((string) $row['overrun_reason']) ?: null
+            : null;
+        $row['writeoff_reason'] = isset($row['writeoff_reason'])
+            ? trim((string) $row['writeoff_reason']) ?: null
             : null;
         $row['overrun_approved_by'] = ($overrunQty > 0 && $isApproved) ? $approvedByUserId : null;
         $row['overrun_approved_at'] = ($overrunQty > 0 && $isApproved)
@@ -153,6 +178,20 @@ class PurchaseOrderAllocationService
             });
 
         return (float) $query->sum('quantity');
+    }
+
+    public function writtenOffQtyForPoItem(int $poItemId, ?int $excludeVoucherId = null): float
+    {
+        $query = PurchaseVoucherItem::query()
+            ->where('source_purchase_order_item_id', $poItemId)
+            ->whereHas('purchaseVoucher', function ($q) use ($excludeVoucherId) {
+                $q->whereIn('status', ['DRAFT', 'POSTED']);
+                if ($excludeVoucherId) {
+                    $q->where('id', '!=', $excludeVoucherId);
+                }
+            });
+
+        return (float) $query->sum('writeoff_qty');
     }
 
     /**
@@ -185,14 +224,16 @@ class PurchaseOrderAllocationService
         /** @var PurchaseOrderItem $item */
         foreach ($items as $item) {
             $consumed = $this->consumedQtyForPoItem((int) $item->id);
+            $writtenOff = $this->writtenOffQtyForPoItem((int) $item->id);
             $ordered = (float) $item->quantity;
-            $remaining = max(0, $ordered - $consumed);
+            $remaining = max(0, $ordered - $consumed - $writtenOff);
 
             $item->consumed_quantity = round($consumed, 3);
+            $item->written_off_quantity = round($writtenOff, 3);
             $item->remaining_quantity = round($remaining, 3);
             $item->save();
 
-            if ($consumed > 0.0000001) {
+            if ($consumed > 0.0000001 || $writtenOff > 0.0000001) {
                 $hasAnyConsumed = true;
             }
             if ($remaining > 0.0000001) {

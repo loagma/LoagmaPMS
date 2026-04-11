@@ -105,6 +105,7 @@ class ReportExportService {
       final total = double.tryParse(row.value.value) ?? (taxable + sgst + cgst + igst + cess + roff);
       final used = double.tryParse(row.usedQty.value) ?? 0;
       final left = double.tryParse(row.leftQty.value) ?? 0;
+      final writeoff = double.tryParse(row.writeoffQty.value) ?? 0;
       final overrun = double.tryParse(row.overrunQty.value) ?? 0;
       return <String>[
         row.productName.value.trim().isEmpty ? '-' : row.productName.value.trim(),
@@ -122,6 +123,7 @@ class ReportExportService {
         row.sourcePoNumber.value.trim().isEmpty ? '-' : row.sourcePoNumber.value.trim(),
         used.toStringAsFixed(1),
         left.toStringAsFixed(1),
+        writeoff.toStringAsFixed(1),
         overrun.toStringAsFixed(1),
       ];
     }).toList();
@@ -177,6 +179,7 @@ class ReportExportService {
               'PO',
               'Used',
               'Left',
+              'WO',
               'Over',
             ],
             data: rows,
@@ -220,6 +223,7 @@ class ReportExportService {
     final rows = controller.items.map((row) {
       final qty = double.tryParse(row.quantity.value) ?? 0;
       final used = double.tryParse(row.usedQty.value) ?? 0;
+      final writeoff = double.tryParse(row.writeoffQty.value) ?? 0;
       final left = double.tryParse(row.leftQty.value) ?? 0;
       final price = double.tryParse(row.price.value) ?? 0;
       final discount = double.tryParse(row.discountPercent.value) ?? 0;
@@ -230,6 +234,7 @@ class ReportExportService {
         row.unit.value.trim().isEmpty ? '-' : row.unit.value.trim(),
         qty.toStringAsFixed(1),
         used.toStringAsFixed(1),
+        writeoff.toStringAsFixed(1),
         left.toStringAsFixed(1),
         price.toStringAsFixed(2),
         discount.toStringAsFixed(2),
@@ -277,6 +282,7 @@ class ReportExportService {
               'Unit',
               'Qty',
               'Used',
+              'WO',
               'Left',
               'Rate',
               'Disc%',
