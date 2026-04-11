@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class PurchaseOrder extends Model
 {
+    protected $appends = ['pending_quantity', 'used_quantity'];
+
     protected $fillable = [
         'po_number',
         'financial_year',
@@ -41,5 +43,17 @@ class PurchaseOrder extends Model
     public function items()
     {
         return $this->hasMany(PurchaseOrderItem::class)->orderBy('line_no');
+    }
+
+    public function getPendingQuantityAttribute(): float
+    {
+        $items = $this->relationLoaded('items') ? $this->items : $this->items()->get();
+        return round($items->sum(fn (PurchaseOrderItem $item) => (float) ($item->remaining_quantity ?? 0)), 3);
+    }
+
+    public function getUsedQuantityAttribute(): float
+    {
+        $items = $this->relationLoaded('items') ? $this->items : $this->items()->get();
+        return round($items->sum(fn (PurchaseOrderItem $item) => (float) ($item->consumed_quantity ?? 0)), 3);
     }
 }

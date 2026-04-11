@@ -52,6 +52,11 @@ class PurchaseVoucher extends Model
         return $this->hasMany(PurchaseVoucherItem::class)->orderBy('line_no');
     }
 
+    public function purchaseOrder()
+    {
+        return $this->belongsTo(PurchaseOrder::class);
+    }
+
     public function getSupplierNameAttribute(): string
     {
         return $this->vendor?->supplier_name ?? '';

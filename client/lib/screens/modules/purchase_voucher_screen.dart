@@ -503,7 +503,7 @@ class _HeaderCard extends StatelessWidget {
               Expanded(
                 flex: 2,
                 child: SizedBox(
-                  height: 52,
+                  height: 50,
                   child: Obx(() => DropdownButtonFormField<String>(
                         value: controller.docNoPrefix.value,
                         decoration: _pvInputDecoration(
@@ -529,7 +529,7 @@ class _HeaderCard extends StatelessWidget {
               Expanded(
                 flex: 2,
                 child: SizedBox(
-                  height: 52,
+                  height: 47,
                   child: Obx(() {
                     final seq = controller.currentSeq.value;
                     final docNo = controller.docNoNumber.value.trim();
@@ -594,7 +594,7 @@ class _HeaderCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           Obx(() {
             final list = controller.suppliers;
             return DropdownButtonFormField<int>(
@@ -681,7 +681,7 @@ class _HeaderCard extends StatelessWidget {
               ],
             );
           }),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
           Obx(() => TextFormField(
                 initialValue: controller.narration.value,
                 decoration: _pvInputDecoration(
@@ -692,11 +692,11 @@ class _HeaderCard extends StatelessWidget {
                     vertical: 8,
                   ),
                 ),
-                minLines: 2,
-                maxLines: 2,
+                minLines: 1,
+                maxLines: 1,
                 onChanged: controller.setNarration,
               )),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
@@ -861,6 +861,12 @@ class _ItemRow extends StatelessWidget {
     required this.isLast,
   });
 
+  String _formatQtyDisplay(String raw) {
+    final parsed = double.tryParse(raw.trim());
+    if (parsed == null) return '0.0';
+    return parsed.toStringAsFixed(1);
+  }
+
   @override
   Widget build(BuildContext context) {
     final excludeIds = controller.items
@@ -921,24 +927,46 @@ class _ItemRow extends StatelessWidget {
           Obx(() {
             final sourcePo = row.sourcePoNumber.value.trim();
             if (sourcePo.isEmpty) return const SizedBox.shrink();
+            final used = _formatQtyDisplay(row.usedQty.value);
+            final left = _formatQtyDisplay(row.leftQty.value);
+            final overrun = _formatQtyDisplay(row.overrunQty.value);
             return Padding(
               padding: const EdgeInsets.only(top: 6),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight.withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'From PO: $sourcePo',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primaryDark,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLighter.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.primaryLight.withValues(alpha: 0.42)),
+                ),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _infoChip(
+                      'PO: $sourcePo',
+                      textColor: AppColors.primaryDark,
+                      bg: Colors.white,
                     ),
-                  ),
+                    _infoChip(
+                      'Used $used',
+                      textColor: AppColors.textMuted,
+                      bg: Colors.white,
+                    ),
+                    _infoChip(
+                      'Left $left',
+                      textColor: AppColors.textMuted,
+                      bg: Colors.white,
+                    ),
+                    if (row.isOverrunApproved.value)
+                      _infoChip(
+                        'Over +$overrun',
+                        textColor: Colors.deepOrange,
+                        bg: Colors.orange.withValues(alpha: 0.14),
+                        borderColor: Colors.orange,
+                      ),
+                  ],
                 ),
               ),
             );
@@ -956,31 +984,40 @@ class _ItemRow extends StatelessWidget {
                 flex: 2,
                 child: Padding(
                   padding: const EdgeInsets.only(top: 2),
-                  child: Obx(() => TextFormField(
-                        initialValue: row.quantity.value,
-                        decoration: _pvInputDecoration(
-                          labelText: 'Qty *',
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(
-                              RegExp(r'^\d+\.?\d{0,4}')),
-                        ],
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Required';
-                          }
-                          final qty = double.tryParse(value);
-                          if (qty == null || qty <= 0) return 'Must be > 0';
-                          return null;
-                        },
-                        onChanged: (value) {
-                          row.quantity.value = value;
-                          controller.recalcItemRow(row);
-                        },
-                      )),
+                  child: TextFormField(
+                    controller: row.quantityController,
+                    focusNode: row.quantityFocusNode,
+                    decoration: _pvInputDecoration(
+                      labelText: 'Qty *',
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                          RegExp(r'^\d+\.?\d{0,4}')),
+                    ],
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Required';
+                      }
+                      final qty = double.tryParse(value);
+                      if (qty == null || qty <= 0) return 'Must be > 0';
+                      return null;
+                    },
+                    onChanged: (value) {
+                      row.quantity.value = value;
+                      controller.recalcItemRow(row);
+                      controller.scheduleQuantityValidation(row);
+                    },
+                    onEditingComplete: () async {
+                      FocusScope.of(context).unfocus();
+                      await controller.onQuantityEditCompleted(row);
+                    },
+                    onFieldSubmitted: (_) async {
+                      await controller.onQuantityEditCompleted(row);
+                    },
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1185,6 +1222,31 @@ class _ItemRow extends StatelessWidget {
       child: Text(
         display,
         style: const TextStyle(fontSize: 13),
+      ),
+    );
+  }
+
+  Widget _infoChip(
+    String label, {
+    required Color textColor,
+    required Color bg,
+    Color? borderColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: borderColor ?? AppColors.primaryLight.withValues(alpha: 0.5)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+          color: textColor,
+          height: 1.1,
+        ),
       ),
     );
   }

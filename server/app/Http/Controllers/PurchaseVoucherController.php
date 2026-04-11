@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PurchaseVoucher;
 use App\Models\PurchaseVoucherItem;
+use App\Services\PurchaseOrderAllocationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,10 @@ use Illuminate\Validation\ValidationException;
 
 class PurchaseVoucherController extends Controller
 {
+    public function __construct(private readonly PurchaseOrderAllocationService $allocationService)
+    {
+    }
+
     public function index(Request $request): JsonResponse
     {
         try {
@@ -103,7 +108,7 @@ class PurchaseVoucherController extends Controller
     public function show(int $id): JsonResponse
     {
         try {
-            $voucher = PurchaseVoucher::with(['vendor', 'items.product'])->findOrFail($id);
+            $voucher = PurchaseVoucher::with(['vendor', 'items.product', 'items.purchaseOrderItem'])->findOrFail($id);
 
             return response()->json([
                 'success' => true,
@@ -134,6 +139,7 @@ class PurchaseVoucherController extends Controller
                         return [
                             'id' => $item->id,
                             'source_purchase_order_id' => $item->source_purchase_order_id,
+                            'source_purchase_order_item_id' => $item->source_purchase_order_item_id,
                             'source_po_number' => $item->source_po_number,
                             'product_id' => $item->product_id,
                             'product_name' => $item->product_name,
@@ -142,6 +148,14 @@ class PurchaseVoucherController extends Controller
                             'alias' => $item->alias,
                             'unit' => $item->unit,
                             'quantity' => (float) $item->quantity,
+                            'overrun_qty' => (float) ($item->overrun_qty ?? 0),
+                            'is_overrun_approved' => (bool) ($item->is_overrun_approved ?? false),
+                            'overrun_reason' => $item->overrun_reason,
+                            'overrun_approved_by' => $item->overrun_approved_by,
+                            'overrun_approved_at' => optional($item->overrun_approved_at)->toDateTimeString(),
+                            'ordered_qty' => (float) ($item->purchaseOrderItem?->quantity ?? 0),
+                            'used_qty' => (float) ($item->purchaseOrderItem?->consumed_quantity ?? 0),
+                            'left_qty' => (float) ($item->purchaseOrderItem?->remaining_quantity ?? 0),
                             'unit_price' => (float) $item->unit_price,
                             'taxable_amount' => (float) $item->taxable_amount,
                             'sgst' => (float) $item->sgst,
@@ -180,12 +194,23 @@ class PurchaseVoucherController extends Controller
         try {
             DB::beginTransaction();
 
+            [$preparedItems, $touchedPoIds] = $this->allocationService->prepareVoucherItems(
+                $validated['items'],
+                (int) ($validated['vendor_id'] ?? $validated['supplier_id']),
+                null,
+                $request->user()?->id
+            );
+
+            if (($validated['purchase_order_id'] ?? null) === null && !empty($touchedPoIds)) {
+                $validated['purchase_order_id'] = $touchedPoIds[0];
+            }
+
             $docNoNumber = $this->resolveDocNoNumber($validated['doc_no_number'] ?? null);
             $docNoPrefix = (string) ($validated['doc_no_prefix'] ?? '25-26/');
             $docNo = $docNoPrefix . $docNoNumber;
 
             [$itemsTotal, $chargesTotal, $netTotal] = $this->computeTotals(
-                $validated['items'],
+                $preparedItems,
                 $validated['charges'] ?? []
             );
 
@@ -210,7 +235,8 @@ class PurchaseVoucherController extends Controller
                 'charges_json' => $validated['charges'] ?? [],
             ]);
 
-            $this->replaceItems($voucher, $validated['items']);
+            $this->replaceItems($voucher, $preparedItems);
+            $this->allocationService->refreshPurchaseOrders($touchedPoIds);
 
             DB::commit();
 
@@ -242,6 +268,12 @@ class PurchaseVoucherController extends Controller
         try {
             $voucher = PurchaseVoucher::findOrFail($id);
 
+            $existingPoIds = $voucher->items()
+                ->whereNotNull('source_purchase_order_id')
+                ->pluck('source_purchase_order_id')
+                ->map(fn ($v) => (int) $v)
+                ->toArray();
+
             DB::beginTransaction();
 
             $docNoNumber = $this->resolveDocNoNumber(
@@ -254,12 +286,20 @@ class PurchaseVoucherController extends Controller
             $items = $validated['items'] ?? $voucher->items()->get()->map(function (PurchaseVoucherItem $i) {
                 return [
                     'product_id' => $i->product_id,
+                    'source_purchase_order_id' => $i->source_purchase_order_id,
+                    'source_purchase_order_item_id' => $i->source_purchase_order_item_id,
+                    'source_po_number' => $i->source_po_number,
                     'product_name' => $i->product_name,
                     'product_code' => $i->product_code,
                     'hsn_code' => $i->hsn_code,
                     'alias' => $i->alias,
                     'unit' => $i->unit,
                     'quantity' => $i->quantity,
+                    'overrun_qty' => $i->overrun_qty,
+                    'is_overrun_approved' => $i->is_overrun_approved,
+                    'overrun_reason' => $i->overrun_reason,
+                    'overrun_approved_by' => $i->overrun_approved_by,
+                    'overrun_approved_at' => optional($i->overrun_approved_at)->toDateTimeString(),
                     'unit_price' => $i->unit_price,
                     'taxable_amount' => $i->taxable_amount,
                     'sgst' => $i->sgst,
@@ -272,6 +312,17 @@ class PurchaseVoucherController extends Controller
                     'gst_itc_eligibility' => $i->gst_itc_eligibility,
                 ];
             })->toArray();
+
+            $touchedPoIds = $existingPoIds;
+            if (array_key_exists('items', $validated)) {
+                [$items, $newTouchedPoIds] = $this->allocationService->prepareVoucherItems(
+                    $validated['items'],
+                    (int) ($validated['vendor_id'] ?? $validated['supplier_id'] ?? $voucher->vendor_id),
+                    $voucher->id,
+                    $request->user()?->id
+                );
+                $touchedPoIds = array_values(array_unique(array_merge($touchedPoIds, $newTouchedPoIds)));
+            }
 
             $charges = $validated['charges'] ?? ($voucher->charges_json ?? []);
 
@@ -302,8 +353,10 @@ class PurchaseVoucherController extends Controller
             $voucher->save();
 
             if (array_key_exists('items', $validated)) {
-                $this->replaceItems($voucher, $validated['items']);
+                $this->replaceItems($voucher, $items);
             }
+
+            $this->allocationService->refreshPurchaseOrders($touchedPoIds);
 
             DB::commit();
 
@@ -338,6 +391,9 @@ class PurchaseVoucherController extends Controller
                 'source_purchase_order_id' => isset($row['source_purchase_order_id'])
                     ? (int) $row['source_purchase_order_id']
                     : null,
+                'source_purchase_order_item_id' => isset($row['source_purchase_order_item_id'])
+                    ? (int) $row['source_purchase_order_item_id']
+                    : null,
                 'source_po_number' => $row['source_po_number'] ?? null,
                 'product_id' => (int) $row['product_id'],
                 'line_no' => (int) ($row['line_no'] ?? ($index + 1)),
@@ -347,6 +403,11 @@ class PurchaseVoucherController extends Controller
                 'alias' => $row['alias'] ?? null,
                 'unit' => $row['unit'] ?? null,
                 'quantity' => (float) ($row['quantity'] ?? 0),
+                'overrun_qty' => (float) ($row['overrun_qty'] ?? 0),
+                'is_overrun_approved' => (bool) ($row['is_overrun_approved'] ?? false),
+                'overrun_reason' => isset($row['overrun_reason']) ? trim((string) $row['overrun_reason']) : null,
+                'overrun_approved_by' => isset($row['overrun_approved_by']) ? (int) $row['overrun_approved_by'] : null,
+                'overrun_approved_at' => $row['overrun_approved_at'] ?? null,
                 'unit_price' => (float) ($row['unit_price'] ?? 0),
                 'taxable_amount' => (float) ($row['taxable_amount'] ?? 0),
                 'sgst' => (float) ($row['sgst'] ?? 0),
@@ -443,7 +504,13 @@ class PurchaseVoucherController extends Controller
             'items.*.gst_itc_eligibility' => 'nullable|string|max:255',
             'items.*.line_no' => 'nullable|integer|min:1',
             'items.*.source_purchase_order_id' => 'nullable|integer|exists:purchase_orders,id',
+            'items.*.source_purchase_order_item_id' => 'nullable|integer|exists:purchase_order_items,id',
             'items.*.source_po_number' => 'nullable|string|max:100',
+            'items.*.overrun_qty' => 'nullable|numeric|min:0',
+            'items.*.is_overrun_approved' => 'nullable|boolean',
+            'items.*.overrun_reason' => 'nullable|string|max:255',
+            'items.*.overrun_approved_by' => 'nullable|integer',
+            'items.*.overrun_approved_at' => 'nullable|date',
 
             'charges' => 'nullable|array',
             'charges.*.name' => 'nullable|string|max:100',

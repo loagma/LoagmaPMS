@@ -9,6 +9,7 @@ class PurchaseVoucherItem extends Model
     protected $fillable = [
         'purchase_voucher_id',
         'source_purchase_order_id',
+        'source_purchase_order_item_id',
         'source_po_number',
         'product_id',
         'line_no',
@@ -18,6 +19,11 @@ class PurchaseVoucherItem extends Model
         'alias',
         'unit',
         'quantity',
+        'overrun_qty',
+        'is_overrun_approved',
+        'overrun_reason',
+        'overrun_approved_by',
+        'overrun_approved_at',
         'unit_price',
         'taxable_amount',
         'sgst',
@@ -32,8 +38,13 @@ class PurchaseVoucherItem extends Model
 
     protected $casts = [
         'source_purchase_order_id' => 'integer',
+        'source_purchase_order_item_id' => 'integer',
         'line_no' => 'integer',
         'quantity' => 'decimal:3',
+        'overrun_qty' => 'decimal:3',
+        'is_overrun_approved' => 'boolean',
+        'overrun_approved_by' => 'integer',
+        'overrun_approved_at' => 'datetime',
         'unit_price' => 'decimal:2',
         'taxable_amount' => 'decimal:2',
         'sgst' => 'decimal:2',
@@ -52,5 +63,10 @@ class PurchaseVoucherItem extends Model
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id', 'product_id');
+    }
+
+    public function purchaseOrderItem()
+    {
+        return $this->belongsTo(PurchaseOrderItem::class, 'source_purchase_order_item_id');
     }
 }

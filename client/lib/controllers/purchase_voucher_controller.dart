@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:fluttertoast/fluttertoast.dart';
@@ -58,6 +59,7 @@ class PurchaseVoucherController extends GetxController {
   final isSaving = false.obs;
 
   final _productTaxCache = <int, List<Map<String, dynamic>>>{};
+  final Map<PVItemRow, Timer> _quantityValidationTimers = {};
 
   /// Parsed numeric sequence from docNoNumber/docNo used for navigation.
   final RxnInt currentSeq = RxnInt();
@@ -157,6 +159,154 @@ class PurchaseVoucherController extends GetxController {
     final customTaxes = _customTaxTotalFromKeys(row, taxable);
     final value = taxable + sgst + cgst + igst + cess + roff + customTaxes;
     row.value.value = value.toStringAsFixed(2);
+  }
+
+  void scheduleQuantityValidation(PVItemRow row) {
+    _quantityValidationTimers[row]?.cancel();
+    _quantityValidationTimers[row] = Timer(const Duration(milliseconds: 450), () async {
+      if (Get.isDialogOpen == true) return;
+      await onQuantityEditCompleted(row);
+    });
+  }
+
+  bool _isLinkedOverrun(PVItemRow row) {
+    if (row.sourcePurchaseOrderItemId.value == null) return false;
+    final qty = double.tryParse(row.quantity.value) ?? 0;
+    final left = double.tryParse(row.leftQty.value) ?? 0;
+    return qty > left + 0.0000001;
+  }
+
+  Future<void> onQuantityEditCompleted(PVItemRow row) async {
+    if (row.sourcePurchaseOrderItemId.value == null) {
+      row.isOverrunApproved.value = false;
+      row.overrunQty.value = '0';
+      row.overrunReason.value = '';
+      row.lastAcceptedQuantity.value = row.quantity.value;
+      return;
+    }
+
+    final qty = double.tryParse(row.quantity.value) ?? 0;
+    final left = double.tryParse(row.leftQty.value) ?? 0;
+    final used = double.tryParse(row.usedQty.value) ?? 0;
+    if (qty <= left + 0.0000001) {
+      row.isOverrunApproved.value = false;
+      row.overrunQty.value = '0';
+      row.overrunReason.value = '';
+      row.lastAcceptedQuantity.value = row.quantity.value;
+      return;
+    }
+
+    final overrun = qty - left;
+    final accepted = await Get.dialog<bool>(
+      Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.warning_amber_rounded, color: Colors.deepOrange),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Quantity above PO balance',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  row.productName.value.trim().isEmpty
+                      ? 'This line exceeds the remaining PO quantity.'
+                      : '${row.productName.value.trim()} exceeds the remaining PO quantity.',
+                  style: const TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.35),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLighter.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.primaryLight.withValues(alpha: 0.4)),
+                  ),
+                  child: Column(
+                    children: [
+                      _QuantitySummaryTile(label: 'Allowed left', value: left.toStringAsFixed(1), accent: AppColors.primaryDark),
+                      const SizedBox(height: 8),
+                      _QuantitySummaryTile(label: 'Entered now', value: qty.toStringAsFixed(1), accent: AppColors.primaryDark),
+                      const SizedBox(height: 8),
+                      _QuantitySummaryTile(label: 'Over by', value: overrun.toStringAsFixed(1), accent: Colors.deepOrange),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Get.back(result: false),
+                        child: const Text('Keep PO limit'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Get.back(result: true),
+                        style: FilledButton.styleFrom(backgroundColor: Colors.deepOrange),
+                        child: const Text('Accept over quantity'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (accepted == true) {
+      row.isOverrunApproved.value = true;
+      row.overrunQty.value = overrun.toStringAsFixed(3);
+      row.lastAcceptedQuantity.value = row.quantity.value;
+      return;
+    }
+
+    final fallback = row.lastAcceptedQuantity.value.trim().isNotEmpty
+        ? row.lastAcceptedQuantity.value
+        : left.toStringAsFixed(3);
+    row.setQuantity(fallback);
+    row.isOverrunApproved.value = false;
+    row.overrunQty.value = '0';
+    row.overrunReason.value = '';
+    recalcItemRow(row);
+  }
+
+  @override
+  void onClose() {
+    for (final timer in _quantityValidationTimers.values) {
+      timer.cancel();
+    }
+    _quantityValidationTimers.clear();
+    for (final row in items) {
+      row.dispose();
+    }
+    super.onClose();
   }
 
   String _taxAmountFromPercent(double taxable, String percentRaw) {
@@ -711,13 +861,18 @@ class PurchaseVoucherController extends GetxController {
     }
 
     final itemsData = (vData['items'] as List?) ?? [];
+    for (final row in items) {
+      row.dispose();
+    }
     items.clear();
     for (var item in itemsData) {
       final map = item as Map<String, dynamic>;
       final row = PVItemRow();
       final srcPoId = int.tryParse(map['source_purchase_order_id']?.toString() ?? '');
+      final srcPoItemId = int.tryParse(map['source_purchase_order_item_id']?.toString() ?? '');
       final srcPoNo = map['source_po_number']?.toString() ?? '';
       row.sourcePurchaseOrderId.value = srcPoId;
+      row.sourcePurchaseOrderItemId.value = srcPoItemId;
       row.sourcePoNumber.value = srcPoNo;
       if (srcPoId != null && !linkedPurchaseOrderIds.contains(srcPoId)) {
         linkedPurchaseOrderIds.add(srcPoId);
@@ -738,9 +893,16 @@ class PurchaseVoucherController extends GetxController {
       row.hsnCode.value = map['hsn_code']?.toString() ?? map['hsn']?.toString() ?? '';
       row.productName.value = map['product_name']?.toString() ?? '';
       row.alias.value = map['alias']?.toString() ?? '';
-      row.quantity.value = map['quantity']?.toString() ?? '';
+      row.setQuantity(map['quantity']?.toString() ?? '');
+      row.lastAcceptedQuantity.value = row.quantity.value;
       row.unitType.value = map['unit']?.toString() ?? 'Nos';
       row.unitPrice.value = map['unit_price']?.toString() ?? '0';
+      row.orderedQty.value = map['ordered_qty']?.toString() ?? map['po_ordered_qty']?.toString() ?? '';
+      row.usedQty.value = map['used_qty']?.toString() ?? map['po_used_qty']?.toString() ?? '';
+      row.leftQty.value = map['left_qty']?.toString() ?? map['po_left_qty']?.toString() ?? '';
+      row.isOverrunApproved.value = map['is_overrun_approved'] == true;
+      row.overrunQty.value = map['overrun_qty']?.toString() ?? '0';
+      row.overrunReason.value = map['overrun_reason']?.toString() ?? '';
       row.taxableAmount.value = map['taxable_amount']?.toString() ?? '0';
       row.sgst.value = map['sgst']?.toString() ?? '0';
       row.cgst.value = map['cgst']?.toString() ?? '0';
@@ -877,7 +1039,11 @@ class PurchaseVoucherController extends GetxController {
   }
 
   void removeItemRow(int index) {
-    if (index >= 0 && index < items.length) items.removeAt(index);
+    if (index >= 0 && index < items.length) {
+      final row = items.removeAt(index);
+      _quantityValidationTimers.remove(row)?.cancel();
+      row.dispose();
+    }
   }
 
   void addChargeRow() {
@@ -1011,6 +1177,7 @@ class PurchaseVoucherController extends GetxController {
       for (final item in po.items) {
         final row = PVItemRow();
         row.sourcePurchaseOrderId.value = poId;
+        row.sourcePurchaseOrderItemId.value = item.id;
         row.sourcePoNumber.value = po.poNumber;
         row.product.value = Product(
           id: item.productId,
@@ -1025,7 +1192,11 @@ class PurchaseVoucherController extends GetxController {
         row.productCode.value = '${item.productId}';
         row.hsnCode.value = row.product.value?.hsnCode ?? '';
         row.alias.value = '${item.productName ?? ''} : ${item.unit ?? 'Nos'}';
-        row.quantity.value = item.quantity.toStringAsFixed(2);
+        row.setQuantity(item.quantity.toStringAsFixed(2));
+        row.lastAcceptedQuantity.value = row.quantity.value;
+        row.orderedQty.value = item.quantity.toStringAsFixed(3);
+        row.usedQty.value = item.usedQty.toStringAsFixed(3);
+        row.leftQty.value = item.leftQty.toStringAsFixed(3);
         row.unitType.value = item.unit ?? (unitTypes.isNotEmpty ? unitTypes.first : 'Nos');
         row.unitPrice.value = item.price.toStringAsFixed(2);
         row.taxableAmount.value = (item.quantity * item.price).toStringAsFixed(2);
@@ -1073,6 +1244,10 @@ class PurchaseVoucherController extends GetxController {
         _showError('Please enter valid quantity for all items');
         return false;
       }
+      if (_isLinkedOverrun(row) && !row.isOverrunApproved.value) {
+        _showError('Over quantity requires explicit acceptance on the line item');
+        return false;
+      }
       final price = double.tryParse(row.unitPrice.value);
       if (price == null || price < 0) {
         _showError('Please enter valid unit price for all items');
@@ -1080,6 +1255,24 @@ class PurchaseVoucherController extends GetxController {
       }
     }
     return true;
+  }
+
+  String? _extractRowLevelError(Map<String, dynamic> errors) {
+    String? best;
+    errors.forEach((key, value) {
+      final match = RegExp(r'^items\.(\d+)\.(.+)$').firstMatch(key);
+      if (match == null) return;
+      final rowIndex = (int.tryParse(match.group(1) ?? '') ?? 0) + 1;
+      final field = match.group(2) ?? 'field';
+      String msg;
+      if (value is List && value.isNotEmpty) {
+        msg = value.first.toString();
+      } else {
+        msg = value.toString();
+      }
+      best ??= 'Row $rowIndex ($field): $msg';
+    });
+    return best;
   }
 
   Future<void> _saveVoucher(String saveStatus) async {
@@ -1119,6 +1312,18 @@ class PurchaseVoucherController extends GetxController {
             'alias': row.alias.value,
             'unit': row.unitType.value,
             'quantity': qty,
+            if (row.sourcePurchaseOrderItemId.value != null)
+              'source_purchase_order_item_id': row.sourcePurchaseOrderItemId.value,
+            if (row.orderedQty.value.trim().isNotEmpty)
+              'ordered_qty': double.tryParse(row.orderedQty.value) ?? 0,
+            if (row.usedQty.value.trim().isNotEmpty)
+              'used_qty': double.tryParse(row.usedQty.value) ?? 0,
+            if (row.leftQty.value.trim().isNotEmpty)
+              'left_qty': double.tryParse(row.leftQty.value) ?? 0,
+            'is_overrun_approved': row.isOverrunApproved.value,
+            'overrun_qty': double.tryParse(row.overrunQty.value) ?? 0,
+            if (row.overrunReason.value.trim().isNotEmpty)
+              'overrun_reason': row.overrunReason.value.trim(),
             'unit_price': price,
             'taxable_amount': taxable,
             'sgst': sgst,
@@ -1216,6 +1421,13 @@ class PurchaseVoucherController extends GetxController {
         final msg = data['message'] ?? 'Failed to save voucher';
         final err = data['error'];
         final errs = data['errors'];
+        if (errs is Map<String, dynamic>) {
+          final rowError = _extractRowLevelError(errs);
+          if (rowError != null) {
+            _showError(rowError);
+            return;
+          }
+        }
         final detail = err != null
             ? (err is String ? err : err.toString())
             : (errs != null ? errs.toString() : null);
@@ -1318,15 +1530,57 @@ class PurchaseVoucherController extends GetxController {
   }
 }
 
+class _QuantitySummaryTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color accent;
+
+  const _QuantitySummaryTile({
+    required this.label,
+    required this.value,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accent.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+          Text(value, style: TextStyle(fontSize: 14, color: accent, fontWeight: FontWeight.w800)),
+        ],
+      ),
+    );
+  }
+}
+
 class PVItemRow {
   final sourcePurchaseOrderId = Rxn<int>();
+  final sourcePurchaseOrderItemId = Rxn<int>();
   final sourcePoNumber = ''.obs;
+  final orderedQty = ''.obs;
+  final usedQty = ''.obs;
+  final leftQty = ''.obs;
+  final isOverrunApproved = false.obs;
+  final overrunQty = '0'.obs;
+  final overrunReason = ''.obs;
+  final lastAcceptedQuantity = ''.obs;
   final product = Rxn<Product>();
   final productCode = ''.obs;
   final productName = ''.obs;
   final hsnCode = ''.obs;
   final alias = ''.obs;
   final quantity = ''.obs;
+  final quantityController = TextEditingController();
+  final quantityFocusNode = FocusNode();
   final unitType = 'Nos'.obs;
   final unitPrice = ''.obs;
   final taxableAmount = '0'.obs;
@@ -1346,6 +1600,21 @@ class PVItemRow {
   final value = '0'.obs;
   final purchaseAccount = 'Def Purchase Accounts'.obs;
   final gstItcEligibility = ''.obs;
+
+  void setQuantity(String value) {
+    quantity.value = value;
+    if (quantityController.text == value) return;
+    quantityController.value = quantityController.value.copyWith(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+      composing: TextRange.empty,
+    );
+  }
+
+  void dispose() {
+    quantityController.dispose();
+    quantityFocusNode.dispose();
+  }
 }
 
 class PVChargeRow {

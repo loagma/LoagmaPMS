@@ -172,6 +172,8 @@ class PurchaseOrderItem {
   final int? lineNo;
   final String? unit;
   final double quantity;
+  final double usedQty;
+  final double leftQty;
   /// Unit price excluding tax.
   final double price;
   final double? discountPercent;
@@ -192,6 +194,8 @@ class PurchaseOrderItem {
     this.lineNo,
     this.unit,
     required this.quantity,
+    this.usedQty = 0,
+    this.leftQty = 0,
     required this.price,
     this.discountPercent,
     this.taxPercent,
@@ -221,6 +225,11 @@ class PurchaseOrderItem {
     final price = parseDouble(json['price']);
     final taxPct = parseDouble(json['tax_percent'], defaultValue: 0);
     final qty = parseDouble(json['quantity']);
+    final usedQty = parseDouble(json['used_qty'] ?? json['consumed_quantity']);
+    final leftQtyRaw = json['left_qty'] ?? json['remaining_quantity'];
+    final leftQty = leftQtyRaw == null
+      ? (qty - usedQty)
+      : parseDouble(leftQtyRaw);
     final discountPct = parseDouble(json['discount_percent'], defaultValue: 0);
     final lineTotalVal = parseDouble(json['line_total']);
     double round2(double v) => (v * 100).round() / 100;
@@ -244,6 +253,8 @@ class PurchaseOrderItem {
       lineNo: int.tryParse(json['line_no']?.toString() ?? ''),
       unit: json['unit']?.toString(),
       quantity: qty,
+      usedQty: usedQty,
+      leftQty: leftQty < 0 ? 0 : leftQty,
       price: price,
       discountPercent: discountPct,
       taxPercent: taxPct,
@@ -264,6 +275,8 @@ class PurchaseOrderItem {
       if (lineNo != null) 'line_no': lineNo,
       if (unit != null) 'unit': unit,
       'quantity': quantity,
+      'used_qty': usedQty,
+      'left_qty': leftQty,
       'price': price,
       if (discountPercent != null) 'discount_percent': discountPercent,
       if (taxPercent != null) 'tax_percent': taxPercent,

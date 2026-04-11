@@ -80,6 +80,17 @@ class PurchaseVoucherHeader {
 }
 
 class PurchaseVoucherItemRow {
+  final int? sourcePurchaseOrderId;
+  final int? sourcePurchaseOrderItemId;
+  final String? sourcePoNumber;
+  final double? orderedQty;
+  final double? usedQty;
+  final double? leftQty;
+  final double? overrunQty;
+  final bool isOverrunApproved;
+  final String? overrunReason;
+  final int? overrunApprovedBy;
+  final String? overrunApprovedAt;
   final int? productId;
   final String? productName;
   final String? productCode;
@@ -98,6 +109,17 @@ class PurchaseVoucherItemRow {
   final String? gstItcEligibility;
 
   PurchaseVoucherItemRow({
+    this.sourcePurchaseOrderId,
+    this.sourcePurchaseOrderItemId,
+    this.sourcePoNumber,
+    this.orderedQty,
+    this.usedQty,
+    this.leftQty,
+    this.overrunQty,
+    this.isOverrunApproved = false,
+    this.overrunReason,
+    this.overrunApprovedBy,
+    this.overrunApprovedAt,
     this.productId,
     this.productName,
     this.productCode,
@@ -132,6 +154,20 @@ class PurchaseVoucherItemRow {
     final roff = d(json['roff']);
     final value = d(json['value'], taxable + sgst + cgst + igst + cess + roff);
     return PurchaseVoucherItemRow(
+      sourcePurchaseOrderId:
+        _pvIntOrNull(json['source_purchase_order_id']),
+      sourcePurchaseOrderItemId:
+        _pvIntOrNull(json['source_purchase_order_item_id']),
+      sourcePoNumber: json['source_po_number']?.toString(),
+      orderedQty: json['ordered_qty'] == null ? null : d(json['ordered_qty']),
+      usedQty: json['used_qty'] == null ? null : d(json['used_qty']),
+      leftQty: json['left_qty'] == null ? null : d(json['left_qty']),
+      overrunQty:
+        json['overrun_qty'] == null ? null : d(json['overrun_qty']),
+      isOverrunApproved: json['is_overrun_approved'] == true,
+      overrunReason: json['overrun_reason']?.toString(),
+      overrunApprovedBy: _pvIntOrNull(json['overrun_approved_by']),
+      overrunApprovedAt: json['overrun_approved_at']?.toString(),
       productId: _pvIntOrNull(json['product_id']),
       productName: json['product_name']?.toString(),
       productCode: json['product_code']?.toString(),
@@ -153,6 +189,19 @@ class PurchaseVoucherItemRow {
 
   Map<String, dynamic> toJson() {
     return {
+      if (sourcePurchaseOrderId != null)
+        'source_purchase_order_id': sourcePurchaseOrderId,
+      if (sourcePurchaseOrderItemId != null)
+        'source_purchase_order_item_id': sourcePurchaseOrderItemId,
+      if (sourcePoNumber != null) 'source_po_number': sourcePoNumber,
+      if (orderedQty != null) 'ordered_qty': orderedQty,
+      if (usedQty != null) 'used_qty': usedQty,
+      if (leftQty != null) 'left_qty': leftQty,
+      if (overrunQty != null) 'overrun_qty': overrunQty,
+      'is_overrun_approved': isOverrunApproved,
+      if (overrunReason != null) 'overrun_reason': overrunReason,
+      if (overrunApprovedBy != null) 'overrun_approved_by': overrunApprovedBy,
+      if (overrunApprovedAt != null) 'overrun_approved_at': overrunApprovedAt,
       if (productId != null) 'product_id': productId,
       if (productName != null) 'product_name': productName,
       if (productCode != null) 'product_code': productCode,
