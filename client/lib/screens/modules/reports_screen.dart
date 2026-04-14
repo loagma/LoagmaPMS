@@ -7,6 +7,7 @@ import 'bom_list_screen.dart';
 import 'inventory_list_screen.dart';
 import 'issue_to_production_list_screen.dart';
 import 'purchase_order_list_screen.dart';
+import 'purchase_return_list_screen.dart';
 import 'purchase_voucher_list_screen.dart';
 import 'receive_from_production_list_screen.dart';
 import 'stock_voucher_list_screen.dart';
@@ -90,6 +91,14 @@ class ReportsScreen extends StatelessWidget {
                 icon: Icons.receipt_long_outlined,
                 onTap: () {
                   Get.to(() => const PurchaseVoucherListScreen());
+                },
+              ),
+              _ReportCard(
+                title: 'Purchase Returns',
+                subtitle: 'View return/debit note documents',
+                icon: Icons.assignment_return_outlined,
+                onTap: () {
+                  Get.to(() => const PurchaseReturnListScreen());
                 },
               ),
               _ReportCard(

@@ -20,7 +20,8 @@ class ApiConfig {
   static const String _localBaseUrl = 'http://10.0.2.2:8000';
 
   /// Production base URL (change to your real domain).
-  static const String _productionBaseUrl = 'https://loagmapms-hd5u.onrender.com';
+  static const String _productionBaseUrl =
+      'https://loagmapms-hd5u.onrender.com';
 
   /// Base URL for the backend (no trailing slash).
   ///
@@ -96,6 +97,16 @@ class ApiConfig {
 
   /// POST ${ApiConfig.apiBaseUrl}/purchase-vouchers
   static String get createPurchaseVoucher => '$apiBaseUrl/purchase-vouchers';
+
+  /// GET/POST ${ApiConfig.apiBaseUrl}/purchase-returns
+  static String get purchaseReturns => '$apiBaseUrl/purchase-returns';
+
+  /// GET ${ApiConfig.apiBaseUrl}/purchase-returns/series
+  static String get purchaseReturnSeries =>
+      '$apiBaseUrl/purchase-returns/series';
+
+  /// POST ${ApiConfig.apiBaseUrl}/purchase-returns
+  static String get createPurchaseReturn => '$apiBaseUrl/purchase-returns';
 
   /// GET/POST ${ApiConfig.apiBaseUrl}/taxes
   static String get taxes => '$apiBaseUrl/taxes';

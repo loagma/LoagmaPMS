@@ -13,6 +13,7 @@ use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SupplierProductController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\PurchaseVoucherController;
+use App\Http\Controllers\PurchaseReturnController;
 use App\Http\Controllers\TaxController;
 use App\Http\Controllers\ProductTaxController;
 use App\Http\Controllers\CategoryController;
@@ -98,6 +99,14 @@ Route::get('/purchase-vouchers', [PurchaseVoucherController::class, 'index']);
 Route::post('/purchase-vouchers', [PurchaseVoucherController::class, 'store']);
 Route::get('/purchase-vouchers/{id}', [PurchaseVoucherController::class, 'show']);
 Route::put('/purchase-vouchers/{id}', [PurchaseVoucherController::class, 'update']);
+
+// Purchase Return routes
+Route::get('/purchase-returns', [PurchaseReturnController::class, 'index']);
+Route::get('/purchase-returns/series', [PurchaseReturnController::class, 'series']);
+Route::post('/purchase-returns', [PurchaseReturnController::class, 'store']);
+Route::get('/purchase-returns/{purchaseReturn}', [PurchaseReturnController::class, 'show']);
+Route::put('/purchase-returns/{purchaseReturn}', [PurchaseReturnController::class, 'update']);
+Route::delete('/purchase-returns/{purchaseReturn}', [PurchaseReturnController::class, 'destroy']);
 
 // Tax routes
 Route::get('/taxes', [TaxController::class, 'index']);

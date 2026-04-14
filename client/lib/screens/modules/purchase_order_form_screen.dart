@@ -550,7 +550,7 @@ class _HeaderCard extends StatelessWidget {
                   }),
                 ),
               ),
-              const SizedBox(width: 5),
+              const SizedBox(width: 10),
               Expanded(
                 flex: 2,
                 child: SizedBox(
@@ -624,7 +624,7 @@ class _HeaderCard extends StatelessWidget {
               validator: (v) => v == null ? 'Please select supplier' : null,
             );
           }),
-          const SizedBox(height: 6),
+          const SizedBox(height: _sectionGap),
           Row(
             children: [
               Expanded(
@@ -804,7 +804,7 @@ class _ItemsCard extends StatelessWidget {
                 ),
               ),
             if (!controller.isReadOnly) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: _sectionGap),
               Align(
                 alignment: Alignment.topRight,
                 child: OutlinedButton.icon(
@@ -896,7 +896,7 @@ class _ItemRow extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: _sectionGap),
           _ProductPicker(
             controller: controller,
             row: row,
@@ -905,7 +905,7 @@ class _ItemRow extends StatelessWidget {
           Obx(() {
             if (!row.isTaxLoading.value) return const SizedBox.shrink();
             return const Padding(
-              padding: EdgeInsets.only(top: 6),
+              padding: EdgeInsets.only(top: _sectionGap),
               child: Row(
                 children: [
                   SizedBox(
@@ -922,7 +922,7 @@ class _ItemRow extends StatelessWidget {
               ),
             );
           }),
-          const SizedBox(height: 8),
+          const SizedBox(height: _sectionGap),
           Row(
             children: [
               Expanded(
@@ -1038,7 +1038,7 @@ class _ItemRow extends StatelessWidget {
               ],
             );
           }),
-          const SizedBox(height: 5),
+          const SizedBox(height: _sectionGap),
           _buildTaxTotals(row),
         ],
       ),

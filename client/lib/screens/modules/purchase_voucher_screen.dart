@@ -11,6 +11,7 @@ import '../../models/product_model.dart';
 import '../../services/report_export_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
+import 'purchase_return_form_screen.dart';
 
 InputDecoration _pvInputDecoration({
   required String labelText,
@@ -137,6 +138,27 @@ class PurchaseVoucherScreen extends StatelessWidget {
               onPressed: controller.enterEditMode,
             );
           }),
+            Obx(() {
+              if (!controller.isReportMode) return const SizedBox.shrink();
+              return IconButton(
+                icon: const Icon(Icons.assignment_return_outlined, color: Colors.white),
+                tooltip: 'Create Return',
+                onPressed: () async {
+                  final result = await Get.to(
+                    () => PurchaseReturnFormScreen(
+                      sourcePvId: controller.activeVoucherId.value,
+                    ),
+                  );
+                  if (result == true) {
+                    Get.snackbar(
+                      'Success',
+                      'Purchase return saved',
+                      snackPosition: SnackPosition.BOTTOM,
+                    );
+                  }
+                },
+              );
+            }),
           IconButton(
             icon: const Icon(Icons.help_outline_rounded, color: Colors.white),
             tooltip: 'Help',

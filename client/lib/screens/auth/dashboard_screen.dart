@@ -216,6 +216,14 @@ class DashboardScreen extends StatelessWidget {
                     Get.toNamed(AppRoutes.purchaseVoucher);
                   },
                 ),
+                _ModuleCard(
+                  title: 'Purchase Return',
+                  subtitle: 'Return goods or create debit note',
+                  icon: Icons.assignment_return_outlined,
+                  onTap: () {
+                    Get.toNamed(AppRoutes.purchaseReturnForm);
+                  },
+                ),
                 // _ModuleCard(
                 //   title: 'Taxes',
                 //   subtitle: 'Create tax definition',

@@ -7,6 +7,7 @@ import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../controllers/purchase_order_form_controller.dart';
+import '../controllers/purchase_return_form_controller.dart';
 import '../controllers/purchase_voucher_controller.dart';
 
 class ReportExportService {
@@ -45,16 +46,13 @@ class ReportExportService {
     final bytes = await buildPurchaseVoucherPdf(controller);
     final docNo =
         '${controller.docNoPrefix.value}${controller.docNoNumber.value}'.trim();
-    await Share.shareXFiles(
-      [
-        XFile.fromData(
-          bytes,
-          mimeType: 'application/pdf',
-          name: 'purchase_voucher_${docNo.isEmpty ? 'report' : docNo}.pdf',
-        ),
-      ],
-      text: 'Purchase Voucher ${docNo.isEmpty ? '' : docNo}'.trim(),
-    );
+    await Share.shareXFiles([
+      XFile.fromData(
+        bytes,
+        mimeType: 'application/pdf',
+        name: 'purchase_voucher_${docNo.isEmpty ? 'report' : docNo}.pdf',
+      ),
+    ], text: 'Purchase Voucher ${docNo.isEmpty ? '' : docNo}'.trim());
   }
 
   static Future<void> printPurchaseOrder(
@@ -71,16 +69,35 @@ class ReportExportService {
     final poNumber = controller.currentPoNumber.value.trim().isEmpty
         ? (controller.currentPoSeq.value?.toString() ?? 'report')
         : controller.currentPoNumber.value.trim();
-    await Share.shareXFiles(
-      [
-        XFile.fromData(
-          bytes,
-          mimeType: 'application/pdf',
-          name: 'purchase_order_$poNumber.pdf',
-        ),
-      ],
-      text: 'Purchase Order $poNumber',
-    );
+    await Share.shareXFiles([
+      XFile.fromData(
+        bytes,
+        mimeType: 'application/pdf',
+        name: 'purchase_order_$poNumber.pdf',
+      ),
+    ], text: 'Purchase Order $poNumber');
+  }
+
+  static Future<void> printPurchaseReturn(
+    PurchaseReturnFormController controller,
+  ) async {
+    final bytes = await buildPurchaseReturnPdf(controller);
+    await Printing.layoutPdf(onLayout: (_) async => bytes);
+  }
+
+  static Future<void> sharePurchaseReturn(
+    PurchaseReturnFormController controller,
+  ) async {
+    final bytes = await buildPurchaseReturnPdf(controller);
+    final docNo =
+        '${controller.docNoPrefix.value}${controller.docNoNumber.value}'.trim();
+    await Share.shareXFiles([
+      XFile.fromData(
+        bytes,
+        mimeType: 'application/pdf',
+        name: 'purchase_return_${docNo.isEmpty ? 'report' : docNo}.pdf',
+      ),
+    ], text: 'Purchase Return ${docNo.isEmpty ? '' : docNo}'.trim());
   }
 
   static Future<Uint8List> buildPurchaseVoucherPdf(
@@ -96,19 +113,24 @@ class ReportExportService {
     final rows = controller.items.map((row) {
       final qty = double.tryParse(row.quantity.value) ?? 0;
       final unitPrice = double.tryParse(row.unitPrice.value) ?? 0;
-      final taxable = double.tryParse(row.taxableAmount.value) ?? (qty * unitPrice);
+      final taxable =
+          double.tryParse(row.taxableAmount.value) ?? (qty * unitPrice);
       final sgst = double.tryParse(row.sgst.value) ?? 0;
       final cgst = double.tryParse(row.cgst.value) ?? 0;
       final igst = double.tryParse(row.igst.value) ?? 0;
       final cess = double.tryParse(row.cess.value) ?? 0;
       final roff = double.tryParse(row.roff.value) ?? 0;
-      final total = double.tryParse(row.value.value) ?? (taxable + sgst + cgst + igst + cess + roff);
+      final total =
+          double.tryParse(row.value.value) ??
+          (taxable + sgst + cgst + igst + cess + roff);
       final used = double.tryParse(row.usedQty.value) ?? 0;
       final left = double.tryParse(row.leftQty.value) ?? 0;
       final writeoff = double.tryParse(row.writeoffQty.value) ?? 0;
       final overrun = double.tryParse(row.overrunQty.value) ?? 0;
       return <String>[
-        row.productName.value.trim().isEmpty ? '-' : row.productName.value.trim(),
+        row.productName.value.trim().isEmpty
+            ? '-'
+            : row.productName.value.trim(),
         row.hsnCode.value.trim().isEmpty ? '-' : row.hsnCode.value.trim(),
         row.unitType.value.trim().isEmpty ? '-' : row.unitType.value.trim(),
         qty.toStringAsFixed(1),
@@ -120,7 +142,9 @@ class ReportExportService {
         cess.toStringAsFixed(2),
         roff.toStringAsFixed(2),
         total.toStringAsFixed(2),
-        row.sourcePoNumber.value.trim().isEmpty ? '-' : row.sourcePoNumber.value.trim(),
+        row.sourcePoNumber.value.trim().isEmpty
+            ? '-'
+            : row.sourcePoNumber.value.trim(),
         used.toStringAsFixed(1),
         left.toStringAsFixed(1),
         writeoff.toStringAsFixed(1),
@@ -146,20 +170,50 @@ class ReportExportService {
           pw.SizedBox(height: 8),
           _kv('Voucher No', docNo.isEmpty ? '-' : docNo),
           _kv('Status', controller.status.value),
-          _kv('Supplier', controller.vendorName.value.trim().isEmpty ? '-' : controller.vendorName.value.trim()),
+          _kv(
+            'Supplier',
+            controller.vendorName.value.trim().isEmpty
+                ? '-'
+                : controller.vendorName.value.trim(),
+          ),
           _kv('Document Date', _normalizeDate(controller.docDate.value)),
-          _kv('Bill No', controller.billNo.value.trim().isEmpty ? '-' : controller.billNo.value.trim()),
+          _kv(
+            'Bill No',
+            controller.billNo.value.trim().isEmpty
+                ? '-'
+                : controller.billNo.value.trim(),
+          ),
           _kv('Bill Date', _normalizeDate(controller.billDate.value)),
-          _kv('Purchase Type', controller.purchaseType.value.trim().isEmpty ? '-' : controller.purchaseType.value.trim()),
-          _kv('GST Reverse Charge', controller.gstReverseCharge.value.trim().isEmpty ? '-' : controller.gstReverseCharge.value.trim()),
-          _kv('Purchase Agent', controller.purchaseAgentId.value.trim().isEmpty ? '-' : controller.purchaseAgentId.value.trim()),
+          _kv(
+            'Purchase Type',
+            controller.purchaseType.value.trim().isEmpty
+                ? '-'
+                : controller.purchaseType.value.trim(),
+          ),
+          _kv(
+            'GST Reverse Charge',
+            controller.gstReverseCharge.value.trim().isEmpty
+                ? '-'
+                : controller.gstReverseCharge.value.trim(),
+          ),
+          _kv(
+            'Purchase Agent',
+            controller.purchaseAgentId.value.trim().isEmpty
+                ? '-'
+                : controller.purchaseAgentId.value.trim(),
+          ),
           _kv('Linked PO', linkedPo.isEmpty ? '-' : linkedPo),
-          _kv('Narration', controller.narration.value.trim().isEmpty ? '-' : controller.narration.value.trim()),
           pw.SizedBox(height: 12),
-          pw.Text('Item Details', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.Text(
+            'Item Details',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+          ),
           pw.SizedBox(height: 6),
           pw.TableHelper.fromTextArray(
-            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8),
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              fontSize: 8,
+            ),
             cellStyle: const pw.TextStyle(fontSize: 7),
             headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
             cellAlignment: pw.Alignment.centerLeft,
@@ -186,10 +240,16 @@ class ReportExportService {
           ),
           if (charges.isNotEmpty) ...[
             pw.SizedBox(height: 12),
-            pw.Text('Charges', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            pw.Text(
+              'Charges',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            ),
             pw.SizedBox(height: 6),
             pw.TableHelper.fromTextArray(
-              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9),
+              headerStyle: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 9,
+              ),
               cellStyle: const pw.TextStyle(fontSize: 9),
               headers: const ['Name', 'Amount'],
               data: charges,
@@ -229,7 +289,9 @@ class ReportExportService {
       final discount = double.tryParse(row.discountPercent.value) ?? 0;
       final tax = double.tryParse(row.taxPercent.value) ?? 0;
       return <String>[
-        row.productName.value.trim().isEmpty ? '-' : row.productName.value.trim(),
+        row.productName.value.trim().isEmpty
+            ? '-'
+            : row.productName.value.trim(),
         row.hsnCode.value.trim().isEmpty ? '-' : row.hsnCode.value.trim(),
         row.unit.value.trim().isEmpty ? '-' : row.unit.value.trim(),
         qty.toStringAsFixed(1),
@@ -266,13 +328,23 @@ class ReportExportService {
           _kv('Supplier', supplierName),
           _kv('Document Date', _normalizeDate(controller.docDate.value)),
           _kv('Expected Date', _normalizeDate(controller.expectedDate.value)),
-          _kv('Financial Year', controller.financialYear.value.trim().isEmpty ? '-' : controller.financialYear.value.trim()),
-          _kv('Narration', controller.narration.value.trim().isEmpty ? '-' : controller.narration.value.trim()),
+          _kv(
+            'Financial Year',
+            controller.financialYear.value.trim().isEmpty
+                ? '-'
+                : controller.financialYear.value.trim(),
+          ),
           pw.SizedBox(height: 12),
-          pw.Text('Item Details', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.Text(
+            'Item Details',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+          ),
           pw.SizedBox(height: 6),
           pw.TableHelper.fromTextArray(
-            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8),
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              fontSize: 8,
+            ),
             cellStyle: const pw.TextStyle(fontSize: 7),
             headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
             cellAlignment: pw.Alignment.centerLeft,
@@ -295,10 +367,16 @@ class ReportExportService {
           ),
           if (charges.isNotEmpty) ...[
             pw.SizedBox(height: 12),
-            pw.Text('Charges', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            pw.Text(
+              'Charges',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            ),
             pw.SizedBox(height: 6),
             pw.TableHelper.fromTextArray(
-              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9),
+              headerStyle: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 9,
+              ),
               cellStyle: const pw.TextStyle(fontSize: 9),
               headers: const ['Name', 'Amount'],
               data: charges,
@@ -306,6 +384,88 @@ class ReportExportService {
           ],
           pw.SizedBox(height: 12),
           _kv('Grand Total', controller.grandTotal.toStringAsFixed(2)),
+        ],
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  static Future<Uint8List> buildPurchaseReturnPdf(
+    PurchaseReturnFormController controller,
+  ) async {
+    final pdf = pw.Document();
+    final theme = await _pdfTheme();
+
+    final docNo =
+        '${controller.docNoPrefix.value}${controller.docNoNumber.value}'.trim();
+
+    final rows = controller.items.map((row) {
+      final received = double.tryParse(row.originalQty.value) ?? 0;
+      final returned = double.tryParse(row.returnedQty.value) ?? 0;
+      return <String>[
+        row.productName.value.trim().isEmpty
+            ? '-'
+            : row.productName.value.trim(),
+        received.toStringAsFixed(2),
+        returned.toStringAsFixed(2),
+        row.returnReason.value.trim().isEmpty
+            ? '-'
+            : row.returnReason.value.trim(),
+      ];
+    }).toList();
+
+    pdf.addPage(
+      pw.MultiPage(
+        theme: theme,
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(24),
+        build: (context) => [
+          pw.Text(
+            'Purchase Return',
+            style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 8),
+          _kv('Return No', docNo.isEmpty ? '-' : docNo),
+          _kv('Status', controller.status.value),
+          _kv(
+            'Vendor',
+            controller.vendorName.value.trim().isEmpty
+                ? '-'
+                : controller.vendorName.value.trim(),
+          ),
+          _kv(
+            'Source Voucher',
+            controller.sourcePvNumber.value.trim().isEmpty
+                ? '-'
+                : controller.sourcePvNumber.value.trim(),
+          ),
+          _kv('Document Date', _normalizeDate(controller.docDate.value)),
+          _kv(
+            'Reason',
+            controller.reason.value.trim().isEmpty
+                ? '-'
+                : controller.reason.value.trim(),
+          ),
+          pw.SizedBox(height: 12),
+          pw.Text(
+            'Item Details',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 6),
+          pw.TableHelper.fromTextArray(
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              fontSize: 8,
+            ),
+            cellStyle: const pw.TextStyle(fontSize: 7),
+            headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
+            cellAlignment: pw.Alignment.centerLeft,
+            headers: const ['Product', 'Received', 'Returned', 'Reason'],
+            data: rows,
+          ),
+          pw.SizedBox(height: 12),
+          _kv('Net Total', controller.totalReturnValue),
         ],
       ),
     );
