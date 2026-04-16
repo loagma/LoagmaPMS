@@ -79,6 +79,7 @@ class ProductController extends Controller
                 $taxRows = DB::table('product_taxes as pt')
                     ->join('taxes as t', 'pt.tax_id', '=', 't.id')
                     ->whereIn('pt.product_id', $productIds)
+                    ->where('t.is_active', 1)
                     ->select(
                         'pt.product_id',
                         'pt.tax_id',
@@ -184,6 +185,7 @@ class ProductController extends Controller
                 $taxRows = DB::table('product_taxes as pt')
                     ->join('taxes as t', 'pt.tax_id', '=', 't.id')
                     ->where('pt.product_id', $id)
+                    ->where('t.is_active', 1)
                     ->select(
                         'pt.tax_id',
                         'pt.tax_percent',

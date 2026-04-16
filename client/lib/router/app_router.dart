@@ -19,6 +19,8 @@ import '../screens/modules/purchase_voucher_list_screen.dart';
 import '../screens/modules/purchase_voucher_screen.dart';
 import '../screens/modules/purchase_return_list_screen.dart';
 import '../screens/modules/purchase_return_form_screen.dart';
+import '../screens/modules/purchase_home_screen.dart';
+import '../screens/modules/purchase_module_reports_screen.dart';
 import '../screens/modules/tax_list_screen.dart';
 import '../screens/modules/tax_form_screen.dart';
 import '../screens/modules/product_tax_form_screen.dart';
@@ -52,13 +54,16 @@ abstract class AppRoutes {
   static const String supplierProducts = '/supplier-products';
   static const String supplierProductForm = '/supplier-product-form';
   static const String supplierProductList = '/supplier-product-list';
-  static const String supplierProductListForSupplier = '/supplier-product-list-for-supplier';
+  static const String supplierProductListForSupplier =
+      '/supplier-product-list-for-supplier';
+  static const String purchase = '/purchase';
   static const String purchaseOrders = '/purchase-orders';
   static const String purchaseOrderForm = '/purchase-order-form';
   static const String purchaseVoucherList = '/purchase-vouchers';
   static const String purchaseVoucher = '/purchase-voucher';
   static const String purchaseReturnList = '/purchase-returns';
   static const String purchaseReturnForm = '/purchase-return';
+  static const String purchaseModuleReports = '/reports/purchase-module';
   static const String taxList = '/taxes';
   static const String taxForm = '/tax-form';
   static const String productTaxForm = '/product-tax-form';
@@ -112,6 +117,7 @@ final List<GetPage<dynamic>> appPages = [
     name: AppRoutes.supplierProductListForSupplier,
     page: () => const SupplierProductListScreen(),
   ),
+  GetPage(name: AppRoutes.purchase, page: () => const PurchaseHomeScreen()),
   GetPage(
     name: AppRoutes.purchaseOrders,
     page: () => const PurchaseOrderFormScreen(),
@@ -141,35 +147,29 @@ final List<GetPage<dynamic>> appPages = [
     ),
   ),
   GetPage(
-    name: AppRoutes.taxList,
-    page: () => const TaxListScreen(),
+    name: AppRoutes.purchaseModuleReports,
+    page: () => const PurchaseModuleReportsScreen(),
   ),
+  GetPage(name: AppRoutes.taxList, page: () => const TaxListScreen()),
   GetPage(
     name: AppRoutes.taxForm,
-    page: () => TaxFormScreen(taxId: Get.arguments is int ? Get.arguments as int? : null),
+    page: () => TaxFormScreen(
+      taxId: Get.arguments is int ? Get.arguments as int? : null,
+    ),
   ),
   GetPage(
     name: AppRoutes.productTaxForm,
     page: () => const ProductTaxFormScreen(),
   ),
-  GetPage(
-    name: AppRoutes.products,
-    page: () => const ProductsHomeScreen(),
-  ),
-  GetPage(
-    name: AppRoutes.productList,
-    page: () => const ProductListScreen(),
-  ),
+  GetPage(name: AppRoutes.products, page: () => const ProductsHomeScreen()),
+  GetPage(name: AppRoutes.productList, page: () => const ProductListScreen()),
   GetPage(
     name: AppRoutes.productForm,
     page: () => ProductFormScreen(
       productId: Get.arguments is int ? Get.arguments as int? : null,
     ),
   ),
-  GetPage(
-    name: AppRoutes.hsnCodeList,
-    page: () => const HsnCodeListScreen(),
-  ),
+  GetPage(name: AppRoutes.hsnCodeList, page: () => const HsnCodeListScreen()),
   GetPage(
     name: AppRoutes.hsnCodeForm,
     page: () => HsnCodeFormScreen(
@@ -200,12 +200,6 @@ final List<GetPage<dynamic>> appPages = [
       );
     },
   ),
-  GetPage(
-    name: AppRoutes.categoryList,
-    page: () => const CategoryListScreen(),
-  ),
-  GetPage(
-    name: AppRoutes.categoryForm,
-    page: () => const CategoryFormScreen(),
-  ),
+  GetPage(name: AppRoutes.categoryList, page: () => const CategoryListScreen()),
+  GetPage(name: AppRoutes.categoryForm, page: () => const CategoryFormScreen()),
 ];

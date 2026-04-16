@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
+import '../router/app_router.dart';
 import '../theme/app_colors.dart';
 
 /// Consistent AppBar for all module screens
@@ -15,6 +18,23 @@ class ModuleAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.onBackPressed,
     this.actions,
   });
+
+  void _handleBack(BuildContext context) {
+    if (onBackPressed != null) {
+      onBackPressed!();
+      return;
+    }
+
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+      return;
+    }
+
+    if (Get.currentRoute != AppRoutes.dashboard) {
+      Get.offAllNamed(AppRoutes.dashboard);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +79,7 @@ class ModuleAppBar extends StatelessWidget implements PreferredSizeWidget {
             ),
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-        onPressed: onBackPressed,
+        onPressed: () => _handleBack(context),
       ),
       actions: actions,
     );

@@ -49,20 +49,39 @@ class MyApp extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: AppColors.primary, width: 2),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 16,
+          ),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             elevation: 0,
           ),
         ),
       ),
       initialRoute: isLoggedIn ? AppRoutes.dashboard : AppRoutes.login,
       getPages: appPages,
+      unknownRoute: GetPage(
+        name: '/not-found',
+        page: () => Scaffold(
+          appBar: AppBar(title: const Text('Page not found')),
+          body: Center(
+            child: FilledButton(
+              onPressed: () => Get.offAllNamed(
+                isLoggedIn ? AppRoutes.dashboard : AppRoutes.login,
+              ),
+              child: const Text('Go to home'),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

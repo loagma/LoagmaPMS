@@ -180,8 +180,18 @@ class DashboardScreen extends StatelessWidget {
                   title: 'Products',
                   subtitle: 'Configure products & taxes',
                   icon: Icons.inventory_2_outlined,
+                  hasSubmodules: true,
                   onTap: () {
                     Get.toNamed(AppRoutes.products);
+                  },
+                ),
+                _ModuleCard(
+                  title: 'Purchase',
+                  subtitle: 'Purchase voucher, order and return',
+                  icon: Icons.shopping_cart_checkout_outlined,
+                  hasSubmodules: true,
+                  onTap: () {
+                    Get.toNamed(AppRoutes.purchase);
                   },
                 ),
                 _ModuleCard(
@@ -200,30 +210,6 @@ class DashboardScreen extends StatelessWidget {
                     Get.to(() => const SupplierProductFormScreen());
                   },
                 ),
-                _ModuleCard(
-                  title: 'Purchase Orders',
-                  subtitle: 'Create and manage purchase orders',
-                  icon: Icons.receipt_long_outlined,
-                  onTap: () {
-                    Get.toNamed(AppRoutes.purchaseOrders);
-                  },
-                ),
-                _ModuleCard(
-                  title: 'Purchase Voucher',
-                  subtitle: 'Create purchase invoice',
-                  icon: Icons.description_outlined,
-                  onTap: () {
-                    Get.toNamed(AppRoutes.purchaseVoucher);
-                  },
-                ),
-                _ModuleCard(
-                  title: 'Purchase Return',
-                  subtitle: 'Return goods or create debit note',
-                  icon: Icons.assignment_return_outlined,
-                  onTap: () {
-                    Get.toNamed(AppRoutes.purchaseReturnForm);
-                  },
-                ),
                 // _ModuleCard(
                 //   title: 'Taxes',
                 //   subtitle: 'Create tax definition',
@@ -236,6 +222,7 @@ class DashboardScreen extends StatelessWidget {
                   title: 'Reports',
                   subtitle: 'View all module reports',
                   icon: Icons.assessment_rounded,
+                  hasSubmodules: true,
                   onTap: () {
                     Get.toNamed(AppRoutes.reports);
                   },
@@ -410,19 +397,11 @@ class _DashboardDrawer extends StatelessWidget {
                     },
                   ),
                   _DrawerItem(
-                    icon: Icons.receipt_long_outlined,
-                    label: 'Purchase Orders',
+                    icon: Icons.shopping_cart_checkout_outlined,
+                    label: 'Purchase',
                     onTap: () {
                       Navigator.of(context).pop();
-                      Get.toNamed(AppRoutes.purchaseOrders);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.description_outlined,
-                    label: 'Purchase Voucher',
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Get.toNamed(AppRoutes.purchaseVoucher);
+                      Get.toNamed(AppRoutes.purchase);
                     },
                   ),
                   _DrawerItem(
@@ -532,12 +511,14 @@ class _ModuleCard extends StatelessWidget {
     required this.subtitle,
     required this.icon,
     required this.onTap,
+    this.hasSubmodules = false,
   });
 
   final String title;
   final String subtitle;
   final IconData icon;
   final VoidCallback onTap;
+  final bool hasSubmodules;
 
   @override
   Widget build(BuildContext context) {
@@ -548,51 +529,74 @@ class _ModuleCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: AppColors.primaryLight.withValues(alpha: 0.9),
-          width: 1,
+          color: hasSubmodules
+              ? AppColors.primary.withValues(alpha: 0.55)
+              : AppColors.primaryLight.withValues(alpha: 0.9),
+          width: hasSubmodules ? 1.4 : 1,
         ),
       ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: AppColors.primary, size: 24),
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icon, color: AppColors.primary, size: 24),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textDark,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textMuted,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
-              const SizedBox(height: 14),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textDark,
+            ),
+            if (hasSubmodules)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.account_tree_outlined,
+                    size: 14,
+                    color: AppColors.primary,
+                  ),
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textMuted,
-                  fontWeight: FontWeight.w500,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
+          ],
         ),
       ),
     );
