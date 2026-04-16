@@ -92,6 +92,15 @@ class ApiConfig {
   /// GET/POST ${ApiConfig.apiBaseUrl}/purchase-orders
   static String get purchaseOrders => '$apiBaseUrl/purchase-orders';
 
+  /// GET/POST ${ApiConfig.apiBaseUrl}/sales-orders
+  static String get salesOrders => '$apiBaseUrl/sales-orders';
+
+  /// GET/POST ${ApiConfig.apiBaseUrl}/sales-invoices
+  static String get salesInvoices => '$apiBaseUrl/sales-invoices';
+
+  /// GET/POST ${ApiConfig.apiBaseUrl}/sales-returns
+  static String get salesReturns => '$apiBaseUrl/sales-returns';
+
   /// GET ${ApiConfig.apiBaseUrl}/purchase-vouchers
   static String get purchaseVouchers => '$apiBaseUrl/purchase-vouchers';
 
