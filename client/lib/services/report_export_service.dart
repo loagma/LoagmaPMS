@@ -9,6 +9,8 @@ import 'package:share_plus/share_plus.dart';
 import '../controllers/purchase_order_form_controller.dart';
 import '../controllers/purchase_return_form_controller.dart';
 import '../controllers/purchase_voucher_controller.dart';
+import '../controllers/sales_invoice_form_controller.dart';
+import '../controllers/sales_order_form_controller.dart';
 
 class ReportExportService {
   static Future<pw.ThemeData> _pdfTheme() async {
@@ -76,6 +78,50 @@ class ReportExportService {
         name: 'purchase_order_$poNumber.pdf',
       ),
     ], text: 'Purchase Order $poNumber');
+  }
+
+  static Future<void> printSalesOrder(
+    SalesOrderFormController controller,
+  ) async {
+    final bytes = await buildSalesOrderPdf(controller);
+    await Printing.layoutPdf(onLayout: (_) async => bytes);
+  }
+
+  static Future<void> shareSalesOrder(
+    SalesOrderFormController controller,
+  ) async {
+    final bytes = await buildSalesOrderPdf(controller);
+    final orderNo = controller.currentOrderId.value?.toString() ?? 'report';
+    await Share.shareXFiles([
+      XFile.fromData(
+        bytes,
+        mimeType: 'application/pdf',
+        name: 'sales_order_$orderNo.pdf',
+      ),
+    ], text: 'Sales Order $orderNo');
+  }
+
+  static Future<void> printSalesInvoice(
+    SalesInvoiceFormController controller,
+  ) async {
+    final bytes = await buildSalesInvoicePdf(controller);
+    await Printing.layoutPdf(onLayout: (_) async => bytes);
+  }
+
+  static Future<void> shareSalesInvoice(
+    SalesInvoiceFormController controller,
+  ) async {
+    final bytes = await buildSalesInvoicePdf(controller);
+    final invoiceNo = controller.invoiceNo.value.trim().isEmpty
+        ? (controller.currentInvoiceId.value?.toString() ?? 'report')
+        : controller.invoiceNo.value.trim();
+    await Share.shareXFiles([
+      XFile.fromData(
+        bytes,
+        mimeType: 'application/pdf',
+        name: 'sales_invoice_$invoiceNo.pdf',
+      ),
+    ], text: 'Sales Invoice $invoiceNo');
   }
 
   static Future<void> printPurchaseReturn(
@@ -384,6 +430,158 @@ class ReportExportService {
           ],
           pw.SizedBox(height: 12),
           _kv('Grand Total', controller.grandTotal.toStringAsFixed(2)),
+        ],
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  static Future<Uint8List> buildSalesOrderPdf(
+    SalesOrderFormController controller,
+  ) async {
+    final pdf = pw.Document();
+    final theme = await _pdfTheme();
+
+    final orderNo = controller.currentOrderId.value?.toString() ?? '-';
+    final customer = controller.customers.firstWhere(
+      (c) => c['id'] == controller.customerUserId.value,
+      orElse: () => <String, dynamic>{},
+    );
+    final customerName = customer['name']?.toString() ?? '-';
+
+    final rows = controller.items.map((row) {
+      final productId = row.productIdCtrl.text.trim().isEmpty
+          ? '-'
+          : row.productIdCtrl.text.trim();
+      final vendorProductId = row.vendorProductIdCtrl.text.trim().isEmpty
+          ? '-'
+          : row.vendorProductIdCtrl.text.trim();
+      final qty = double.tryParse(row.quantityCtrl.text.trim()) ?? 0;
+      final rate = double.tryParse(row.itemPriceCtrl.text.trim()) ?? 0;
+      return <String>[
+        productId,
+        vendorProductId,
+        qty.toStringAsFixed(1),
+        rate.toStringAsFixed(2),
+        row.lineTotal.toStringAsFixed(2),
+      ];
+    }).toList();
+
+    pdf.addPage(
+      pw.MultiPage(
+        theme: theme,
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(24),
+        build: (context) => [
+          pw.Text(
+            'Sales Order',
+            style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 8),
+          _kv('Order ID', orderNo),
+          _kv('State', controller.orderState.value),
+          _kv('Customer', customerName),
+          _kv('Payment Status', controller.paymentStatus.value),
+          _kv('Payment Method', controller.paymentMethod.value),
+          _kv('Order Date', _normalizeDate(controller.orderDate.value)),
+          if (controller.remarks.value.trim().isNotEmpty)
+            _kv('Remarks', controller.remarks.value.trim()),
+          pw.SizedBox(height: 12),
+          pw.Text(
+            'Item Details',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 6),
+          pw.TableHelper.fromTextArray(
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              fontSize: 8,
+            ),
+            cellStyle: const pw.TextStyle(fontSize: 8),
+            headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
+            cellAlignment: pw.Alignment.centerLeft,
+            headers: const [
+              'Product',
+              'Vendor Product',
+              'Qty',
+              'Rate',
+              'Total',
+            ],
+            data: rows,
+          ),
+          pw.SizedBox(height: 12),
+          _kv('Subtotal', controller.subtotal.toStringAsFixed(2)),
+        ],
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  static Future<Uint8List> buildSalesInvoicePdf(
+    SalesInvoiceFormController controller,
+  ) async {
+    final pdf = pw.Document();
+    final theme = await _pdfTheme();
+
+    final invoiceNo = controller.invoiceNo.value.trim().isEmpty
+        ? (controller.currentInvoiceId.value?.toString() ?? '-')
+        : controller.invoiceNo.value.trim();
+    final customer = controller.customers.firstWhere(
+      (c) => c['id'] == controller.customerUserId.value,
+      orElse: () => <String, dynamic>{},
+    );
+    final customerName = customer['name']?.toString() ?? '-';
+
+    final orderRef = controller.salesOrders.firstWhere(
+      (o) => o['order_id'] == controller.orderId.value,
+      orElse: () => <String, dynamic>{},
+    );
+    final orderLabel = orderRef['order_id']?.toString() ?? '-';
+
+    pdf.addPage(
+      pw.MultiPage(
+        theme: theme,
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(24),
+        build: (context) => [
+          pw.Text(
+            'Sales Invoice',
+            style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 8),
+          _kv('Invoice No', invoiceNo),
+          _kv('Order ID', orderLabel),
+          _kv('Customer', customerName),
+          _kv('Invoice Status', controller.invoiceStatus.value),
+          _kv('Payment Status', controller.paymentStatus.value),
+          _kv('Invoice Date', _normalizeDate(controller.invoiceDate.value)),
+          _kv('Due Date', _normalizeDate(controller.dueDate.value)),
+          if (controller.notes.value.trim().isNotEmpty)
+            _kv('Notes', controller.notes.value.trim()),
+          pw.SizedBox(height: 12),
+          pw.Text(
+            'Totals',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 6),
+          pw.TableHelper.fromTextArray(
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              fontSize: 8,
+            ),
+            cellStyle: const pw.TextStyle(fontSize: 8),
+            headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
+            headers: const ['Field', 'Amount'],
+            data: [
+              ['Subtotal', controller.subtotal.value],
+              ['Discount', controller.discountTotal.value],
+              ['Delivery Charge', controller.deliveryCharge.value],
+              ['Tax', controller.taxTotal.value],
+              ['Grand Total', controller.grandTotal.value],
+            ],
+          ),
         ],
       ),
     );

@@ -17,7 +17,7 @@ class ApiConfig {
   /// Local base URL (emulator / device hitting your dev machine).
   /// 10.0.2.2 is Android emulator's "localhost". Replace with your LAN IP
   /// if you want a physical device to connect.
-  static const String _localBaseUrl = 'http://10.0.2.2:8000';
+  static const String _localBaseUrl = 'http://192.168.1.41:8000';
 
   /// Production base URL (change to your real domain).
   static const String _productionBaseUrl =

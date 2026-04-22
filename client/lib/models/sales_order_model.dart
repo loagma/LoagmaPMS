@@ -1,6 +1,7 @@
 class SalesOrder {
   final int? orderId;
   final int? customerUserId;
+  final double? orderTotal;
   final String orderState;
   final String paymentStatus;
   final String paymentMethod;
@@ -11,6 +12,7 @@ class SalesOrder {
   const SalesOrder({
     this.orderId,
     this.customerUserId,
+    this.orderTotal,
     required this.orderState,
     required this.paymentStatus,
     required this.paymentMethod,
@@ -29,11 +31,18 @@ class SalesOrder {
       return int.tryParse(value.toString());
     }
 
+    double? parseDouble(dynamic value) {
+      if (value == null) return null;
+      if (value is num) return value.toDouble();
+      return double.tryParse(value.toString());
+    }
+
     return SalesOrder(
       orderId: parseInt(json['order_id'] ?? json['id']),
       customerUserId: parseInt(
         json['buyer_userid'] ?? json['customer_user_id'],
       ),
+      orderTotal: parseDouble(json['order_total']),
       orderState: (json['order_state'] ?? 'registered').toString(),
       paymentStatus: (json['payment_status'] ?? 'not_paid').toString(),
       paymentMethod: (json['payment_method'] ?? 'cod').toString(),
@@ -51,6 +60,7 @@ class SalesOrder {
     return {
       if (orderId != null) 'order_id': orderId,
       if (customerUserId != null) 'buyer_userid': customerUserId,
+      if (orderTotal != null) 'order_total': orderTotal,
       'order_state': orderState,
       'payment_status': paymentStatus,
       'payment_method': paymentMethod,
@@ -115,10 +125,10 @@ class SalesOrderItem {
       if (itemId != null) 'item_id': itemId,
       'product_id': productId,
       if (vendorProductId != null) 'vendor_product_id': vendorProductId,
-      'quantity': quantity,
-      'qty_loaded': qtyLoaded,
-      'qty_delivered': qtyDelivered,
-      'qty_returned': qtyReturned,
+      'quantity': quantity.toInt(),
+      'qty_loaded': qtyLoaded.toInt(),
+      'qty_delivered': qtyDelivered.toInt(),
+      'qty_returned': qtyReturned.toInt(),
       'item_price': itemPrice,
       'item_total': itemTotal,
     };

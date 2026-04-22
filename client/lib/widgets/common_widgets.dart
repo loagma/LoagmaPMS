@@ -231,16 +231,32 @@ class ActionButtonBar extends StatelessWidget {
         ],
       ),
       child: SafeArea(
-        child: Row(
-          children: buttons
-              .map(
-                (btn) => [
-                  Expanded(child: btn),
-                  if (btn != buttons.last) const SizedBox(width: 12),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 360) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (int i = 0; i < buttons.length; i++) ...[
+                    SizedBox(width: double.infinity, child: buttons[i]),
+                    if (i != buttons.length - 1) const SizedBox(height: 10),
+                  ],
                 ],
-              )
-              .expand((e) => e)
-              .toList(),
+              );
+            }
+
+            return Row(
+              children: buttons
+                  .map(
+                    (btn) => [
+                      Expanded(child: btn),
+                      if (btn != buttons.last) const SizedBox(width: 12),
+                    ],
+                  )
+                  .expand((e) => e)
+                  .toList(),
+            );
+          },
         ),
       ),
     );

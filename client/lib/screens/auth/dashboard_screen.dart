@@ -195,6 +195,15 @@ class DashboardScreen extends StatelessWidget {
                   },
                 ),
                 _ModuleCard(
+                  title: 'Sales',
+                  subtitle: 'Sales order, invoice and return',
+                  icon: Icons.point_of_sale_outlined,
+                  hasSubmodules: true,
+                  onTap: () {
+                    Get.toNamed(AppRoutes.sales);
+                  },
+                ),
+                _ModuleCard(
                   title: 'Create Supplier',
                   subtitle: 'Add new supplier profile',
                   icon: Icons.person_add_outlined,
