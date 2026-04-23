@@ -258,48 +258,6 @@ ALTER TABLE `product`
     ADD COLUMN `buffer_limit` int unsigned NOT NULL DEFAULT 0;
 
 
--- 2026-04-16: Minimal sales invoice table mapped to legacy orders
--- Keeps existing sales flow on orders/orders_item and adds invoice tracking only.
-CREATE TABLE IF NOT EXISTS `sales_invoices` (
-    `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-    `invoice_no` varchar(50) NOT NULL,
-    `invoice_prefix` varchar(20) DEFAULT NULL,
-    `invoice_number` bigint unsigned DEFAULT NULL,
-
-    `order_id` bigint unsigned NOT NULL,
-    `customer_user_id` bigint unsigned DEFAULT NULL,
-
-    `invoice_date` date NOT NULL,
-    `due_date` date DEFAULT NULL,
-
-    `invoice_status` enum('DRAFT','ISSUED','CANCELLED') NOT NULL DEFAULT 'DRAFT',
-    `payment_status` enum('PENDING','PARTIAL','PAID') NOT NULL DEFAULT 'PENDING',
-
-    `subtotal` decimal(12,2) NOT NULL DEFAULT 0.00,
-    `discount_total` decimal(12,2) NOT NULL DEFAULT 0.00,
-    `delivery_charge` decimal(12,2) NOT NULL DEFAULT 0.00,
-    `tax_total` decimal(12,2) NOT NULL DEFAULT 0.00,
-    `grand_total` decimal(12,2) NOT NULL DEFAULT 0.00,
-    `notes` text,
-
-    `created_by` bigint unsigned DEFAULT NULL,
-    `updated_by` bigint unsigned DEFAULT NULL,
-    `created_at` timestamp NULL DEFAULT NULL,
-    `updated_at` timestamp NULL DEFAULT NULL,
-
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `sales_invoices_invoice_no_unique` (`invoice_no`),
-    UNIQUE KEY `sales_invoices_order_id_unique` (`order_id`),
-    KEY `sales_invoices_invoice_date_index` (`invoice_date`),
-    KEY `sales_invoices_invoice_status_index` (`invoice_status`),
-    KEY `sales_invoices_payment_status_index` (`payment_status`),
-    KEY `sales_invoices_customer_user_id_index` (`customer_user_id`),
-
-    CONSTRAINT `sales_invoices_order_id_foreign`
-        FOREIGN KEY (`order_id`) REFERENCES `orders` (`order_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-
 -- 2026-03-24: Master dropdown tables for supplier form
 CREATE TABLE IF NOT EXISTS `BusinessType` (
     `id` varchar(10) NOT NULL,

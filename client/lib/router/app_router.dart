@@ -21,9 +21,6 @@ import '../screens/modules/purchase_return_list_screen.dart';
 import '../screens/modules/purchase_return_form_screen.dart';
 import '../screens/modules/purchase_home_screen.dart';
 import '../screens/modules/purchase_module_reports_screen.dart';
-import '../screens/modules/sales_invoice_form_screen.dart';
-import '../screens/modules/sales_order_form_screen.dart';
-import '../screens/modules/sales_return_form_screen.dart';
 import '../screens/modules/tax_list_screen.dart';
 import '../screens/modules/tax_form_screen.dart';
 import '../screens/modules/product_tax_form_screen.dart';
@@ -67,9 +64,6 @@ abstract class AppRoutes {
   static const String purchaseReturnList = '/purchase-returns';
   static const String purchaseReturnForm = '/purchase-return';
   static const String purchaseModuleReports = '/reports/purchase-module';
-  static const String salesOrderForm = '/sales-order-form';
-  static const String salesInvoiceForm = '/sales-invoice-form';
-  static const String salesReturnForm = '/sales-return-form';
   static const String taxList = '/taxes';
   static const String taxForm = '/tax-form';
   static const String productTaxForm = '/product-tax-form';
@@ -155,66 +149,6 @@ final List<GetPage<dynamic>> appPages = [
   GetPage(
     name: AppRoutes.purchaseModuleReports,
     page: () => const PurchaseModuleReportsScreen(),
-  ),
-  GetPage(
-    name: AppRoutes.salesOrderForm,
-    page: () {
-      final args = Get.arguments;
-      int? orderId;
-      bool startInViewOnly = false;
-
-      if (args is int) {
-        orderId = args;
-      } else if (args is Map) {
-        orderId = args['orderId'] as int?;
-        startInViewOnly = args['viewOnly'] == true;
-      }
-
-      return SalesOrderFormScreen(
-        orderId: orderId,
-        startInViewOnly: startInViewOnly,
-      );
-    },
-  ),
-  GetPage(
-    name: AppRoutes.salesInvoiceForm,
-    page: () {
-      final args = Get.arguments;
-      int? invoiceId;
-      bool startInViewOnly = false;
-
-      if (args is int) {
-        invoiceId = args;
-      } else if (args is Map) {
-        invoiceId = args['invoiceId'] as int?;
-        startInViewOnly = args['viewOnly'] == true;
-      }
-
-      return SalesInvoiceFormScreen(
-        invoiceId: invoiceId,
-        startInViewOnly: startInViewOnly,
-      );
-    },
-  ),
-  GetPage(
-    name: AppRoutes.salesReturnForm,
-    page: () {
-      final args = Get.arguments;
-      int? returnId;
-      bool startInViewOnly = false;
-
-      if (args is int) {
-        returnId = args;
-      } else if (args is Map) {
-        returnId = args['returnId'] as int?;
-        startInViewOnly = args['viewOnly'] == true;
-      }
-
-      return SalesReturnFormScreen(
-        returnId: returnId,
-        startInViewOnly: startInViewOnly,
-      );
-    },
   ),
   GetPage(name: AppRoutes.taxList, page: () => const TaxListScreen()),
   GetPage(
