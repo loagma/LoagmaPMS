@@ -12,9 +12,6 @@ class SalesInvoiceFormController extends GetxController {
   final int? invoiceId;
   final bool startInViewOnly;
 
-  final customers = <Map<String, dynamic>>[].obs;
-  final salesOrders = <Map<String, dynamic>>[].obs;
-
   final viewOnly = false.obs;
   final isLoading = false.obs;
   final isSaving = false.obs;
@@ -43,8 +40,6 @@ class SalesInvoiceFormController extends GetxController {
   void onInit() {
     super.onInit();
     viewOnly.value = startInViewOnly;
-    _loadCustomers();
-    _loadSalesOrders();
     currentInvoiceId.value = invoiceId;
     final now = DateTime.now();
     invoiceDate.value =
@@ -57,85 +52,6 @@ class SalesInvoiceFormController extends GetxController {
 
     if (invoiceId != null) {
       loadInvoice(invoiceId!);
-    }
-  }
-
-  int? _safeInt(dynamic raw) {
-    if (raw is int) return raw;
-    if (raw == null) return null;
-    return int.tryParse(raw.toString());
-  }
-
-  Future<void> _loadCustomers() async {
-    try {
-      final response = await http
-          .get(
-            Uri.parse(ApiConfig.users).replace(
-              queryParameters: {'limit': '500'},
-            ),
-            headers: {'Accept': 'application/json'},
-          )
-          .timeout(const Duration(seconds: 15));
-
-      if (response.statusCode != 200) return;
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (data['success'] != true) return;
-
-      final List raw = data['data'] as List? ?? const [];
-      customers.value = raw
-          .whereType<Map>()
-          .map((e) {
-            final id = _safeInt(e['id']);
-            return {
-              'id': id,
-              'name': e['name']?.toString() ?? 'User ${id ?? ''}',
-            };
-          })
-          .where((e) => e['id'] != null)
-          .toList();
-    } catch (_) {}
-  }
-
-  Future<void> _loadSalesOrders() async {
-    try {
-      final response = await http
-          .get(
-            Uri.parse(ApiConfig.salesOrders).replace(
-              queryParameters: {'per_page': '200'},
-            ),
-            headers: {'Accept': 'application/json'},
-          )
-          .timeout(const Duration(seconds: 15));
-
-      if (response.statusCode != 200) return;
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (data['success'] != true) return;
-
-      final payload = data['data'];
-      final List raw = payload is Map<String, dynamic>
-          ? (payload['data'] as List? ?? const [])
-          : const [];
-
-      salesOrders.value = raw.whereType<Map>().map((e) {
-        final orderId = _safeInt(e['order_id'] ?? e['id']);
-        final customerId = _safeInt(e['buyer_userid'] ?? e['customer_user_id']);
-        return {
-          'order_id': orderId,
-          'customer_user_id': customerId,
-        };
-      }).where((e) => e['order_id'] != null).toList();
-    } catch (_) {}
-  }
-
-  void selectOrder(int? selectedOrderId) {
-    orderId.value = selectedOrderId;
-    if (selectedOrderId == null) return;
-    final selected = salesOrders.firstWhereOrNull(
-      (o) => o['order_id'] == selectedOrderId,
-    );
-    final selectedCustomerId = _safeInt(selected?['customer_user_id']);
-    if (selectedCustomerId != null) {
-      customerUserId.value = selectedCustomerId;
     }
   }
 

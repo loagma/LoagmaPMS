@@ -221,19 +221,6 @@ class SalesReturnFormScreen extends StatelessWidget {
                         child: Obx(
                           () => Column(
                             children: [
-                              const Align(
-                                alignment: Alignment.centerLeft,
-                                child: Padding(
-                                  padding: EdgeInsets.only(bottom: 6),
-                                  child: Text(
-                                    'Tip: Provide Item ID when the same Product ID appears more than once in an order.',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: AppColors.textMuted,
-                                    ),
-                                  ),
-                                ),
-                              ),
                               for (int i = 0; i < controller.items.length; i++)
                                 _ReturnItemRow(
                                   row: controller.items[i],
@@ -340,16 +327,6 @@ class _ReturnItemRow extends StatelessWidget {
             children: [
               Expanded(
                 child: TextFormField(
-                  controller: row.itemIdCtrl,
-                  readOnly: readOnly,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: _inputDecoration(labelText: 'Item ID'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextFormField(
                   controller: row.productIdCtrl,
                   readOnly: readOnly,
                   keyboardType: TextInputType.number,
@@ -364,10 +341,12 @@ class _ReturnItemRow extends StatelessWidget {
                 child: TextFormField(
                   controller: row.originalQtyCtrl,
                   readOnly: readOnly,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: _inputDecoration(labelText: 'Original Qty *'),
-                  validator: (v) => (int.tryParse((v ?? '').trim()) ?? -1) < 0
+                  validator: (v) =>
+                      (double.tryParse((v ?? '').trim()) ?? -1) < 0
                       ? 'Invalid'
                       : null,
                 ),
@@ -389,10 +368,12 @@ class _ReturnItemRow extends StatelessWidget {
                 child: TextFormField(
                   controller: row.returnQtyCtrl,
                   readOnly: readOnly,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: _inputDecoration(labelText: 'Return Qty *'),
-                  validator: (v) => (int.tryParse((v ?? '').trim()) ?? -1) < 0
+                  validator: (v) =>
+                      (double.tryParse((v ?? '').trim()) ?? -1) < 0
                       ? 'Invalid'
                       : null,
                 ),

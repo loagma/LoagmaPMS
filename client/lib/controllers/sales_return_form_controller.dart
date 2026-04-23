@@ -138,14 +138,6 @@ class SalesReturnFormController extends GetxController {
         );
         return;
       }
-      if (parsed.returnQty > parsed.originalQty) {
-        Get.snackbar(
-          'Validation',
-          'Return quantity cannot exceed original quantity',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-        return;
-      }
       parsedItems.add(parsed);
     }
 
@@ -260,8 +252,8 @@ class SalesReturnLineRow {
 
   SalesReturnItem? toItem() {
     final productId = int.tryParse(productIdCtrl.text.trim());
-    final originalQty = int.tryParse(originalQtyCtrl.text.trim());
-    final returnQty = int.tryParse(returnQtyCtrl.text.trim());
+    final originalQty = double.tryParse(originalQtyCtrl.text.trim());
+    final returnQty = double.tryParse(returnQtyCtrl.text.trim());
     final refundAmount = double.tryParse(refundAmountCtrl.text.trim());
 
     if (productId == null ||
@@ -274,8 +266,8 @@ class SalesReturnLineRow {
     return SalesReturnItem(
       itemId: int.tryParse(itemIdCtrl.text.trim()),
       productId: productId,
-      originalQty: originalQty.toDouble(),
-      returnQty: returnQty.toDouble(),
+      originalQty: originalQty,
+      returnQty: returnQty,
       refundAmount: refundAmount,
       reason: reasonCtrl.text.trim().isEmpty ? null : reasonCtrl.text.trim(),
     );

@@ -4,7 +4,6 @@ class SalesReturn {
   final String returnDate;
   final String returnStatus;
   final String? reason;
-  final double? totalRefund;
   final List<SalesReturnItem> items;
 
   const SalesReturn({
@@ -13,7 +12,6 @@ class SalesReturn {
     required this.returnDate,
     required this.returnStatus,
     this.reason,
-    this.totalRefund,
     this.items = const [],
   });
 
@@ -27,19 +25,12 @@ class SalesReturn {
     final rawItems =
         (json['items'] ?? json['return_items']) as List<dynamic>? ?? const [];
 
-    double? parseDouble(dynamic value) {
-      if (value == null) return null;
-      if (value is num) return value.toDouble();
-      return double.tryParse(value.toString());
-    }
-
     return SalesReturn(
       id: parseInt(json['id']),
       orderId: parseInt(json['order_id']) ?? 0,
       returnDate: (json['return_date'] ?? '').toString(),
       returnStatus: (json['return_status'] ?? 'DRAFT').toString(),
       reason: json['reason']?.toString(),
-      totalRefund: parseDouble(json['total_refund']),
       items: rawItems
           .whereType<Map<String, dynamic>>()
           .map(SalesReturnItem.fromJson)
@@ -54,7 +45,6 @@ class SalesReturn {
       'return_date': returnDate,
       'return_status': returnStatus,
       if (reason != null && reason!.isNotEmpty) 'reason': reason,
-      if (totalRefund != null) 'total_refund': totalRefund,
       'items': items.map((e) => e.toJson()).toList(),
     };
   }
@@ -106,8 +96,8 @@ class SalesReturnItem {
     return {
       if (itemId != null) 'item_id': itemId,
       'product_id': productId,
-      'original_qty': originalQty.toInt(),
-      'return_qty': returnQty.toInt(),
+      'original_qty': originalQty,
+      'return_qty': returnQty,
       'refund_amount': refundAmount,
       if (reason != null && reason!.isNotEmpty) 'reason': reason,
     };

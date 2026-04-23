@@ -14,9 +14,6 @@ use App\Http\Controllers\SupplierProductController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\PurchaseVoucherController;
 use App\Http\Controllers\PurchaseReturnController;
-use App\Http\Controllers\SalesOrderController;
-use App\Http\Controllers\SalesInvoiceController;
-use App\Http\Controllers\SalesReturnController;
 use App\Http\Controllers\TaxController;
 use App\Http\Controllers\ProductTaxController;
 use App\Http\Controllers\CategoryController;
@@ -110,27 +107,6 @@ Route::post('/purchase-returns', [PurchaseReturnController::class, 'store']);
 Route::get('/purchase-returns/{purchaseReturn}', [PurchaseReturnController::class, 'show']);
 Route::put('/purchase-returns/{purchaseReturn}', [PurchaseReturnController::class, 'update']);
 Route::delete('/purchase-returns/{purchaseReturn}', [PurchaseReturnController::class, 'destroy']);
-
-// Sales Order routes (legacy orders table)
-Route::get('/sales-orders', [SalesOrderController::class, 'index']);
-Route::post('/sales-orders', [SalesOrderController::class, 'store']);
-Route::get('/sales-orders/{id}', [SalesOrderController::class, 'show']);
-Route::put('/sales-orders/{id}', [SalesOrderController::class, 'update']);
-Route::delete('/sales-orders/{id}', [SalesOrderController::class, 'destroy']);
-
-// Sales Invoice routes
-Route::get('/sales-invoices', [SalesInvoiceController::class, 'index']);
-Route::post('/sales-invoices', [SalesInvoiceController::class, 'store']);
-Route::get('/sales-invoices/{id}', [SalesInvoiceController::class, 'show']);
-Route::put('/sales-invoices/{id}', [SalesInvoiceController::class, 'update']);
-Route::delete('/sales-invoices/{id}', [SalesInvoiceController::class, 'destroy']);
-
-// Sales Return routes (qty_returned on orders_item)
-Route::get('/sales-returns', [SalesReturnController::class, 'index']);
-Route::post('/sales-returns', [SalesReturnController::class, 'store']);
-Route::get('/sales-returns/{id}', [SalesReturnController::class, 'show']);
-Route::put('/sales-returns/{id}', [SalesReturnController::class, 'update']);
-Route::delete('/sales-returns/{id}', [SalesReturnController::class, 'destroy']);
 
 // Tax routes
 Route::get('/taxes', [TaxController::class, 'index']);

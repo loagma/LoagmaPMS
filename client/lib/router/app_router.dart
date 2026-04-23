@@ -21,14 +21,9 @@ import '../screens/modules/purchase_return_list_screen.dart';
 import '../screens/modules/purchase_return_form_screen.dart';
 import '../screens/modules/purchase_home_screen.dart';
 import '../screens/modules/purchase_module_reports_screen.dart';
-import '../screens/modules/sales_home_screen.dart';
 import '../screens/modules/sales_invoice_form_screen.dart';
-import '../screens/modules/sales_invoice_list_screen.dart';
-import '../screens/modules/sales_module_reports_screen.dart';
 import '../screens/modules/sales_order_form_screen.dart';
-import '../screens/modules/sales_order_list_screen.dart';
 import '../screens/modules/sales_return_form_screen.dart';
-import '../screens/modules/sales_return_list_screen.dart';
 import '../screens/modules/tax_list_screen.dart';
 import '../screens/modules/tax_form_screen.dart';
 import '../screens/modules/product_tax_form_screen.dart';
@@ -72,11 +67,6 @@ abstract class AppRoutes {
   static const String purchaseReturnList = '/purchase-returns';
   static const String purchaseReturnForm = '/purchase-return';
   static const String purchaseModuleReports = '/reports/purchase-module';
-  static const String sales = '/sales';
-  static const String salesModuleReports = '/reports/sales-module';
-  static const String salesOrderList = '/sales-orders';
-  static const String salesInvoiceList = '/sales-invoices';
-  static const String salesReturnList = '/sales-returns';
   static const String salesOrderForm = '/sales-order-form';
   static const String salesInvoiceForm = '/sales-invoice-form';
   static const String salesReturnForm = '/sales-return-form';
@@ -165,23 +155,6 @@ final List<GetPage<dynamic>> appPages = [
   GetPage(
     name: AppRoutes.purchaseModuleReports,
     page: () => const PurchaseModuleReportsScreen(),
-  ),
-  GetPage(name: AppRoutes.sales, page: () => const SalesHomeScreen()),
-  GetPage(
-    name: AppRoutes.salesModuleReports,
-    page: () => const SalesModuleReportsScreen(),
-  ),
-  GetPage(
-    name: AppRoutes.salesOrderList,
-    page: () => const SalesOrderListScreen(),
-  ),
-  GetPage(
-    name: AppRoutes.salesInvoiceList,
-    page: () => const SalesInvoiceListScreen(),
-  ),
-  GetPage(
-    name: AppRoutes.salesReturnList,
-    page: () => const SalesReturnListScreen(),
   ),
   GetPage(
     name: AppRoutes.salesOrderForm,

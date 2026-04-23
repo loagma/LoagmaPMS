@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/sales_invoice_form_controller.dart';
-import '../../services/report_export_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 
@@ -16,23 +16,6 @@ InputDecoration _inputDecoration({
     hintText: hintText,
     suffixIcon: suffixIcon,
   ).copyWith(floatingLabelBehavior: FloatingLabelBehavior.always);
-}
-
-const double _fieldGap = 10;
-const double _fieldVerticalGap = 6;
-const double _sectionGap = 10;
-
-Widget _twoFieldRow({
-  required Widget left,
-  required Widget right,
-}) {
-  return Row(
-    children: [
-      Expanded(child: left),
-      const SizedBox(width: _fieldGap),
-      Expanded(child: right),
-    ],
-  );
 }
 
 Future<void> _pickDate(
@@ -54,34 +37,6 @@ Future<void> _pickDate(
   final m = picked.month.toString().padLeft(2, '0');
   final d = picked.day.toString().padLeft(2, '0');
   onPicked('${picked.year}-$m-$d');
-}
-
-Future<void> _printSalesInvoice(SalesInvoiceFormController controller) async {
-  try {
-    await ReportExportService.printSalesInvoice(controller);
-  } catch (e) {
-    Get.snackbar(
-      'Print failed',
-      'Could not generate sales invoice PDF: $e',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.redAccent,
-      colorText: Colors.white,
-    );
-  }
-}
-
-Future<void> _shareSalesInvoice(SalesInvoiceFormController controller) async {
-  try {
-    await ReportExportService.shareSalesInvoice(controller);
-  } catch (e) {
-    Get.snackbar(
-      'Share failed',
-      'Could not share sales invoice PDF: $e',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.redAccent,
-      colorText: Colors.white,
-    );
-  }
 }
 
 class SalesInvoiceFormScreen extends StatelessWidget {
@@ -110,22 +65,6 @@ class SalesInvoiceFormScreen extends StatelessWidget {
         subtitle: 'Loagma',
         onBackPressed: () => Get.back(),
         actions: [
-          Obx(() {
-            if (!controller.isReadOnly) return const SizedBox.shrink();
-            return IconButton(
-              icon: const Icon(Icons.print_outlined, color: Colors.white),
-              tooltip: 'Print/PDF',
-              onPressed: () async => _printSalesInvoice(controller),
-            );
-          }),
-          Obx(() {
-            if (!controller.isReadOnly) return const SizedBox.shrink();
-            return IconButton(
-              icon: const Icon(Icons.share_outlined, color: Colors.white),
-              tooltip: 'Share/Export',
-              onPressed: () async => _shareSalesInvoice(controller),
-            );
-          }),
           Obx(() {
             final canEdit =
                 controller.viewOnly.value &&
@@ -160,247 +99,216 @@ class SalesInvoiceFormScreen extends StatelessWidget {
                         title: 'Invoice Header',
                         child: Column(
                           children: [
-                            _twoFieldRow(
-                              left: Obx(
-                                () => TextFormField(
-                                  initialValue: controller.invoiceNo.value,
-                                  readOnly: readOnly,
-                                  decoration: _inputDecoration(
-                                    labelText: 'Invoice No *',
-                                  ),
-                                  validator: (v) =>
-                                      (v ?? '').trim().isEmpty ? 'Required' : null,
-                                  onChanged: (v) => controller.invoiceNo.value = v,
-                                ),
-                              ),
-                              right: Obx(() {
-                                final selectedOrderId = controller.orderId.value;
-                                final orderOptions = controller.salesOrders
-                                    .where((e) => e['order_id'] != null)
-                                    .map((e) {
-                                      final id = e['order_id'] as int;
-                                      final customerId = e['customer_user_id'];
-                                      final label = customerId == null
-                                          ? 'SO-$id'
-                                          : 'SO-$id (Customer #$customerId)';
-                                      return DropdownMenuItem<int>(
-                                        value: id,
-                                        child: Text(
-                                          label,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      );
-                                    })
-                                    .toList();
-
-                                if (selectedOrderId != null &&
-                                    !orderOptions.any(
-                                      (o) => o.value == selectedOrderId,
-                                    )) {
-                                  orderOptions.insert(
-                                    0,
-                                    DropdownMenuItem<int>(
-                                      value: selectedOrderId,
-                                      child: Text('SO-$selectedOrderId'),
-                                    ),
-                                  );
-                                }
-
-                                return DropdownButtonFormField<int>(
-                                  initialValue: selectedOrderId,
-                                  decoration:
-                                      _inputDecoration(labelText: 'Order ID *'),
-                                  items: orderOptions,
-                                  validator: (v) => v == null ? 'Required' : null,
-                                  onChanged: readOnly
-                                      ? null
-                                      : controller.selectOrder,
-                                );
-                              }),
-                            ),
-                            const SizedBox(height: _fieldVerticalGap),
-                            _twoFieldRow(
-                              left: Obx(() {
-                                final selectedCustomerId =
-                                    controller.customerUserId.value;
-                                final customerOptions = controller.customers
-                                    .where((e) => e['id'] != null)
-                                    .map((e) {
-                                      final id = e['id'] as int;
-                                      final name = (e['name'] ?? '').toString();
-                                      return DropdownMenuItem<int>(
-                                        value: id,
-                                        child: Text(
-                                          name.trim().isEmpty
-                                              ? '$id'
-                                              : '$name (#$id)',
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      );
-                                    })
-                                    .toList();
-
-                                if (selectedCustomerId != null &&
-                                    !customerOptions.any(
-                                      (o) => o.value == selectedCustomerId,
-                                    )) {
-                                  customerOptions.insert(
-                                    0,
-                                    DropdownMenuItem<int>(
-                                      value: selectedCustomerId,
-                                      child: Text('Customer #$selectedCustomerId'),
-                                    ),
-                                  );
-                                }
-
-                                return DropdownButtonFormField<int>(
-                                  initialValue: selectedCustomerId,
-                                  decoration: _inputDecoration(
-                                    labelText: 'Customer User ID',
-                                  ),
-                                  items: customerOptions,
-                                  onChanged: readOnly
-                                      ? null
-                                      : (v) =>
-                                            controller.customerUserId.value = v,
-                                );
-                              }),
-                              right: Obx(
-                                () => TextFormField(
-                                  controller: TextEditingController(
-                                    text: controller.invoiceDate.value,
-                                  ),
-                                  readOnly: true,
-                                  decoration: _inputDecoration(
-                                    labelText: 'Invoice Date *',
-                                    suffixIcon: IconButton(
-                                      icon: const Icon(
-                                        Icons.calendar_today_rounded,
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Obx(
+                                    () => TextFormField(
+                                      initialValue: controller.invoiceNo.value,
+                                      readOnly: readOnly,
+                                      decoration: _inputDecoration(
+                                        labelText: 'Invoice No *',
                                       ),
-                                      onPressed: readOnly
-                                          ? null
-                                          : () => _pickDate(
-                                              context,
-                                              currentValue:
-                                                  controller.invoiceDate.value,
-                                              onPicked: (v) =>
-                                                  controller.invoiceDate.value = v,
-                                            ),
+                                      validator: (v) => (v ?? '').trim().isEmpty
+                                          ? 'Required'
+                                          : null,
+                                      onChanged: (v) =>
+                                          controller.invoiceNo.value = v,
                                     ),
                                   ),
                                 ),
-                              ),
-                            ),
-                            const SizedBox(height: _fieldVerticalGap),
-                            _twoFieldRow(
-                              left: Obx(
-                                () => TextFormField(
-                                  controller: TextEditingController(
-                                    text: controller.dueDate.value,
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: TextFormField(
+                                    initialValue:
+                                        controller.orderId.value?.toString() ??
+                                        '',
+                                    readOnly: readOnly,
+                                    keyboardType: TextInputType.number,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                    ],
+                                    decoration: _inputDecoration(
+                                      labelText: 'Order ID *',
+                                    ),
+                                    validator: (v) => (v ?? '').trim().isEmpty
+                                        ? 'Required'
+                                        : null,
+                                    onChanged: (v) => controller.orderId.value =
+                                        int.tryParse(v.trim()),
                                   ),
-                                  readOnly: true,
-                                  decoration: _inputDecoration(
-                                    labelText: 'Due Date',
-                                    suffixIcon: IconButton(
-                                      icon: const Icon(
-                                        Icons.calendar_today_rounded,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextFormField(
+                                    initialValue:
+                                        controller.customerUserId.value
+                                            ?.toString() ??
+                                        '',
+                                    readOnly: readOnly,
+                                    keyboardType: TextInputType.number,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                    ],
+                                    decoration: _inputDecoration(
+                                      labelText: 'Customer User ID',
+                                    ),
+                                    onChanged: (v) =>
+                                        controller.customerUserId.value =
+                                            int.tryParse(v.trim()),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Obx(
+                                    () => TextFormField(
+                                      controller: TextEditingController(
+                                        text: controller.invoiceDate.value,
                                       ),
-                                      onPressed: readOnly
-                                          ? null
-                                          : () => _pickDate(
-                                              context,
-                                              currentValue: controller.dueDate.value,
-                                              onPicked: (v) =>
-                                                  controller.dueDate.value = v,
-                                            ),
+                                      readOnly: true,
+                                      decoration: _inputDecoration(
+                                        labelText: 'Invoice Date *',
+                                        suffixIcon: IconButton(
+                                          icon: const Icon(
+                                            Icons.calendar_today_rounded,
+                                          ),
+                                          onPressed: readOnly
+                                              ? null
+                                              : () => _pickDate(
+                                                  context,
+                                                  currentValue: controller
+                                                      .invoiceDate
+                                                      .value,
+                                                  onPicked: (v) =>
+                                                      controller
+                                                              .invoiceDate
+                                                              .value =
+                                                          v,
+                                                ),
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              right: Obx(
-                                () => DropdownButtonFormField<String>(
-                                  initialValue: controller.invoiceStatus.value,
-                                  decoration: _inputDecoration(
-                                    labelText: 'Invoice Status',
-                                  ),
-                                  items: const ['DRAFT', 'ISSUED', 'CANCELLED']
-                                      .map(
-                                        (s) => DropdownMenuItem(
-                                          value: s,
-                                          child: Text(s),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: readOnly
-                                      ? null
-                                      : (v) => controller.invoiceStatus.value =
-                                            v ?? 'DRAFT',
-                                ),
-                              ),
+                              ],
                             ),
-                            const SizedBox(height: _fieldVerticalGap),
-                            _twoFieldRow(
-                              left: Obx(
-                                () => DropdownButtonFormField<String>(
-                                  initialValue: controller.paymentStatus.value,
-                                  decoration: _inputDecoration(
-                                    labelText: 'Payment Status',
-                                  ),
-                                  items: const ['PENDING', 'PARTIAL', 'PAID']
-                                      .map(
-                                        (s) => DropdownMenuItem(
-                                          value: s,
-                                          child: Text(s),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Obx(
+                                    () => TextFormField(
+                                      controller: TextEditingController(
+                                        text: controller.dueDate.value,
+                                      ),
+                                      readOnly: true,
+                                      decoration: _inputDecoration(
+                                        labelText: 'Due Date',
+                                        suffixIcon: IconButton(
+                                          icon: const Icon(
+                                            Icons.calendar_today_rounded,
+                                          ),
+                                          onPressed: readOnly
+                                              ? null
+                                              : () => _pickDate(
+                                                  context,
+                                                  currentValue:
+                                                      controller.dueDate.value,
+                                                  onPicked: (v) =>
+                                                      controller.dueDate.value =
+                                                          v,
+                                                ),
                                         ),
-                                      )
-                                      .toList(),
-                                  onChanged: readOnly
-                                      ? null
-                                      : (v) => controller.paymentStatus.value =
-                                            v ?? 'PENDING',
+                                      ),
+                                    ),
+                                  ),
                                 ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Obx(
+                                    () => DropdownButtonFormField<String>(
+                                      value: controller.invoiceStatus.value,
+                                      decoration: _inputDecoration(
+                                        labelText: 'Invoice Status',
+                                      ),
+                                      items:
+                                          const ['DRAFT', 'ISSUED', 'CANCELLED']
+                                              .map(
+                                                (s) => DropdownMenuItem(
+                                                  value: s,
+                                                  child: Text(s),
+                                                ),
+                                              )
+                                              .toList(),
+                                      onChanged: readOnly
+                                          ? null
+                                          : (v) =>
+                                                controller.invoiceStatus.value =
+                                                    v ?? 'DRAFT',
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Obx(
+                              () => DropdownButtonFormField<String>(
+                                value: controller.paymentStatus.value,
+                                decoration: _inputDecoration(
+                                  labelText: 'Payment Status',
+                                ),
+                                items: const ['PENDING', 'PARTIAL', 'PAID']
+                                    .map(
+                                      (s) => DropdownMenuItem(
+                                        value: s,
+                                        child: Text(s),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: readOnly
+                                    ? null
+                                    : (v) => controller.paymentStatus.value =
+                                          v ?? 'PENDING',
                               ),
-                              right: const SizedBox.shrink(),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: _sectionGap),
+                      const SizedBox(height: 8),
                       ContentCard(
                         title: 'Totals',
                         child: Column(
                           children: [
-                            _twoFieldRow(
-                              left: _numField(
-                                'Subtotal *',
-                                controller.subtotal,
-                                readOnly,
-                              ),
-                              right: _numField(
-                                'Discount',
-                                controller.discountTotal,
-                                readOnly,
-                              ),
+                            _numField(
+                              'Subtotal *',
+                              controller.subtotal,
+                              readOnly,
                             ),
-                            const SizedBox(height: _fieldVerticalGap),
-                            _twoFieldRow(
-                              left: _numField(
-                                'Delivery Charge',
-                                controller.deliveryCharge,
-                                readOnly,
-                              ),
-                              right: _numField('Tax', controller.taxTotal, readOnly),
+                            const SizedBox(height: 6),
+                            _numField(
+                              'Discount',
+                              controller.discountTotal,
+                              readOnly,
                             ),
-                            const SizedBox(height: _fieldVerticalGap),
-                            _twoFieldRow(
-                              left: _numField(
-                                'Grand Total *',
-                                controller.grandTotal,
-                                readOnly,
-                              ),
-                              right: const SizedBox.shrink(),
+                            const SizedBox(height: 6),
+                            _numField(
+                              'Delivery Charge',
+                              controller.deliveryCharge,
+                              readOnly,
                             ),
-                            const SizedBox(height: _fieldVerticalGap),
+                            const SizedBox(height: 6),
+                            _numField('Tax', controller.taxTotal, readOnly),
+                            const SizedBox(height: 6),
+                            _numField(
+                              'Grand Total *',
+                              controller.grandTotal,
+                              readOnly,
+                            ),
+                            const SizedBox(height: 6),
                             TextFormField(
                               initialValue: controller.notes.value,
                               readOnly: readOnly,
@@ -424,16 +332,6 @@ class SalesInvoiceFormScreen extends StatelessWidget {
                           ? null
                           : () => Get.back(),
                     ),
-                    if (readOnly)
-                      ActionButton(
-                        label: 'Print/PDF',
-                        onPressed: () async => _printSalesInvoice(controller),
-                      ),
-                    if (readOnly)
-                      ActionButton(
-                        label: 'Share',
-                        onPressed: () async => _shareSalesInvoice(controller),
-                      ),
                     if (!readOnly)
                       ActionButton(
                         label: 'Save',

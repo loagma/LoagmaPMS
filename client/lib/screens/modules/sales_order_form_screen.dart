@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/sales_order_form_controller.dart';
-import '../../services/report_export_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 
@@ -17,23 +16,6 @@ InputDecoration _inputDecoration({
     hintText: hintText,
     suffixIcon: suffixIcon,
   ).copyWith(floatingLabelBehavior: FloatingLabelBehavior.always);
-}
-
-const double _fieldGap = 10;
-const double _fieldVerticalGap = 6;
-const double _sectionGap = 10;
-
-Widget _twoFieldRow({
-  required Widget left,
-  required Widget right,
-}) {
-  return Row(
-    children: [
-      Expanded(child: left),
-      const SizedBox(width: _fieldGap),
-      Expanded(child: right),
-    ],
-  );
 }
 
 Future<void> _pickDate(
@@ -55,34 +37,6 @@ Future<void> _pickDate(
   final m = picked.month.toString().padLeft(2, '0');
   final d = picked.day.toString().padLeft(2, '0');
   onPicked('${picked.year}-$m-$d');
-}
-
-Future<void> _printSalesOrder(SalesOrderFormController controller) async {
-  try {
-    await ReportExportService.printSalesOrder(controller);
-  } catch (e) {
-    Get.snackbar(
-      'Print failed',
-      'Could not generate sales order PDF: $e',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.redAccent,
-      colorText: Colors.white,
-    );
-  }
-}
-
-Future<void> _shareSalesOrder(SalesOrderFormController controller) async {
-  try {
-    await ReportExportService.shareSalesOrder(controller);
-  } catch (e) {
-    Get.snackbar(
-      'Share failed',
-      'Could not share sales order PDF: $e',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.redAccent,
-      colorText: Colors.white,
-    );
-  }
 }
 
 class SalesOrderFormScreen extends StatelessWidget {
@@ -111,22 +65,6 @@ class SalesOrderFormScreen extends StatelessWidget {
         subtitle: 'Loagma',
         onBackPressed: () => Get.back(),
         actions: [
-          Obx(() {
-            if (!controller.isReadOnly) return const SizedBox.shrink();
-            return IconButton(
-              icon: const Icon(Icons.print_outlined, color: Colors.white),
-              tooltip: 'Print/PDF',
-              onPressed: () async => _printSalesOrder(controller),
-            );
-          }),
-          Obx(() {
-            if (!controller.isReadOnly) return const SizedBox.shrink();
-            return IconButton(
-              icon: const Icon(Icons.share_outlined, color: Colors.white),
-              tooltip: 'Share/Export',
-              onPressed: () async => _shareSalesOrder(controller),
-            );
-          }),
           Obx(() {
             final canEdit =
                 controller.viewOnly.value &&
@@ -171,9 +109,9 @@ class SalesOrderFormScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _HeaderCard(controller: controller),
-                      const SizedBox(height: _sectionGap),
+                      const SizedBox(height: 8),
                       _ItemsCard(controller: controller),
-                      const SizedBox(height: _sectionGap),
+                      const SizedBox(height: 8),
                       _SummaryCard(controller: controller),
                     ],
                   ),
@@ -223,9 +161,9 @@ class _SalesOrderReadOnlyView extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _HeaderCard(controller: controller, readOnly: true),
-                const SizedBox(height: _sectionGap),
+                const SizedBox(height: 8),
                 _ItemsCard(controller: controller, readOnly: true),
-                const SizedBox(height: _sectionGap),
+                const SizedBox(height: 8),
                 _SummaryCard(controller: controller),
               ],
             ),
@@ -234,14 +172,6 @@ class _SalesOrderReadOnlyView extends StatelessWidget {
         ActionButtonBar(
           buttons: [
             ActionButton(label: 'Back', onPressed: () => Get.back()),
-            ActionButton(
-              label: 'Print/PDF',
-              onPressed: () async => _printSalesOrder(controller),
-            ),
-            ActionButton(
-              label: 'Share',
-              onPressed: () async => _shareSalesOrder(controller),
-            ),
             if (controller.orderState.value == 'registered')
               ActionButton(
                 label: 'Edit Draft',
@@ -267,113 +197,126 @@ class _HeaderCard extends StatelessWidget {
       title: 'Order Header',
       child: Column(
         children: [
-          _twoFieldRow(
-            left: TextFormField(
-              initialValue: controller.currentOrderId.value?.toString() ?? '',
-              readOnly: true,
-              decoration: _inputDecoration(labelText: 'Order ID'),
-            ),
-            right: Obx(() {
-              final currentValue = controller.customerUserId.value;
-              final options = controller.customers
-                  .where((e) => e['id'] != null)
-                  .map((e) {
-                    final id = e['id'] as int;
-                    final name = (e['name'] ?? '').toString();
-                    return DropdownMenuItem<int>(
-                      value: id,
-                      child: Text(
-                        name.trim().isEmpty ? '$id' : '$name (#$id)',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  })
-                  .toList();
-
-              if (currentValue != null &&
-                  !options.any((o) => o.value == currentValue)) {
-                options.insert(
-                  0,
-                  DropdownMenuItem<int>(
-                    value: currentValue,
-                    child: Text('Customer #$currentValue'),
-                  ),
-                );
-              }
-
-              return DropdownButtonFormField<int>(
-                initialValue: currentValue,
-                decoration: _inputDecoration(labelText: 'Customer User ID *'),
-                items: options,
-                validator: (v) => v == null ? 'Required' : null,
-                onChanged: readOnly
-                    ? null
-                    : (v) => controller.customerUserId.value = v,
-              );
-            }),
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  initialValue:
+                      controller.currentOrderId.value?.toString() ?? '',
+                  readOnly: true,
+                  decoration: _inputDecoration(labelText: 'Order ID'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextFormField(
+                  initialValue:
+                      controller.customerUserId.value?.toString() ?? '',
+                  readOnly: readOnly,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: _inputDecoration(labelText: 'Customer User ID *'),
+                  validator: (v) {
+                    if ((v ?? '').trim().isEmpty) return 'Required';
+                    return null;
+                  },
+                  onChanged: (v) =>
+                      controller.customerUserId.value = int.tryParse(v.trim()),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: _fieldVerticalGap),
-          _twoFieldRow(
-            left: Obx(
-              () => TextFormField(
-                controller: TextEditingController(text: controller.orderDate.value),
-                readOnly: true,
-                decoration: _inputDecoration(
-                  labelText: 'Order Date *',
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.calendar_today_rounded),
-                    onPressed: readOnly
-                        ? null
-                        : () => _pickDate(
-                            context,
-                            currentValue: controller.orderDate.value,
-                            onPicked: (v) => controller.orderDate.value = v,
-                          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: Obx(
+                  () => TextFormField(
+                    controller: TextEditingController(
+                      text: controller.orderDate.value,
+                    ),
+                    readOnly: true,
+                    decoration: _inputDecoration(
+                      labelText: 'Order Date *',
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.calendar_today_rounded),
+                        onPressed: readOnly
+                            ? null
+                            : () => _pickDate(
+                                context,
+                                currentValue: controller.orderDate.value,
+                                onPicked: (v) => controller.orderDate.value = v,
+                              ),
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-            right: Obx(
-              () => DropdownButtonFormField<String>(
-                initialValue: controller.orderState.value,
-                decoration: _inputDecoration(labelText: 'Order State'),
-                items: const ['registered', 'dispatched', 'delivered', 'cancelled']
-                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                    .toList(),
-                onChanged: readOnly
-                    ? null
-                    : (v) => controller.orderState.value = v ?? 'registered',
+              const SizedBox(width: 10),
+              Expanded(
+                child: Obx(
+                  () => DropdownButtonFormField<String>(
+                    value: controller.orderState.value,
+                    decoration: _inputDecoration(labelText: 'Order State'),
+                    items:
+                        const [
+                              'registered',
+                              'dispatched',
+                              'delivered',
+                              'cancelled',
+                            ]
+                            .map(
+                              (s) => DropdownMenuItem(value: s, child: Text(s)),
+                            )
+                            .toList(),
+                    onChanged: readOnly
+                        ? null
+                        : (v) =>
+                              controller.orderState.value = v ?? 'registered',
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-          const SizedBox(height: _fieldVerticalGap),
-          _twoFieldRow(
-            left: Obx(
-              () => DropdownButtonFormField<String>(
-                initialValue: controller.paymentStatus.value,
-                decoration: _inputDecoration(labelText: 'Payment Status'),
-                items: const ['not_paid', 'pending', 'partially_paid', 'paid']
-                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                    .toList(),
-                onChanged: readOnly
-                    ? null
-                    : (v) => controller.paymentStatus.value = v ?? 'not_paid',
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: Obx(
+                  () => DropdownButtonFormField<String>(
+                    value: controller.paymentStatus.value,
+                    decoration: _inputDecoration(labelText: 'Payment Status'),
+                    items:
+                        const ['not_paid', 'pending', 'partially_paid', 'paid']
+                            .map(
+                              (s) => DropdownMenuItem(value: s, child: Text(s)),
+                            )
+                            .toList(),
+                    onChanged: readOnly
+                        ? null
+                        : (v) =>
+                              controller.paymentStatus.value = v ?? 'not_paid',
+                  ),
+                ),
               ),
-            ),
-            right: Obx(
-              () => DropdownButtonFormField<String>(
-                initialValue: controller.paymentMethod.value,
-                decoration: _inputDecoration(labelText: 'Payment Method'),
-                items: const ['cod', 'online', 'bank']
-                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                    .toList(),
-                onChanged: readOnly
-                    ? null
-                    : (v) => controller.paymentMethod.value = v ?? 'cod',
+              const SizedBox(width: 10),
+              Expanded(
+                child: Obx(
+                  () => DropdownButtonFormField<String>(
+                    value: controller.paymentMethod.value,
+                    decoration: _inputDecoration(labelText: 'Payment Method'),
+                    items: const ['cod', 'online', 'bank']
+                        .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                        .toList(),
+                    onChanged: readOnly
+                        ? null
+                        : (v) => controller.paymentMethod.value = v ?? 'cod',
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-          const SizedBox(height: _fieldVerticalGap),
+          const SizedBox(height: 6),
           TextFormField(
             initialValue: controller.remarks.value,
             readOnly: readOnly,
@@ -409,7 +352,6 @@ class _ItemsCard extends StatelessWidget {
           children: [
             for (int i = 0; i < controller.items.length; i++)
               _ItemRow(
-                controller: controller,
                 index: i,
                 row: controller.items[i],
                 readOnly: readOnly,
@@ -428,14 +370,12 @@ class _ItemsCard extends StatelessWidget {
 }
 
 class _ItemRow extends StatelessWidget {
-  final SalesOrderFormController controller;
   final int index;
   final SalesOrderLineRow row;
   final bool readOnly;
   final VoidCallback onDelete;
 
   const _ItemRow({
-    required this.controller,
     required this.index,
     required this.row,
     required this.readOnly,
@@ -456,47 +396,17 @@ class _ItemRow extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Obx(() {
-                  final selectedId = int.tryParse(row.productIdCtrl.text.trim());
-                  final productOptions = controller.products
-                      .where((p) => p['id'] != null)
-                      .map((p) {
-                        final id = p['id'] as int;
-                        final name = (p['name'] ?? '').toString();
-                        return DropdownMenuItem<int>(
-                          value: id,
-                          child: Text(
-                            name.trim().isEmpty ? '$id' : '$name (#$id)',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        );
-                      })
-                      .toList();
-
-                  if (selectedId != null &&
-                      !productOptions.any((o) => o.value == selectedId)) {
-                    productOptions.insert(
-                      0,
-                      DropdownMenuItem<int>(
-                        value: selectedId,
-                        child: Text('Product #$selectedId'),
-                      ),
-                    );
-                  }
-
-                  return DropdownButtonFormField<int>(
-                    initialValue: selectedId,
-                    isExpanded: true,
-                    decoration: _inputDecoration(labelText: 'Product ID *'),
-                    items: productOptions,
-                    validator: (v) => v == null ? 'Required' : null,
-                    onChanged: readOnly
-                        ? null
-                        : (v) => row.productIdCtrl.text = v?.toString() ?? '',
-                  );
-                }),
+                child: TextFormField(
+                  controller: row.productIdCtrl,
+                  readOnly: readOnly,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: _inputDecoration(labelText: 'Product ID *'),
+                  validator: (v) =>
+                      (v ?? '').trim().isEmpty ? 'Required' : null,
+                ),
               ),
-              const SizedBox(width: _fieldGap),
+              const SizedBox(width: 8),
               Expanded(
                 child: TextFormField(
                   controller: row.vendorProductIdCtrl,
@@ -507,53 +417,47 @@ class _ItemRow extends StatelessWidget {
                 ),
               ),
               if (!readOnly)
-                SizedBox(
-                  width: 32,
-                  height: 32,
-                  child: IconButton(
-                    onPressed: onDelete,
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                    constraints: const BoxConstraints.tightFor(
-                      width: 32,
-                      height: 32,
-                    ),
-                    icon: const Icon(
-                      Icons.delete_outline,
-                      color: Colors.redAccent,
-                      size: 18,
-                    ),
-                    tooltip: 'Delete item',
+                IconButton(
+                  onPressed: onDelete,
+                  icon: const Icon(
+                    Icons.delete_outline,
+                    color: Colors.redAccent,
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: _fieldVerticalGap),
+          const SizedBox(height: 6),
           Row(
             children: [
               Expanded(
                 child: TextFormField(
                   controller: row.quantityCtrl,
                   readOnly: readOnly,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: _inputDecoration(labelText: 'Qty *'),
                   validator: (v) =>
-                      (int.tryParse((v ?? '').trim()) ?? 0) <= 0 ? 'Invalid' : null,
+                      (double.tryParse((v ?? '').trim()) ?? 0) <= 0
+                      ? 'Invalid'
+                      : null,
                 ),
               ),
-              const SizedBox(width: _fieldGap),
+              const SizedBox(width: 8),
               Expanded(
                 child: TextFormField(
                   controller: row.itemPriceCtrl,
                   readOnly: readOnly,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: _inputDecoration(labelText: 'Rate *'),
-                  validator: (v) =>
-                      (double.tryParse((v ?? '').trim()) ?? 0) < 0 ? 'Invalid' : null,
+                  validator: (v) => (double.tryParse((v ?? '').trim()) ?? 0) < 0
+                      ? 'Invalid'
+                      : null,
                 ),
               ),
-              const SizedBox(width: _fieldGap),
+              const SizedBox(width: 8),
               Expanded(
                 child: TextFormField(
                   initialValue: row.lineTotal.toStringAsFixed(2),

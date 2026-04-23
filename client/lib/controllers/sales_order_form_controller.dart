@@ -12,9 +12,6 @@ class SalesOrderFormController extends GetxController {
   final int? orderId;
   final bool startInViewOnly;
 
-  final customers = <Map<String, dynamic>>[].obs;
-  final products = <Map<String, dynamic>>[].obs;
-
   final viewOnly = false.obs;
   final isLoading = false.obs;
   final isSaving = false.obs;
@@ -40,8 +37,6 @@ class SalesOrderFormController extends GetxController {
   void onInit() {
     super.onInit();
     viewOnly.value = startInViewOnly;
-    _loadCustomers();
-    _loadProducts();
     final now = DateTime.now();
     orderDate.value =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
@@ -70,75 +65,6 @@ class SalesOrderFormController extends GetxController {
     if (index < 0 || index >= items.length) return;
     items[index].dispose();
     items.removeAt(index);
-  }
-
-  int? _safeInt(dynamic raw) {
-    if (raw is int) return raw;
-    if (raw == null) return null;
-    return int.tryParse(raw.toString());
-  }
-
-  Future<void> _loadCustomers() async {
-    try {
-      final response = await http
-          .get(
-            Uri.parse(ApiConfig.users).replace(
-              queryParameters: {'limit': '500'},
-            ),
-            headers: {'Accept': 'application/json'},
-          )
-          .timeout(const Duration(seconds: 15));
-
-      if (response.statusCode != 200) return;
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (data['success'] != true) return;
-
-      final List raw = data['data'] as List? ?? const [];
-      customers.value = raw
-          .whereType<Map>()
-          .map((e) {
-            final id = _safeInt(e['id']);
-            return {
-              'id': id,
-              'name': e['name']?.toString() ?? 'User ${id ?? ''}',
-            };
-          })
-          .where((e) => e['id'] != null)
-          .toList();
-    } catch (_) {}
-  }
-
-  Future<void> _loadProducts() async {
-    try {
-      final response = await http
-          .get(
-            Uri.parse(ApiConfig.products).replace(
-              queryParameters: {'limit': '500'},
-            ),
-            headers: {'Accept': 'application/json'},
-          )
-          .timeout(const Duration(seconds: 15));
-
-      if (response.statusCode != 200) return;
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (data['success'] != true) return;
-
-      final List raw = data['data'] as List? ?? const [];
-      products.value = raw
-          .whereType<Map>()
-          .map((e) {
-            final id = _safeInt(e['product_id'] ?? e['id']);
-            return {
-              'id': id,
-              'name':
-                  e['name']?.toString() ??
-                  e['product_name']?.toString() ??
-                  'Product ${id ?? ''}',
-            };
-          })
-          .where((e) => e['id'] != null)
-          .toList();
-    } catch (_) {}
   }
 
   Future<void> loadOrder(int id) async {
@@ -347,7 +273,7 @@ class SalesOrderLineRow {
 
   SalesOrderItem? toItem() {
     final productId = int.tryParse(productIdCtrl.text.trim());
-    final quantity = int.tryParse(quantityCtrl.text.trim());
+    final quantity = double.tryParse(quantityCtrl.text.trim());
     final itemPrice = double.tryParse(itemPriceCtrl.text.trim());
 
     if (productId == null || quantity == null || itemPrice == null) {
@@ -358,11 +284,10 @@ class SalesOrderLineRow {
       itemId: int.tryParse(itemIdCtrl.text.trim()),
       productId: productId,
       vendorProductId: int.tryParse(vendorProductIdCtrl.text.trim()),
-      quantity: quantity.toDouble(),
-      qtyLoaded: (int.tryParse(qtyLoadedCtrl.text.trim()) ?? 0).toDouble(),
-      qtyDelivered:
-          (int.tryParse(qtyDeliveredCtrl.text.trim()) ?? 0).toDouble(),
-      qtyReturned: (int.tryParse(qtyReturnedCtrl.text.trim()) ?? 0).toDouble(),
+      quantity: quantity,
+      qtyLoaded: double.tryParse(qtyLoadedCtrl.text.trim()) ?? 0,
+      qtyDelivered: double.tryParse(qtyDeliveredCtrl.text.trim()) ?? 0,
+      qtyReturned: double.tryParse(qtyReturnedCtrl.text.trim()) ?? 0,
       itemPrice: itemPrice,
       itemTotal: quantity * itemPrice,
     );
