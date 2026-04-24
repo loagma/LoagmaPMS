@@ -6,8 +6,9 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
 import '../../controllers/purchase_voucher_controller.dart';
-import '../../models/purchase_order_model.dart';
+import '../../models/party_result.dart';
 import '../../models/product_model.dart';
+import '../../models/purchase_order_model.dart';
 import '../../services/report_export_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
@@ -940,30 +941,63 @@ class _HeaderCard extends StatelessWidget {
           ),
           const SizedBox(height: _sectionGap),
           Obx(() {
-            final list = controller.suppliers;
-            return DropdownButtonFormField<int>(
-              value: controller.vendorId.value,
-              decoration: _pvInputDecoration(labelText: 'Supplier *'),
-              isExpanded: true,
-              items: list
-                  .map((s) => DropdownMenuItem<int>(
-                        value: s['id'] as int,
-                        child: Text(
-                          '${s['supplier_code'] ?? s['id']} - ${s['supplier_name'] ?? 'Vendor'}',
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ))
-                  .toList(),
-              onChanged: (v) {
-                if (v != null) {
-                  final s = list.cast<Map<String, dynamic>>().firstWhere(
-                        (e) => e['id'] == v,
-                        orElse: () => {'supplier_name': 'Vendor'},
-                      );
-                  controller.setVendor(v, s['supplier_name']?.toString() ?? '');
-                }
-              },
+            final selectedId = controller.vendorId.value;
+            final selectedName = controller.vendorName.value;
+            return FormField<int>(
+              initialValue: selectedId,
               validator: (v) => v == null ? 'Please select Vendor' : null,
+              builder: (state) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  InkWell(
+                    onTap: controller.isReportMode
+                        ? null
+                        : () async {
+                            final party = await showDialog<PartyResult>(
+                              context: context,
+                              builder: (_) => PartySearchDialog(
+                                title: 'Select Supplier',
+                                hint: 'Search by name, phone or ID...',
+                                headerIcon: Icons.local_shipping_outlined,
+                                searchFn: controller.searchSuppliers,
+                              ),
+                            );
+                            if (party != null) {
+                              controller.setVendor(party.id, party.name);
+                              state.didChange(party.id);
+                              state.validate();
+                            }
+                          },
+                    child: InputDecorator(
+                      decoration: _pvInputDecoration(labelText: 'Supplier *'),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              selectedId == null ? 'Tap to select...' : selectedName,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: selectedId == null ? Colors.grey : null,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (!controller.isReportMode)
+                            const Icon(Icons.search, size: 18, color: Colors.grey),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (state.hasError)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 12, top: 4),
+                      child: Text(
+                        state.errorText!,
+                        style: const TextStyle(color: Colors.red, fontSize: 12),
+                      ),
+                    ),
+                ],
+              ),
             );
           }),
           const SizedBox(height: _sectionGap),
@@ -1660,12 +1694,21 @@ class _ProductPickerField extends StatelessWidget {
           children: [
             InkWell(
               onTap: () async {
+                bool showAll = controller.vendorId.value == null;
                 final product = await showDialog<Product>(
                   context: context,
-                  builder: (ctx) => _PVProductSearchDialog(
-                    controller: controller,
-                    excludeIds: excludeIds,
-                    current: row.product.value,
+                  builder: (ctx) => StatefulBuilder(
+                    builder: (ctx2, setLocal) => ProductSearchDialog(
+                      title: 'Select Product',
+                      searchFn: (q) => controller.searchProductsAsModels(
+                        q,
+                        includeAll: showAll,
+                      ),
+                      excludeIds: excludeIds,
+                      showSupplierToggle: controller.vendorId.value != null,
+                      supplierToggleValue: showAll,
+                      onSupplierToggle: (v) => setLocal(() => showAll = v),
+                    ),
                   ),
                 );
                 if (product != null) {
@@ -1728,177 +1771,6 @@ class _ProductPickerField extends StatelessWidget {
   }
 }
 
-class _PVProductSearchDialog extends StatefulWidget {
-  final PurchaseVoucherController controller;
-  final Set<int> excludeIds;
-  final Product? current;
-
-  const _PVProductSearchDialog({
-    required this.controller,
-    required this.excludeIds,
-    this.current,
-  });
-
-  @override
-  State<_PVProductSearchDialog> createState() => _PVProductSearchDialogState();
-}
-
-class _PVProductSearchDialogState extends State<_PVProductSearchDialog> {
-  final TextEditingController _searchController = TextEditingController();
-  List<Product> _filtered = [];
-  bool _showAllProducts = false;
-  Timer? _debounce;
-  static const _debounceDuration = Duration(milliseconds: 350);
-
-  @override
-  void initState() {
-    super.initState();
-    _showAllProducts = widget.controller.vendorId.value == null;
-    widget.controller.showAllProducts.value = _showAllProducts;
-    _initialLoad();
-  }
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _refreshFromController() async {
-    _filtered = widget.controller.products
-        .where((p) => !widget.excludeIds.contains(p.id))
-        .take(50)
-        .toList();
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  Future<void> _initialLoad() async {
-    await _runSearch(null);
-  }
-
-  void _onSearch(String query) {
-    _debounce?.cancel();
-    _debounce = Timer(_debounceDuration, () {
-      if (!mounted) return;
-      if (_searchController.text != query) return;
-      _runSearch(query);
-    });
-  }
-
-  Future<void> _runSearch(String? rawQuery) async {
-    final query = rawQuery?.trim();
-    await widget.controller.loadProductsForVendor(
-      search: (query == null || query.isEmpty) ? null : query,
-      includeAll: _showAllProducts,
-    );
-    if (!mounted) return;
-    final currentText = _searchController.text.trim();
-    final requestText = query ?? '';
-    if (currentText != requestText) return;
-    await _refreshFromController();
-  }
-
-  Future<void> _toggleViewMode() async {
-    setState(() {
-      _showAllProducts = !_showAllProducts;
-      widget.controller.showAllProducts.value = _showAllProducts;
-    });
-    await _runSearch(_searchController.text);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      child: Container(
-        width: 500,
-        height: 500,
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Search Product',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _searchController,
-              decoration: _pvInputDecoration(
-                labelText: 'Name or code',
-              ),
-              onChanged: _onSearch,
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: _filtered.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No products',
-                        style: TextStyle(color: AppColors.textMuted),
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: _filtered.length,
-                      itemBuilder: (context, i) {
-                        final p = _filtered[i];
-                        return ListTile(
-                          title: Text(p.name),
-                          subtitle: Text('ID: ${p.id}'),
-                          onTap: () => Navigator.pop(context, p),
-                        );
-                      },
-                    ),
-            ),
-            const SizedBox(height: 8),
-            Builder(
-              builder: (context) {
-                final hasVendor =
-                    widget.controller.vendorId.value != null;
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (!hasVendor)
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 4),
-                        child: Text(
-                          'Select vendor to filter by assigned products.',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                      ),
-                    ElevatedButton(
-                      onPressed: hasVendor ? _toggleViewMode : null,
-                      child: Text(
-                        _showAllProducts
-                            ? 'Show only products assigned to this vendor'
-                            : 'View all products',
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _ChargesCard extends StatelessWidget {
   final PurchaseVoucherController controller;

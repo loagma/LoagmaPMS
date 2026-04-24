@@ -2,15 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
-import '../../controllers/purchase_order_form_controller.dart';
+import '../../controllers/sales_order_form_controller.dart';
 import '../../models/party_result.dart';
 import '../../models/product_model.dart';
-import '../../services/report_export_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
-import 'purchase_order_list_screen.dart';
+import 'sales_order_list_screen.dart';
 
-InputDecoration _poInputDecoration({
+InputDecoration _soInputDecoration({
   required String labelText,
   String? hintText,
   Widget? suffixIcon,
@@ -30,7 +29,7 @@ const double _fieldGap = 10;
 const double _fieldVerticalGap = 6;
 const double _sectionGap = 10;
 
-Future<void> _pickPoDate(
+Future<void> _pickSoDate(
   BuildContext context, {
   required String currentValue,
   required ValueChanged<String> onPicked,
@@ -58,49 +57,21 @@ Future<void> _pickPoDate(
   onPicked('${picked.year}-$month-$day');
 }
 
-Future<void> _printPurchaseOrderReport(PurchaseOrderFormController controller) async {
-  try {
-    await ReportExportService.printPurchaseOrder(controller);
-  } catch (e) {
-    Get.snackbar(
-      'Print failed',
-      'Could not generate purchase order PDF: $e',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.redAccent,
-      colorText: Colors.white,
-    );
-  }
-}
-
-Future<void> _sharePurchaseOrderReport(PurchaseOrderFormController controller) async {
-  try {
-    await ReportExportService.sharePurchaseOrder(controller);
-  } catch (e) {
-    Get.snackbar(
-      'Share failed',
-      'Could not share purchase order PDF: $e',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.redAccent,
-      colorText: Colors.white,
-    );
-  }
-}
-
-class PurchaseOrderFormScreen extends StatelessWidget {
-  final int? poId;
+class SalesOrderFormScreen extends StatelessWidget {
+  final int? soId;
   final bool startInViewOnly;
 
-  const PurchaseOrderFormScreen({
+  const SalesOrderFormScreen({
     super.key,
-    this.poId,
+    this.soId,
     this.startInViewOnly = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final controller = Get.put(
-      PurchaseOrderFormController(
-        poId: poId,
+      SalesOrderFormController(
+        soId: soId,
         startInViewOnly: startInViewOnly,
       ),
     );
@@ -108,26 +79,10 @@ class PurchaseOrderFormScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: ModuleAppBar(
-        title: controller.isEditMode ? 'Purchase Order' : 'Create Purchase Order',
+        title: controller.isEditMode ? 'Sales Order' : 'Create Sales Order',
         subtitle: 'Loagma',
         onBackPressed: () => Get.back(),
         actions: [
-          Obx(() {
-            if (!controller.isReadOnly) return const SizedBox.shrink();
-            return IconButton(
-              icon: const Icon(Icons.print_outlined, color: Colors.white),
-              tooltip: 'Print/PDF',
-              onPressed: () async => _printPurchaseOrderReport(controller),
-            );
-          }),
-          Obx(() {
-            if (!controller.isReadOnly) return const SizedBox.shrink();
-            return IconButton(
-              icon: const Icon(Icons.share_outlined, color: Colors.white),
-              tooltip: 'Share/Export',
-              onPressed: () async => _sharePurchaseOrderReport(controller),
-            );
-          }),
           Obx(() {
             final canEdit = controller.viewOnly.value && controller.status.value == 'DRAFT';
             if (!canEdit) return const SizedBox.shrink();
@@ -139,8 +94,8 @@ class PurchaseOrderFormScreen extends StatelessWidget {
           }),
           IconButton(
             icon: const Icon(Icons.list_alt_rounded, color: Colors.white),
-            tooltip: 'View all purchase orders',
-            onPressed: () => Get.to(() => const PurchaseOrderListScreen()),
+            tooltip: 'View all sales orders',
+            onPressed: () => Get.to(() => const SalesOrderListScreen()),
           ),
           IconButton(
             icon: const Icon(Icons.help_outline_rounded, color: Colors.white),
@@ -148,7 +103,7 @@ class PurchaseOrderFormScreen extends StatelessWidget {
             onPressed: () {
               Get.snackbar(
                 'Help',
-                'Fill in supplier, dates and add line items with quantity and price.',
+                'Fill in customer, dates and add line items with quantity and price.',
                 snackPosition: SnackPosition.BOTTOM,
               );
             },
@@ -180,7 +135,7 @@ class PurchaseOrderFormScreen extends StatelessWidget {
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(8),
-                  child: _PurchaseOrderReportView(controller: controller),
+                  child: _SalesOrderReportView(controller: controller),
                 ),
               ),
               ActionButtonBar(
@@ -188,14 +143,6 @@ class PurchaseOrderFormScreen extends StatelessWidget {
                   ActionButton(
                     label: 'Back',
                     onPressed: () => Get.back(),
-                  ),
-                  ActionButton(
-                    label: 'Print/PDF',
-                    onPressed: () async => _printPurchaseOrderReport(controller),
-                  ),
-                  ActionButton(
-                    label: 'Share',
-                    onPressed: () async => _sharePurchaseOrderReport(controller),
                   ),
                   if (controller.status.value == 'DRAFT')
                     ActionButton(
@@ -256,33 +203,33 @@ class PurchaseOrderFormScreen extends StatelessWidget {
   }
 }
 
-class _PurchaseOrderReportView extends StatelessWidget {
-  final PurchaseOrderFormController controller;
+class _SalesOrderReportView extends StatelessWidget {
+  final SalesOrderFormController controller;
 
-  const _PurchaseOrderReportView({required this.controller});
+  const _SalesOrderReportView({required this.controller});
 
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      final poNumber = controller.currentPoNumber.value.trim().isEmpty
-          ? (controller.currentPoSeq.value?.toString() ?? '-')
-          : controller.currentPoNumber.value.trim();
-      final supplier = controller.suppliers.firstWhere(
-        (s) => s['id'] == controller.supplierId.value,
+      final soNumber = controller.currentSoNumber.value.trim().isEmpty
+          ? (controller.currentSoSeq.value?.toString() ?? '-')
+          : controller.currentSoNumber.value.trim();
+      final customer = controller.customers.firstWhere(
+        (c) => c['id'] == controller.customerId.value,
         orElse: () => <String, dynamic>{},
       );
-      final supplierName = supplier['supplier_name']?.toString() ?? 'Supplier';
+      final customerName = customer['name']?.toString() ?? 'Customer';
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ContentCard(
-            title: 'Purchase Order Invoice',
+            title: 'Sales Order Invoice',
             child: Column(
               children: [
-                _metaRow('PO Number', poNumber),
+                _metaRow('SO Number', soNumber),
                 _metaRow('Status', controller.status.value),
-                _metaRow('Supplier', supplierName),
+                _metaRow('Customer', customerName),
                 _metaRow('Document Date', _normalizeDate(controller.docDate.value)),
                 _metaRow('Expected Date', _normalizeDate(controller.expectedDate.value)),
                 _metaRow('Financial Year', controller.financialYear.value.trim().isEmpty ? '-' : controller.financialYear.value.trim()),
@@ -296,7 +243,7 @@ class _PurchaseOrderReportView extends StatelessWidget {
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 1240),
+                constraints: const BoxConstraints(minWidth: 1000),
                 child: DataTable(
                   headingRowColor: WidgetStateProperty.all(
                     AppColors.primaryLighter.withValues(alpha: 0.25),
@@ -309,81 +256,33 @@ class _PurchaseOrderReportView extends StatelessWidget {
                     DataColumn(label: Text('HSN')),
                     DataColumn(label: Text('Unit')),
                     DataColumn(label: Text('Qty')),
-                    DataColumn(label: Text('Used')),
-                    DataColumn(label: Text('WO')),
-                    DataColumn(label: Text('Left')),
                     DataColumn(label: Text('Rate')),
                     DataColumn(label: Text('Disc %')),
                     DataColumn(label: Text('Tax %')),
-                    DataColumn(label: Text('Rate+Tax')),
                     DataColumn(label: Text('Taxable')),
                     DataColumn(label: Text('Total')),
                     DataColumn(label: Text('Description')),
-                    DataColumn(label: Text('Flag')),
                   ],
                   rows: List<DataRow>.generate(controller.items.length, (i) {
                     final row = controller.items[i];
                     final qty = double.tryParse(row.quantity.value) ?? 0;
-                    final used = double.tryParse(row.usedQty.value) ?? 0;
-                    final writeoff = double.tryParse(row.writeoffQty.value) ?? 0;
-                    final left = double.tryParse(row.leftQty.value) ?? 0;
                     final rate = double.tryParse(row.price.value) ?? 0;
                     final disc = double.tryParse(row.discountPercent.value) ?? 0;
                     final tax = double.tryParse(row.taxPercent.value) ?? 0;
-                    final overUsed = used > qty + 0.000001;
 
                     return DataRow(
-                      color: overUsed
-                          ? WidgetStateProperty.all(
-                              Colors.orange.withValues(alpha: 0.08),
-                            )
-                          : null,
                       cells: [
                         DataCell(Text('${i + 1}')),
                         DataCell(SizedBox(width: 170, child: Text(row.productName.value.trim().isEmpty ? '-' : row.productName.value.trim(), maxLines: 2, overflow: TextOverflow.ellipsis))),
                         DataCell(Text(row.hsnCode.value.trim().isEmpty ? '-' : row.hsnCode.value.trim())),
                         DataCell(Text(row.unit.value.trim().isEmpty ? '-' : row.unit.value.trim())),
                         DataCell(Text(qty.toStringAsFixed(1))),
-                        DataCell(
-                          overUsed
-                              ? Text(
-                                  used.toStringAsFixed(1),
-                                  style: const TextStyle(
-                                    color: Colors.deepOrange,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                )
-                              : Text(used.toStringAsFixed(1)),
-                        ),
-                        DataCell(Text(writeoff.toStringAsFixed(1))),
-                        DataCell(Text(left.toStringAsFixed(1))),
                         DataCell(Text(rate.toStringAsFixed(2))),
                         DataCell(Text(disc.toStringAsFixed(2))),
                         DataCell(Text(tax.toStringAsFixed(2))),
-                        DataCell(Text(row.priceInclTax.toStringAsFixed(2))),
                         DataCell(Text(row.lineTotalExclTax.toStringAsFixed(2))),
                         DataCell(Text(row.lineTotal.toStringAsFixed(2))),
                         DataCell(SizedBox(width: 160, child: Text(row.description.value.trim().isEmpty ? '-' : row.description.value.trim(), maxLines: 2, overflow: TextOverflow.ellipsis))),
-                        DataCell(
-                          overUsed
-                              ? Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: Colors.deepOrange.withValues(alpha: 0.14),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.deepOrange.withValues(alpha: 0.45)),
-                                  ),
-                                  child: const Text(
-                                    'EXTRA',
-                                    style: TextStyle(
-                                      color: Colors.deepOrange,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                )
-                              : const Text('-'),
-                        ),
                       ],
                     );
                   }),
@@ -401,8 +300,7 @@ class _PurchaseOrderReportView extends StatelessWidget {
                           padding: const EdgeInsets.only(bottom: 6),
                           child: _reportMetaRow(
                             row.name.value,
-                            (double.tryParse(row.amount.value) ?? 0)
-                                .toStringAsFixed(2),
+                            (double.tryParse(row.amount.value) ?? 0).toStringAsFixed(2),
                           ),
                         ))
                     .toList(),
@@ -469,8 +367,6 @@ class _PurchaseOrderReportView extends StatelessWidget {
     );
   }
 
-  
-
   Widget _reportMetaRow(String label, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -503,14 +399,14 @@ class _PurchaseOrderReportView extends StatelessWidget {
 }
 
 class _HeaderCard extends StatelessWidget {
-  final PurchaseOrderFormController controller;
+  final SalesOrderFormController controller;
 
   const _HeaderCard({required this.controller});
 
   @override
   Widget build(BuildContext context) {
     return ContentCard(
-      title: 'Supplier & Dates',
+      title: 'Customer & Dates',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -530,17 +426,12 @@ class _HeaderCard extends StatelessWidget {
                     }.toList();
                     return DropdownButtonFormField<String>(
                       value: fy.isEmpty ? null : fy,
-                      decoration: _poInputDecoration(
-                        labelText: 'Financial Year',
-                      ),
+                      decoration: _soInputDecoration(labelText: 'Financial Year'),
                       isExpanded: true,
                       items: options
                           .map((s) => DropdownMenuItem(
                                 value: s,
-                                child: Text(
-                                  s,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                                child: Text(s, overflow: TextOverflow.ellipsis),
                               ))
                           .toList(),
                       onChanged: controller.isReadOnly
@@ -558,13 +449,13 @@ class _HeaderCard extends StatelessWidget {
                 child: SizedBox(
                   height: 48,
                   child: Obx(() {
-                    final poNumber = controller.currentPoNumber.value;
-                    final seqValue = controller.currentPoSeq.value;
+                    final soNumber = controller.currentSoNumber.value;
+                    final seqValue = controller.currentSoSeq.value;
                     final labelText = controller.isEditMode
-                        ? (poNumber.isEmpty ? 'Existing (no number)' : poNumber)
+                        ? (soNumber.isEmpty ? 'Existing (no number)' : soNumber)
                         : (seqValue != null ? seqValue.toString() : '');
                     return InputDecorator(
-                      decoration: _poInputDecoration(labelText: 'Voucher No'),
+                      decoration: _soInputDecoration(labelText: 'Voucher No'),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -609,11 +500,11 @@ class _HeaderCard extends StatelessWidget {
           ),
           const SizedBox(height: _sectionGap),
           Obx(() {
-            final selectedId = controller.supplierId.value;
-            final selectedName = controller.supplierName.value;
+            final selectedId = controller.customerId.value;
+            final selectedName = controller.customerName.value;
             return FormField<int>(
               initialValue: selectedId,
-              validator: (v) => v == null ? 'Please select supplier' : null,
+              validator: (v) => v == null ? 'Please select customer' : null,
               builder: (state) => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -624,20 +515,19 @@ class _HeaderCard extends StatelessWidget {
                             final party = await showDialog<PartyResult>(
                               context: context,
                               builder: (_) => PartySearchDialog(
-                                title: 'Select Supplier',
+                                title: 'Select Customer',
                                 hint: 'Search by name, phone or ID...',
-                                headerIcon: Icons.local_shipping_outlined,
-                                searchFn: controller.searchSuppliers,
+                                searchFn: controller.searchCustomers,
                               ),
                             );
                             if (party != null) {
-                              controller.setSupplier(party.id, party.name);
+                              controller.setCustomer(party.id, party.name);
                               state.didChange(party.id);
                               state.validate();
                             }
                           },
                     child: InputDecorator(
-                      decoration: _poInputDecoration(labelText: 'Supplier *'),
+                      decoration: _soInputDecoration(labelText: 'Customer *'),
                       child: Row(
                         children: [
                           Expanded(
@@ -669,83 +559,45 @@ class _HeaderCard extends StatelessWidget {
             );
           }),
           const SizedBox(height: _sectionGap),
-          Row(
-            children: [
-              Expanded(
-                child: Obx(() {
-                  final list = controller.salesmen;
-                  final current = controller.salesmanId.value;
-                  final hasValue = list
-                      .any((s) => s['id']?.toString() == current?.toString());
-                  final value = hasValue ? current : null;
-                  return DropdownButtonFormField<String>(
-                    value: value,
-                    decoration: _poInputDecoration(
-                      labelText: 'Salesman',
-                    ),
-                    items: list
-                        .map((s) => DropdownMenuItem<String>(
-                              value: s['id']?.toString(),
-                              child: Text(
-                                s['name']?.toString() ?? 'Salesman',
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ))
-                        .toList(),
-                    onChanged: controller.isReadOnly
-                        ? null
-                        : (v) => controller.setSalesmanId(v),
-                  );
-                }),
-              ),
-              const SizedBox(width: _fieldGap),
-              Expanded(
-                child: Obx(() {
-                  final list = controller.departments;
-                  final current = controller.departmentId.value;
-                  final hasValue = list
-                      .any((d) => d['id']?.toString() == current?.toString());
-                  final value = hasValue ? current : null;
-                  return DropdownButtonFormField<String>(
-                    value: value,
-                    decoration: _poInputDecoration(
-                      labelText: 'Department',
-                    ),
-                    items: list
-                        .map((d) => DropdownMenuItem<String>(
-                              value: d['id']?.toString(),
-                              child: Text(
-                                d['name']?.toString() ?? 'Department',
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ))
-                        .toList(),
-                    onChanged: controller.isReadOnly
-                        ? null
-                        : (v) => controller.setDepartmentId(v),
-                  );
-                }),
-              ),
-            ],
-          ),
+          Obx(() {
+            final list = controller.departments;
+            final current = controller.departmentId.value;
+            final hasValue = list.any((d) => d['id']?.toString() == current?.toString());
+            final value = hasValue ? current : null;
+            return DropdownButtonFormField<String>(
+              value: value,
+              decoration: _soInputDecoration(labelText: 'Department'),
+              items: list
+                  .map((d) => DropdownMenuItem<String>(
+                        value: d['id']?.toString(),
+                        child: Text(
+                          d['name']?.toString() ?? 'Department',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ))
+                  .toList(),
+              onChanged: controller.isReadOnly
+                  ? null
+                  : (v) => controller.setDepartmentId(v),
+            );
+          }),
           const SizedBox(height: _sectionGap),
           Row(
             children: [
               Expanded(
                 child: Obx(() => TextFormField(
-                      key: ValueKey('po-doc-date-${controller.docDate.value}'),
+                      key: ValueKey('so-doc-date-${controller.docDate.value}'),
                       enabled: !controller.isReadOnly,
                       readOnly: true,
                       initialValue: controller.docDate.value,
-                      decoration: _poInputDecoration(
+                      decoration: _soInputDecoration(
                         labelText: 'Document Date *',
                         suffixIcon: const Icon(Icons.calendar_month_rounded),
                       ),
-                      validator: (v) =>
-                          v == null || v.trim().isEmpty ? 'Required' : null,
+                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                       onTap: controller.isReadOnly
                           ? null
-                          : () => _pickPoDate(
+                          : () => _pickSoDate(
                                 context,
                                 currentValue: controller.docDate.value,
                                 onPicked: controller.setDocDate,
@@ -755,17 +607,17 @@ class _HeaderCard extends StatelessWidget {
               const SizedBox(width: _fieldGap),
               Expanded(
                 child: Obx(() => TextFormField(
-                      key: ValueKey('po-expected-date-${controller.expectedDate.value}'),
+                      key: ValueKey('so-expected-date-${controller.expectedDate.value}'),
                       enabled: !controller.isReadOnly,
                       readOnly: true,
                       initialValue: controller.expectedDate.value,
-                      decoration: _poInputDecoration(
+                      decoration: _soInputDecoration(
                         labelText: 'Expected Date',
                         suffixIcon: const Icon(Icons.calendar_month_rounded),
                       ),
                       onTap: controller.isReadOnly
                           ? null
-                          : () => _pickPoDate(
+                          : () => _pickSoDate(
                                 context,
                                 currentValue: controller.expectedDate.value,
                                 onPicked: controller.setExpectedDate,
@@ -778,13 +630,11 @@ class _HeaderCard extends StatelessWidget {
             const SizedBox(height: _sectionGap),
             Obx(() => DropdownButtonFormField<String>(
                   value: controller.status.value,
-                  decoration: _poInputDecoration(labelText: 'Status'),
+                  decoration: _soInputDecoration(labelText: 'Status'),
                   items: const [
                     DropdownMenuItem(value: 'DRAFT', child: Text('Draft')),
-                    DropdownMenuItem(value: 'SENT', child: Text('Sent')),
-                    DropdownMenuItem(
-                        value: 'PARTIALLY_RECEIVED',
-                        child: Text('Partially received')),
+                    DropdownMenuItem(value: 'CONFIRMED', child: Text('Confirmed')),
+                    DropdownMenuItem(value: 'PARTIALLY_INVOICED', child: Text('Partially invoiced')),
                     DropdownMenuItem(value: 'CLOSED', child: Text('Closed')),
                     DropdownMenuItem(value: 'CANCELLED', child: Text('Cancelled')),
                   ],
@@ -799,13 +649,8 @@ class _HeaderCard extends StatelessWidget {
           Obx(() => TextFormField(
                 enabled: !controller.isReadOnly,
                 initialValue: controller.narration.value,
-                decoration: _poInputDecoration(
-                  labelText: 'Narration',
-                ).copyWith(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
+                decoration: _soInputDecoration(labelText: 'Narration').copyWith(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
                 minLines: 1,
                 maxLines: 1,
@@ -818,7 +663,7 @@ class _HeaderCard extends StatelessWidget {
 }
 
 class _ItemsCard extends StatelessWidget {
-  final PurchaseOrderFormController controller;
+  final SalesOrderFormController controller;
 
   const _ItemsCard({required this.controller});
 
@@ -858,9 +703,7 @@ class _ItemsCard extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.primary,
                     side: const BorderSide(color: AppColors.primary, width: 1.2),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: _fieldVerticalGap),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
@@ -875,9 +718,9 @@ class _ItemsCard extends StatelessWidget {
 }
 
 class _ItemRow extends StatelessWidget {
-  final PurchaseOrderFormController controller;
+  final SalesOrderFormController controller;
   final int index;
-  final POLineRow row;
+  final SOLineRow row;
   final bool isLast;
 
   const _ItemRow({
@@ -941,11 +784,7 @@ class _ItemRow extends StatelessWidget {
             ],
           ),
           const SizedBox(height: _sectionGap),
-          _ProductPicker(
-            controller: controller,
-            row: row,
-            readOnly: controller.isReadOnly,
-          ),
+          _ProductPicker(controller: controller, row: row, readOnly: controller.isReadOnly),
           Obx(() {
             if (!row.isTaxLoading.value) return const SizedBox.shrink();
             return const Padding(
@@ -958,10 +797,7 @@ class _ItemRow extends StatelessWidget {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                   SizedBox(width: 6),
-                  Text(
-                    'Fetching taxes...',
-                    style: TextStyle(fontSize: 11, color: AppColors.textMuted),
-                  ),
+                  Text('Fetching taxes...', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
                 ],
               ),
             );
@@ -976,13 +812,9 @@ class _ItemRow extends StatelessWidget {
                   child: Obx(() => TextFormField(
                         enabled: !controller.isReadOnly,
                         initialValue: row.quantity.value,
-                        decoration: _poInputDecoration(
-                          labelText: 'Qty *',
-                        ),
+                        decoration: _soInputDecoration(labelText: 'Qty *'),
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,3}')),
-                        ],
+                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,3}'))],
                         validator: (v) {
                           if (v == null || v.trim().isEmpty) return 'Required';
                           final q = double.tryParse(v);
@@ -998,50 +830,38 @@ class _ItemRow extends StatelessWidget {
                 flex: 2,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: _fieldVerticalGap),
-                  child: Obx(
-                    () {
-                      final units = controller.unitTypes.isEmpty
-                          ? ['KG', 'PCS', 'LTR', 'MTR', 'GM', 'ML']
-                          : controller.unitTypes;
-                      final current = row.unit.value;
-                      final value = units.contains(current) ? current : units.first;
-                      if (value != current && !controller.isReadOnly) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          row.unit.value = value;
-                        });
-                      }
-                      return DropdownButtonFormField<String>(
-                        value: value,
-                        decoration: _poInputDecoration(labelText: 'Unit')
-                            .copyWith(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 10,
-                          ),
-                        ),
-                        isDense: true,
-                        isExpanded: true,
-                        iconSize: 16,
-                        items: units
-                            .map(
-                              (u) => DropdownMenuItem(
+                  child: Obx(() {
+                    final units = controller.unitTypes.isEmpty
+                        ? ['KG', 'PCS', 'LTR', 'MTR', 'GM', 'ML']
+                        : controller.unitTypes;
+                    final current = row.unit.value;
+                    final value = units.contains(current) ? current : units.first;
+                    if (value != current && !controller.isReadOnly) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        row.unit.value = value;
+                      });
+                    }
+                    return DropdownButtonFormField<String>(
+                      value: value,
+                      decoration: _soInputDecoration(labelText: 'Unit').copyWith(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                      ),
+                      isDense: true,
+                      isExpanded: true,
+                      iconSize: 16,
+                      items: units
+                          .map((u) => DropdownMenuItem(
                                 value: u,
-                                child: Text(
-                                  u,
-                                  style: const TextStyle(fontSize: 13),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: controller.isReadOnly
-                            ? null
-                            : (v) {
-                                if (v != null) row.unit.value = v;
-                              },
-                      );
-                    },
-                  ),
+                                child: Text(u, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
+                              ))
+                          .toList(),
+                      onChanged: controller.isReadOnly
+                          ? null
+                          : (v) {
+                              if (v != null) row.unit.value = v;
+                            },
+                    );
+                  }),
                 ),
               ),
               const SizedBox(width: _fieldGap),
@@ -1052,13 +872,9 @@ class _ItemRow extends StatelessWidget {
                   child: Obx(() => TextFormField(
                         enabled: !controller.isReadOnly,
                         initialValue: row.price.value,
-                        decoration: _poInputDecoration(
-                          labelText: 'Unit Price *',
-                        ),
+                        decoration: _soInputDecoration(labelText: 'Unit Price *'),
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                        ],
+                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
                         validator: (v) {
                           if (v == null || v.trim().isEmpty) return 'Required';
                           final p = double.tryParse(v);
@@ -1089,7 +905,7 @@ class _ItemRow extends StatelessWidget {
     );
   }
 
-  Widget _buildTaxRows(POLineRow row) {
+  Widget _buildTaxRows(SOLineRow row) {
     return Column(
       children: [
         Container(
@@ -1100,22 +916,9 @@ class _ItemRow extends StatelessWidget {
           ),
           child: const Row(
             children: [
-              Expanded(
-                flex: 3,
-                child: Text('Tax',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text('Tax %',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text('Tax Amount',
-                    textAlign: TextAlign.right,
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-              ),
+              Expanded(flex: 3, child: Text('Tax', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
+              Expanded(flex: 2, child: Text('Tax %', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
+              Expanded(flex: 2, child: Text('Tax Amount', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
             ],
           ),
         ),
@@ -1129,15 +932,8 @@ class _ItemRow extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(flex: 3, child: Text(key, style: const TextStyle(fontSize: 11))),
-                Expanded(
-                    flex: 2,
-                    child: Text('${percent.toStringAsFixed(2)}%',
-                        style: const TextStyle(fontSize: 11))),
-                Expanded(
-                    flex: 2,
-                    child: Text(amount.toStringAsFixed(2),
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(fontSize: 11))),
+                Expanded(flex: 2, child: Text('${percent.toStringAsFixed(2)}%', style: const TextStyle(fontSize: 11))),
+                Expanded(flex: 2, child: Text(amount.toStringAsFixed(2), textAlign: TextAlign.right, style: const TextStyle(fontSize: 11))),
               ],
             ),
           );
@@ -1146,7 +942,7 @@ class _ItemRow extends StatelessWidget {
     );
   }
 
-  Widget _buildTaxTotals(POLineRow row) {
+  Widget _buildTaxTotals(SOLineRow row) {
     return Row(
       children: [
         Expanded(
@@ -1168,17 +964,14 @@ class _ItemRow extends StatelessWidget {
 
   Widget _readOnlyAmountField({required String label, required String value}) {
     return InputDecorator(
-      decoration: _poInputDecoration(labelText: label),
-      child: Text(
-        value,
-        style: const TextStyle(fontSize: 13),
-      ),
+      decoration: _soInputDecoration(labelText: label),
+      child: Text(value, style: const TextStyle(fontSize: 13)),
     );
   }
 }
 
 class _AddonCard extends StatelessWidget {
-  final PurchaseOrderFormController controller;
+  final SalesOrderFormController controller;
 
   const _AddonCard({required this.controller});
 
@@ -1202,36 +995,26 @@ class _AddonCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppColors.primaryLighter.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: AppColors.primaryLight.withValues(alpha: 0.5),
-                    ),
+                    border: Border.all(color: AppColors.primaryLight.withValues(alpha: 0.5)),
                   ),
                   child: Row(
                     children: [
                       Expanded(
                         flex: 2,
                         child: Obx(() => DropdownButtonFormField<String>(
-                              value: PurchaseOrderFormController.chargeTypeNames
-                                      .contains(charge.name.value)
+                              value: SalesOrderFormController.chargeTypeNames.contains(charge.name.value)
                                   ? charge.name.value
-                                  : PurchaseOrderFormController.chargeTypeNames.first,
-                              decoration: _poInputDecoration(
-                                labelText: 'Name',
-                              ).copyWith(
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: _fieldVerticalGap,
-                                ),
+                                  : SalesOrderFormController.chargeTypeNames.first,
+                              decoration: _soInputDecoration(labelText: 'Name').copyWith(
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: _fieldVerticalGap),
                               ),
                               isExpanded: true,
                               isDense: true,
-                              items: PurchaseOrderFormController.chargeTypeNames
-                                  .map(
-                                    (name) => DropdownMenuItem(
-                                      value: name,
-                                      child: Text(name, overflow: TextOverflow.ellipsis),
-                                    ),
-                                  )
+                              items: SalesOrderFormController.chargeTypeNames
+                                  .map((name) => DropdownMenuItem(
+                                        value: name,
+                                        child: Text(name, overflow: TextOverflow.ellipsis),
+                                      ))
                                   .toList(),
                               onChanged: controller.isReadOnly
                                   ? null
@@ -1245,13 +1028,9 @@ class _AddonCard extends StatelessWidget {
                         child: TextFormField(
                           enabled: !controller.isReadOnly,
                           initialValue: charge.amount.value,
-                          decoration: _poInputDecoration(
-                            labelText: 'Amount',
-                          ),
+                          decoration: _soInputDecoration(labelText: 'Amount'),
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'^-?\d+\.?\d{0,2}')),
-                          ],
+                          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^-?\d+\.?\d{0,2}'))],
                           onChanged: (v) => charge.amount.value = v,
                         ),
                       ),
@@ -1284,9 +1063,7 @@ class _AddonCard extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.primary,
                     side: const BorderSide(color: AppColors.primary, width: 1.2),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: _fieldVerticalGap),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     visualDensity: VisualDensity.compact,
@@ -1301,8 +1078,8 @@ class _AddonCard extends StatelessWidget {
 }
 
 class _ProductPicker extends StatelessWidget {
-  final PurchaseOrderFormController controller;
-  final POLineRow row;
+  final SalesOrderFormController controller;
+  final SOLineRow row;
   final bool readOnly;
 
   const _ProductPicker({
@@ -1324,20 +1101,11 @@ class _ProductPicker extends StatelessWidget {
               onTap: readOnly
                   ? null
                   : () async {
-                      bool showAll = controller.supplierId.value == null;
                       final product = await showDialog<Product>(
                         context: context,
-                        builder: (ctx) => StatefulBuilder(
-                          builder: (ctx2, setLocal) => ProductSearchDialog(
-                            title: 'Select Product',
-                            searchFn: (q) => controller.searchProductsAsModels(
-                              q,
-                              includeAll: showAll,
-                            ),
-                            showSupplierToggle: controller.supplierId.value != null,
-                            supplierToggleValue: showAll,
-                            onSupplierToggle: (v) => setLocal(() => showAll = v),
-                          ),
+                        builder: (ctx) => ProductSearchDialog(
+                          title: 'Select Product',
+                          searchFn: controller.searchProductsAsModels,
                         ),
                       );
                       if (product != null) {
@@ -1350,24 +1118,17 @@ class _ProductPicker extends StatelessWidget {
                       }
                     },
               child: InputDecorator(
-                decoration: _poInputDecoration(
-                  labelText: 'Product *',
-                ),
+                decoration: _soInputDecoration(labelText: 'Product *'),
                 child: Row(
                   children: [
                     Expanded(
                       child: Obx(() => Text(
-                            row.productName.value.isEmpty
-                                ? 'Tap to search...'
-                                : row.productName.value,
-                            style: TextStyle(
-                              color: row.productId.value == null ? Colors.grey : null,
-                            ),
+                            row.productName.value.isEmpty ? 'Tap to search...' : row.productName.value,
+                            style: TextStyle(color: row.productId.value == null ? Colors.grey : null),
                             overflow: TextOverflow.ellipsis,
                           )),
                     ),
-                    if (!readOnly)
-                      const Icon(Icons.search, size: 18, color: AppColors.textMuted),
+                    if (!readOnly) const Icon(Icons.search, size: 18, color: AppColors.textMuted),
                   ],
                 ),
               ),
@@ -1375,10 +1136,7 @@ class _ProductPicker extends StatelessWidget {
             if (state.hasError)
               Padding(
                 padding: const EdgeInsets.only(left: 12, top: 4),
-                child: Text(
-                  state.errorText!,
-                  style: const TextStyle(color: Colors.red, fontSize: 12),
-                ),
+                child: Text(state.errorText!, style: const TextStyle(color: Colors.red, fontSize: 12)),
               ),
           ],
         );
@@ -1389,7 +1147,7 @@ class _ProductPicker extends StatelessWidget {
 
 
 class _SummaryCard extends StatelessWidget {
-  final PurchaseOrderFormController controller;
+  final SalesOrderFormController controller;
 
   const _SummaryCard({required this.controller});
 
@@ -1436,11 +1194,7 @@ class _SummaryCard extends StatelessWidget {
             _summaryRow('Gross Amount', '₹ ${grossAmount.toStringAsFixed(2)}', false),
             for (final entry in visibleTaxEntries) ...[
               const SizedBox(height: 3),
-              _summaryRow(
-                displayTaxLabel(entry.key),
-                '₹ ${entry.value.toStringAsFixed(2)}',
-                false,
-              ),
+              _summaryRow(displayTaxLabel(entry.key), '₹ ${entry.value.toStringAsFixed(2)}', false),
             ],
             if (roundOffTax > 0) ...[
               const SizedBox(height: 3),

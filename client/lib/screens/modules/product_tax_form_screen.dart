@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../../api_config.dart';
 import '../../controllers/product_tax_form_controller.dart';
+import '../../models/product_model.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 
@@ -127,6 +128,29 @@ class ProductTaxFormScreen extends StatelessWidget {
   }
 }
 
+Future<List<Product>> _fetchProductsForDialog(String query) async {
+  try {
+    final uri = Uri.parse(ApiConfig.products).replace(
+      queryParameters: {
+        'limit': '50',
+        if (query.trim().isNotEmpty) 'search': query.trim(),
+      },
+    );
+    final response = await http.get(uri, headers: {'Accept': 'application/json'});
+    if (response.statusCode != 200) return [];
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    if (data['success'] != true) return [];
+    final List list = data['data'] ?? [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map((e) { try { return Product.fromJson(e); } catch (_) { return null; } })
+        .whereType<Product>()
+        .toList();
+  } catch (_) {
+    return [];
+  }
+}
+
 class _ProductPicker extends StatelessWidget {
   final ProductTaxFormController controller;
 
@@ -143,21 +167,17 @@ class _ProductPicker extends StatelessWidget {
           children: [
             InkWell(
               onTap: () async {
-                final result = await showDialog<Map<String, dynamic>>(
+                final result = await showDialog<Product>(
                   context: context,
-                  builder: (ctx) => _ProductSearchDialog(),
+                  builder: (ctx) => ProductSearchDialog(
+                    title: 'Select Product',
+                    searchFn: _fetchProductsForDialog,
+                  ),
                 );
                 if (result != null) {
-                  final rawId = result['product_id'] ?? result['id'];
-                  final pid = rawId is int
-                      ? rawId
-                      : int.tryParse(rawId?.toString() ?? '');
-                  final name = result['name']?.toString() ?? '';
-                  if (pid != null) {
-                    controller.setProduct(pid, name);
-                    state.didChange(pid);
-                    state.validate();
-                  }
+                  controller.setProduct(result.id, result.name);
+                  state.didChange(result.id);
+                  state.validate();
                 }
               },
               child: InputDecorator(
@@ -210,127 +230,3 @@ class _ProductPicker extends StatelessWidget {
   }
 }
 
-class _ProductSearchDialog extends StatefulWidget {
-  @override
-  State<_ProductSearchDialog> createState() => _ProductSearchDialogState();
-}
-
-class _ProductSearchDialogState extends State<_ProductSearchDialog> {
-  final TextEditingController _searchController = TextEditingController();
-  List<Map<String, dynamic>> _items = [];
-  bool _loading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _runSearch('');
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _runSearch(String query) async {
-    setState(() => _loading = true);
-    try {
-      final uri = Uri.parse(ApiConfig.products).replace(
-        queryParameters: {
-          'limit': '50',
-          if (query.trim().isNotEmpty) 'search': query.trim(),
-        },
-      );
-      final response = await http.get(
-        uri,
-        headers: {'Accept': 'application/json'},
-      );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        if (data['success'] == true) {
-          final List list = data['data'] ?? [];
-          setState(() {
-            _items = list
-                .map((e) => {
-                      'product_id': (e as Map)['product_id'] ?? (e)['id'],
-                      'name': (e)['name']?.toString() ??
-                          (e)['product_name']?.toString() ??
-                          '',
-                    })
-                .toList();
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('[PRODUCT_TAX] Search error: $e');
-    } finally {
-      setState(() => _loading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      child: Container(
-        width: 500,
-        height: 500,
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Search Product',
-                    style: TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _searchController,
-              decoration: AppInputDecoration.standard(
-                labelText: 'Name or ID',
-                hintText: 'Type to search...',
-              ),
-              onChanged: _runSearch,
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _items.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'No products found',
-                            style: TextStyle(color: AppColors.textMuted),
-                          ),
-                        )
-                      : ListView.builder(
-                          itemCount: _items.length,
-                          itemBuilder: (context, i) {
-                            final p = _items[i];
-                            final name = p['name']?.toString() ?? 'Product';
-                            final id = p['product_id'] ?? p['id'];
-                            return ListTile(
-                              title: Text(name),
-                              subtitle: Text('ID: $id'),
-                              onTap: () =>
-                                  Navigator.pop(context, p),
-                            );
-                          },
-                        ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 
 import '../api_config.dart';
 import '../constants/charge_constants.dart';
+import '../models/party_result.dart';
 import '../models/product_model.dart';
 import '../models/purchase_order_model.dart';
 import '../theme/app_colors.dart';
@@ -653,6 +654,31 @@ class PurchaseVoucherController extends GetxController {
     }
   }
 
+  Future<List<PartyResult>> searchSuppliers(String query) async {
+    try {
+      final uri = Uri.parse(ApiConfig.suppliers).replace(queryParameters: {
+        'limit': '50',
+        if (query.trim().isNotEmpty) 'search': query.trim(),
+      });
+      final response = await http.get(uri, headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return [];
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) return [];
+      final List list = data['data'] ?? [];
+      return list.whereType<Map<String, dynamic>>().map((e) {
+        final rawId = e['id'];
+        final id = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
+        if (id == null) return null;
+        return PartyResult(
+          id: id,
+          name: e['supplier_name']?.toString() ?? e['name']?.toString() ?? 'Supplier $id',
+          phone: e['phone']?.toString(),
+          code: e['supplier_code']?.toString(),
+        );
+      }).whereType<PartyResult>().toList();
+    } catch (_) { return []; }
+  }
+
   Future<void> _loadUnitTypes() async {
     try {
       final response = await http.get(
@@ -1130,6 +1156,17 @@ class PurchaseVoucherController extends GetxController {
 
   Future<void> searchProducts(String query) =>
       loadProductsForVendor(search: query);
+
+  Future<List<Product>> searchProductsAsModels(
+    String query, {
+    bool includeAll = false,
+  }) async {
+    await loadProductsForVendor(
+      search: query.isEmpty ? null : query,
+      includeAll: includeAll,
+    );
+    return List<Product>.from(products);
+  }
 
   void setDocNoPrefix(String v) => docNoPrefix.value = v;
   void setDocNoNumber(String v) => docNoNumber.value = v;

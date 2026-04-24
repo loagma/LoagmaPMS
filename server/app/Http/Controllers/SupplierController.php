@@ -22,7 +22,10 @@ class SupplierController extends Controller
                 $query->where(function ($q) use ($search) {
                     $q->where('supplier_name', 'like', "%{$search}%")
                       ->orWhere('supplier_code', 'like', "%{$search}%")
-                      ->orWhere('short_name', 'like', "%{$search}%");
+                      ->orWhere('short_name', 'like', "%{$search}%")
+                      ->orWhere('phone', 'like', "%{$search}%")
+                      ->orWhere('alternate_phone', 'like', "%{$search}%")
+                      ->orWhere('id', 'like', "%{$search}%");
                 });
             }
 

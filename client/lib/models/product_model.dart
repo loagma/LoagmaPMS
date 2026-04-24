@@ -1,13 +1,55 @@
+class ProductPack {
+  final String id;
+  final String label;
+  final double? weight;
+  final String? unit;
+  final double? price;
+
+  ProductPack({
+    required this.id,
+    required this.label,
+    this.weight,
+    this.unit,
+    this.price,
+  });
+
+  factory ProductPack.fromJson(Map<String, dynamic> json) {
+    final rawId = json['pack_id'] ?? json['id'] ?? '';
+    final label = json['pack_name'] ?? json['label'] ?? json['name'] ?? rawId.toString();
+    double? weight;
+    if (json['pack_wt'] != null) {
+      weight = (json['pack_wt'] as num?)?.toDouble();
+    } else if (json['weight'] != null) {
+      weight = (json['weight'] as num?)?.toDouble();
+    }
+    double? price;
+    if (json['price'] != null) {
+      price = (json['price'] as num?)?.toDouble();
+    }
+    return ProductPack(
+      id: rawId.toString(),
+      label: label.toString(),
+      weight: weight,
+      unit: json['unit']?.toString() ?? json['pack_ut']?.toString(),
+      price: price,
+    );
+  }
+}
+
 class Product {
   final int id;
   final String name;
   final String? code;
   final String? hsnCode;
-  final String productType; // 'FINISHED' or 'RAW'
+  final String productType; // 'SINGLE' or 'PACK_WISE'
   final String? defaultUnit; // 'WEIGHT', 'QUANTITY', 'LITRE', 'METER'
   final double? stock; // Available stock (optional, when include_stock=1)
   final double gstPercent;
   final List<ProductTaxInfo> taxes;
+  final String? description;
+  final String? brand;
+  final List<ProductPack> packs;
+  final String? defaultPackId;
 
   Product({
     required this.id,
@@ -19,6 +61,10 @@ class Product {
     this.stock,
     this.gstPercent = 0,
     this.taxes = const [],
+    this.description,
+    this.brand,
+    this.packs = const [],
+    this.defaultPackId,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -87,6 +133,16 @@ class Product {
           nestedProduct?['hsn'],
     );
 
+    final List<ProductPack> packs = [];
+    final packsRaw = json['packs'];
+    if (packsRaw is List) {
+      for (final item in packsRaw) {
+        if (item is Map<String, dynamic>) {
+          packs.add(ProductPack.fromJson(item));
+        }
+      }
+    }
+
     return Product(
       id: id,
       name: productName.toString().trim(),
@@ -97,6 +153,10 @@ class Product {
       stock: stock,
       gstPercent: gstPercent,
       taxes: taxes,
+      description: json['description']?.toString().trim(),
+      brand: json['brand']?.toString().trim(),
+      packs: packs,
+      defaultPackId: json['default_pack_id']?.toString().trim(),
     );
   }
 
@@ -110,6 +170,8 @@ class Product {
       'default_unit': defaultUnit,
       'gst_percent': gstPercent,
       'taxes': taxes.map((t) => t.toJson()).toList(),
+      if (description != null) 'description': description,
+      if (brand != null) 'brand': brand,
     };
   }
 }

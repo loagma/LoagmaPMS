@@ -23,7 +23,7 @@ class ProductController extends Controller
             $includeStock = filter_var(request()->query('include_stock', false), FILTER_VALIDATE_BOOLEAN);
             $includeTaxes = filter_var(request()->query('include_taxes', false), FILTER_VALIDATE_BOOLEAN);
 
-            $selectCols = ['product_id', 'name', 'hsn_code', 'inventory_type', 'inventory_unit_type', 'gst_percent'];
+            $selectCols = ['product_id', 'name', 'hsn_code', 'inventory_type', 'inventory_unit_type', 'gst_percent', 'description', 'brand', 'packs', 'default_pack_id'];
             if ($includeStock) {
                 $selectCols[] = 'stock';
             }
@@ -120,6 +120,14 @@ class ProductController extends Controller
                     $unitType = 'WEIGHT';
                 }
 
+                $packsDecoded = null;
+                if (!empty($product->packs)) {
+                    $decoded = json_decode($product->packs, true);
+                    if (is_array($decoded)) {
+                        $packsDecoded = array_values($decoded);
+                    }
+                }
+
                 $result = [
                     'product_id' => (int) $product->product_id,
                     'name' => $cleanName,
@@ -127,6 +135,10 @@ class ProductController extends Controller
                     'inventory_type' => $inventoryType,
                     'inventory_unit_type' => $unitType,
                     'gst_percent' => isset($product->gst_percent) ? (float) $product->gst_percent : 0,
+                    'description' => isset($product->description) ? trim((string) $product->description) : null,
+                    'brand' => isset($product->brand) ? trim((string) $product->brand) : null,
+                    'packs' => $packsDecoded,
+                    'default_pack_id' => isset($product->default_pack_id) ? trim((string) $product->default_pack_id) : null,
                 ];
                 if ($includeStock && isset($product->stock)) {
                     $result['stock'] = $product->stock !== null ? (float) $product->stock : 0;

@@ -9,70 +9,58 @@ import '../api_config.dart';
 import '../constants/charge_constants.dart';
 import '../models/party_result.dart';
 import '../models/product_model.dart';
-import '../models/purchase_order_model.dart';
+import '../models/sales_order_model.dart';
 
-class PurchaseOrderFormController extends GetxController {
+class SalesOrderFormController extends GetxController {
   final formKey = GlobalKey<FormState>();
-  final int? poId;
+  final int? soId;
   final bool startInViewOnly;
 
-  final suppliers = <Map<String, dynamic>>[].obs;
-  final salesmen = <Map<String, dynamic>>[].obs;
+  final customers = <Map<String, dynamic>>[].obs;
   final departments = <Map<String, dynamic>>[].obs;
   final products = <Map<String, dynamic>>[].obs;
   final unitTypes = <String>[].obs;
   final viewOnly = false.obs;
 
-  /// Current purchase order number label for navigation/display (e.g. PO-1001 or just 1001).
-  final currentPoNumber = ''.obs;
-  /// Parsed numeric sequence used for previous/next navigation.
-  final RxnInt currentPoSeq = RxnInt();
+  final currentSoNumber = ''.obs;
+  final RxnInt currentSoSeq = RxnInt();
 
   final financialYear = '25-26'.obs;
-  final supplierId = Rxn<int>();
-  final supplierName = ''.obs;
-  final salesmanId = Rxn<String>();
+  final customerId = Rxn<int>();
+  final customerName = ''.obs;
   final departmentId = Rxn<String>();
   final docDate = ''.obs;
   final expectedDate = ''.obs;
   final status = 'DRAFT'.obs;
   final narration = ''.obs;
-  final charges = <POChargeRow>[].obs;
+  final charges = <SOChargeRow>[].obs;
 
-  final items = <POLineRow>[].obs;
+  final items = <SOLineRow>[].obs;
 
   final isLoading = false.obs;
   final isSaving = false.obs;
 
   static const List<String> chargeTypeNames = addonChargeTypeNames;
 
-  PurchaseOrderFormController({this.poId, this.startInViewOnly = false});
-
-  int? _safeInt(dynamic raw) {
-    if (raw is int) return raw;
-    if (raw == null) return null;
-    return int.tryParse(raw.toString());
-  }
+  SalesOrderFormController({this.soId, this.startInViewOnly = false});
 
   @override
   void onInit() {
     super.onInit();
     viewOnly.value = startInViewOnly;
     _ensureDefaultCharges();
-    _loadSuppliers();
-    _loadSalesmen();
+    _loadCustomers();
     _loadDepartments();
     _loadUnitTypes();
-    if (poId != null) {
-      _loadPurchaseOrder();
+    if (soId != null) {
+      _loadSalesOrder();
     } else {
       _setDefaultDocDate();
-      _loadNextPoNumberForNew();
+      _loadNextSoNumberForNew();
       addItem();
     }
   }
 
-  /// Search all products via /products (no supplier filter).
   Future<List<Map<String, dynamic>>> _searchAllProducts(String query) async {
     try {
       final uri = Uri.parse(ApiConfig.products).replace(
@@ -88,96 +76,18 @@ class PurchaseOrderFormController extends GetxController {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       if (data['success'] != true) return [];
       final List list = data['data'] ?? [];
-      return list
-          .map((e) {
-            final map = e as Map<String, dynamic>;
-            final productId = _safeInt(map['product_id'] ?? map['id']);
-            final name = map['name']?.toString() ??
-                map['product_name']?.toString() ??
-                (productId != null ? 'Product $productId' : '');
-            final hsnCode = map['hsn_code']?.toString() ??
-                map['hsn']?.toString() ??
-                map['hsnCode']?.toString();
-            return {
-              'product_id': productId,
-              'name': name,
-              'hsn_code': hsnCode,
-            };
-          })
-          .toList();
+      return list.whereType<Map<String, dynamic>>().toList();
     } catch (e) {
-      debugPrint('[PO FORM] Search products error: $e');
+      debugPrint('[SO FORM] Search products error: $e');
       return [];
     }
   }
 
-  /// Supplier-aware product search.
-  /// If a supplier is selected and [includeAll] is false, we hit /supplier-products
-  /// so that only products assigned to that supplier are returned.
-  /// Otherwise we fall back to the generic /products search.
-  Future<List<Map<String, dynamic>>> searchProductsForSupplier(
-    String query, {
-    bool includeAll = false,
-  }) async {
-    final supplier = supplierId.value;
-    if (!includeAll && supplier != null) {
-      try {
-        final uri = Uri.parse(ApiConfig.supplierProducts).replace(
-          queryParameters: {
-            'limit': '50',
-            'supplier_id': supplier.toString(),
-            if (query.trim().isNotEmpty) 'search': query.trim(),
-          },
-        );
-        final response = await http
-            .get(uri, headers: {'Accept': 'application/json'})
-            .timeout(const Duration(seconds: 15));
-        if (response.statusCode != 200) return [];
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        if (data['success'] != true) return [];
-        final List list = data['data'] ?? [];
-        return list.map((e) {
-          final map = e as Map<String, dynamic>;
-          final dynamic productRaw = map['product'];
-          final product =
-              productRaw is Map<String, dynamic> ? productRaw : null;
-          final productId = _safeInt(
-            map['product_id'] ?? product?['product_id'] ?? product?['id'],
-          );
-          final name = product?['name']?.toString() ??
-              map['product_name']?.toString() ??
-              map['supplier_product_name']?.toString() ??
-              (productId != null ? 'Product $productId' : 'Product');
-          final hsnCode = product?['hsn_code']?.toString() ??
-              product?['hsn']?.toString() ??
-              product?['hsnCode']?.toString() ??
-              map['hsn_code']?.toString() ??
-              map['hsn']?.toString() ??
-              map['hsnCode']?.toString();
-          return {
-            'product_id': productId,
-            'name': name,
-            'hsn_code': hsnCode,
-          };
-        }).toList();
-      } catch (e) {
-        debugPrint('[PO FORM] Supplier search error: $e');
-        // fall through to all-products search
-      }
-    }
-    return _searchAllProducts(query);
-  }
-
-  /// Backwards-compatible wrapper for existing callers that always want all products.
   Future<List<Map<String, dynamic>>> searchProducts(String query) =>
       _searchAllProducts(query);
 
-  /// Returns search results as [Product] models — used by the shared ProductSearchDialog.
-  Future<List<Product>> searchProductsAsModels(
-    String query, {
-    bool includeAll = false,
-  }) async {
-    final raw = await searchProductsForSupplier(query, includeAll: includeAll);
+  Future<List<Product>> searchProductsAsModels(String query) async {
+    final raw = await _searchAllProducts(query);
     return raw
         .map((e) {
           try {
@@ -190,27 +100,24 @@ class PurchaseOrderFormController extends GetxController {
         .toList();
   }
 
-  /// Resolves line-item taxes only from product_taxes for selected product.
-  /// If no product taxes are found, tax fields remain empty.
-  Future<void> applyProductTaxesToRow(POLineRow row, int productId) async {
+  Future<void> applyProductTaxesToRow(SOLineRow row, int productId) async {
     row.isTaxLoading.value = true;
     _clearTaxBreakdown(row);
     try {
       final productTaxes = await _fetchProductTaxRows(productId);
       final applied = _applyTaxRowsToRow(row, productTaxes);
-
       if (!applied) {
         row.taxPercent.value = '';
       }
     } catch (e) {
-      debugPrint('[PO FORM] Resolve taxes error: $e');
+      debugPrint('[SO FORM] Resolve taxes error: $e');
       row.taxPercent.value = '';
     } finally {
       row.isTaxLoading.value = false;
     }
   }
 
-  void _clearTaxBreakdown(POLineRow row) {
+  void _clearTaxBreakdown(SOLineRow row) {
     row.sgst.value = '';
     row.cgst.value = '';
     row.igst.value = '';
@@ -220,7 +127,7 @@ class PurchaseOrderFormController extends GetxController {
     row.availableTaxKeys.clear();
   }
 
-  bool _applyTaxRowsToRow(POLineRow row, List<Map<String, dynamic>> rows) {
+  bool _applyTaxRowsToRow(SOLineRow row, List<Map<String, dynamic>> rows) {
     if (rows.isEmpty) return false;
     var applied = false;
     var totalPercent = 0.0;
@@ -230,8 +137,7 @@ class PurchaseOrderFormController extends GetxController {
     for (final map in rows) {
       final tax = map['tax'] as Map<String, dynamic>?;
       final rawName = (tax?['tax_name'] ?? map['tax_name'] ?? '').toString().trim();
-      final rawSub =
-          (tax?['tax_sub_category'] ?? map['tax_sub_category'] ?? '').toString().trim();
+      final rawSub = (tax?['tax_sub_category'] ?? map['tax_sub_category'] ?? '').toString().trim();
       final taxName = rawName.toUpperCase();
       final taxSub = rawSub.toUpperCase();
       final percent = (map['tax_percent'] ?? 0) is num
@@ -295,8 +201,8 @@ class PurchaseOrderFormController extends GetxController {
     if (data['success'] != true) return [];
     final List list = data['data'] ?? [];
     return list
-      .whereType<Map<dynamic, dynamic>>()
-      .map((e) => Map<String, dynamic>.from(e))
+        .whereType<Map<dynamic, dynamic>>()
+        .map((e) => Map<String, dynamic>.from(e))
         .toList();
   }
 
@@ -321,56 +227,7 @@ class PurchaseOrderFormController extends GetxController {
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
   }
 
-  Future<void> _loadSuppliers() async {
-    try {
-      final response = await http.get(
-        Uri.parse(ApiConfig.suppliers),
-        headers: {'Accept': 'application/json'},
-      );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        if (data['success'] == true) {
-          final List list = data['data'] ?? [];
-          suppliers.value = list
-              .map((e) => {
-                    'id': (e as Map)['id'],
-                    'supplier_code': (e)['supplier_code']?.toString(),
-                    'supplier_name': (e)['supplier_name']?.toString() ?? (e)['name']?.toString(),
-                  })
-              .toList();
-        }
-      }
-    } catch (e) {
-      debugPrint('[PO FORM] Load suppliers error: $e');
-    }
-  }
-
-  Future<List<PartyResult>> searchSuppliers(String query) async {
-    try {
-      final uri = Uri.parse(ApiConfig.suppliers).replace(queryParameters: {
-        'limit': '50',
-        if (query.trim().isNotEmpty) 'search': query.trim(),
-      });
-      final response = await http.get(uri, headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) return [];
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (data['success'] != true) return [];
-      final List list = data['data'] ?? [];
-      return list.whereType<Map<String, dynamic>>().map((e) {
-        final rawId = e['id'];
-        final id = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
-        if (id == null) return null;
-        return PartyResult(
-          id: id,
-          name: e['supplier_name']?.toString() ?? e['name']?.toString() ?? 'Supplier $id',
-          phone: e['phone']?.toString(),
-          code: e['supplier_code']?.toString(),
-        );
-      }).whereType<PartyResult>().toList();
-    } catch (_) { return []; }
-  }
-
-  Future<void> _loadSalesmen() async {
+  Future<void> _loadCustomers() async {
     try {
       Future<List<Map<String, dynamic>>> fetch(Uri uri) async {
         final response = await http.get(
@@ -383,24 +240,24 @@ class PurchaseOrderFormController extends GetxController {
         final List list = data['data'] ?? [];
         return list
             .map((e) => {
-                  'id': (e as Map)['id']?.toString(),
+                  'id': (e as Map)['id'],
                   'name': (e)['name']?.toString() ?? 'User ${(e)['id'] ?? ''}',
                 })
-            .where((e) => (e['id'] ?? '').toString().isNotEmpty)
+            .where((e) => e['id'] != null)
             .toList();
       }
 
       final filteredUri = Uri.parse(ApiConfig.users)
-          .replace(queryParameters: {'role': 'Salesman', 'limit': '500'});
+          .replace(queryParameters: {'role': 'Customer', 'limit': '500'});
       var list = await fetch(filteredUri);
       if (list.isEmpty) {
         final fallbackUri = Uri.parse(ApiConfig.users)
             .replace(queryParameters: {'limit': '500'});
         list = await fetch(fallbackUri);
       }
-      salesmen.value = list;
+      customers.value = list;
     } catch (e) {
-      debugPrint('[PO FORM] Load salesmen error: $e');
+      debugPrint('[SO FORM] Load customers error: $e');
     }
   }
 
@@ -424,7 +281,7 @@ class PurchaseOrderFormController extends GetxController {
         }
       }
     } catch (e) {
-      debugPrint('[PO FORM] Load departments error: $e');
+      debugPrint('[SO FORM] Load departments error: $e');
     }
   }
 
@@ -446,14 +303,10 @@ class PurchaseOrderFormController extends GetxController {
     }
   }
 
-  /// For a brand new PO, fetch the latest existing PO and
-  /// set [currentPoNumber] to the next consecutive number.
-  Future<void> _loadNextPoNumberForNew() async {
+  Future<void> _loadNextSoNumberForNew() async {
     try {
-      final uri = Uri.parse(ApiConfig.purchaseOrders).replace(
-        queryParameters: {
-          'limit': '1',
-        },
+      final uri = Uri.parse(ApiConfig.salesOrders).replace(
+        queryParameters: {'limit': '1'},
       );
       final response = await http
           .get(uri, headers: {'Accept': 'application/json'})
@@ -463,27 +316,23 @@ class PurchaseOrderFormController extends GetxController {
       if (data['success'] != true) return;
       final List list = data['data'] ?? [];
       if (list.isEmpty) {
-        currentPoSeq.value = 1;
-        currentPoNumber.value = '1';
+        currentSoSeq.value = 1;
+        currentSoNumber.value = '1';
         return;
       }
       final last = list.first as Map<String, dynamic>;
-      final next = _nextSequenceFromRaw(
-        last['po_number']?.toString(),
-        last['id'],
-      );
-      currentPoSeq.value = next;
-      currentPoNumber.value = next.toString();
+      final next = _nextSequenceFromRaw(last['so_number']?.toString(), last['id']);
+      currentSoSeq.value = next;
+      currentSoNumber.value = next.toString();
     } catch (e) {
-      debugPrint('[PO FORM] Next PO number error: $e');
+      debugPrint('[SO FORM] Next SO number error: $e');
     }
   }
 
-  /// Compute the next integer sequence from a raw po_number or id.
-  int _nextSequenceFromRaw(String? poNumber, dynamic id) {
+  int _nextSequenceFromRaw(String? soNumber, dynamic id) {
     int? base;
-    if (poNumber != null && poNumber.isNotEmpty) {
-      final match = RegExp(r'(\d+)$').firstMatch(poNumber);
+    if (soNumber != null && soNumber.isNotEmpty) {
+      final match = RegExp(r'(\d+)$').firstMatch(soNumber);
       if (match != null) {
         base = int.tryParse(match.group(1)!);
       }
@@ -492,10 +341,9 @@ class PurchaseOrderFormController extends GetxController {
     return (base ?? 0) + 1;
   }
 
-  /// Parse integer sequence from po_number suffix, falling back to id.
-  int? _sequenceFromRaw(String? poNumber, dynamic id) {
-    if (poNumber != null && poNumber.isNotEmpty) {
-      final match = RegExp(r'(\d+)$').firstMatch(poNumber);
+  int? _sequenceFromRaw(String? soNumber, dynamic id) {
+    if (soNumber != null && soNumber.isNotEmpty) {
+      final match = RegExp(r'(\d+)$').firstMatch(soNumber);
       if (match != null) {
         final parsed = int.tryParse(match.group(1)!);
         if (parsed != null) return parsed;
@@ -505,13 +353,10 @@ class PurchaseOrderFormController extends GetxController {
     return int.tryParse(id?.toString() ?? '');
   }
 
-  /// Returns latest voucher sequence from the most recent purchase order.
   Future<int?> _fetchLatestSequence() async {
     try {
-      final uri = Uri.parse(ApiConfig.purchaseOrders).replace(
-        queryParameters: {
-          'limit': '1',
-        },
+      final uri = Uri.parse(ApiConfig.salesOrders).replace(
+        queryParameters: {'limit': '1'},
       );
       final response = await http
           .get(uri, headers: {'Accept': 'application/json'})
@@ -522,34 +367,32 @@ class PurchaseOrderFormController extends GetxController {
       final List list = data['data'] ?? [];
       if (list.isEmpty) return null;
       final last = list.first as Map<String, dynamic>;
-      return _sequenceFromRaw(last['po_number']?.toString(), last['id']);
+      return _sequenceFromRaw(last['so_number']?.toString(), last['id']);
     } catch (_) {
       return null;
     }
   }
 
-  Future<void> _applyPurchaseOrderToState(PurchaseOrder po) async {
-    financialYear.value = po.financialYear ?? '25-26';
-    supplierId.value = po.supplierId;
-    supplierName.value = po.supplierName ?? '';
-    salesmanId.value = po.salesmanId;
-    departmentId.value = po.departmentId;
-    docDate.value = po.docDate;
-    expectedDate.value = po.expectedDate ?? '';
-    status.value = po.status;
-    narration.value = po.narration ?? '';
-    currentPoNumber.value = po.poNumber;
-    // Update numeric sequence from poNumber if possible.
-    if (po.poNumber.isNotEmpty) {
-      final match = RegExp(r'(\d+)$').firstMatch(po.poNumber);
+  Future<void> _applySalesOrderToState(SalesOrder so) async {
+    financialYear.value = so.financialYear ?? '25-26';
+    customerId.value = so.customerId;
+    customerName.value = so.customerName ?? '';
+    departmentId.value = so.departmentId;
+    docDate.value = so.docDate;
+    expectedDate.value = so.expectedDate ?? '';
+    status.value = so.status;
+    narration.value = so.narration ?? '';
+    currentSoNumber.value = so.soNumber;
+    if (so.soNumber.isNotEmpty) {
+      final match = RegExp(r'(\d+)$').firstMatch(so.soNumber);
       if (match != null) {
-        currentPoSeq.value = int.tryParse(match.group(1)!);
+        currentSoSeq.value = int.tryParse(match.group(1)!);
       }
     }
-    _loadChargesFromModel(po.chargesJson);
+    _loadChargesFromModel(so.chargesJson);
     items.clear();
-    for (final item in po.items) {
-      items.add(POLineRow(
+    for (final item in so.items) {
+      items.add(SOLineRow(
         productId: item.productId,
         productName: item.productName,
         hsnCode: item.hsnCode,
@@ -564,7 +407,7 @@ class PurchaseOrderFormController extends GetxController {
         description: item.description ?? '',
       ));
     }
-    if (items.isEmpty) items.add(POLineRow());
+    if (items.isEmpty) items.add(SOLineRow());
     await _hydrateLineItemTaxes();
   }
 
@@ -576,80 +419,54 @@ class PurchaseOrderFormController extends GetxController {
     }
   }
 
-  /// Reset the form to a new purchase order state (when navigating to non-existent voucher).
   Future<void> _resetToNewForm() async {
-    supplierId.value = null;
-    salesmanId.value = null;
+    customerId.value = null;
     departmentId.value = null;
     docDate.value = '';
     expectedDate.value = '';
     status.value = 'DRAFT';
     narration.value = '';
-    currentPoNumber.value = '';
+    currentSoNumber.value = '';
     _ensureDefaultCharges(reset: true);
     items.clear();
     _setDefaultDocDate();
-    await _loadNextPoNumberForNew();
+    await _loadNextSoNumberForNew();
     addItem();
     viewOnly.value = false;
   }
 
-  /// Load a purchase order by a numeric sequence (voucher number).
   Future<void> loadBySequence(int seq) async {
     try {
       isLoading.value = true;
-      final uri = Uri.parse(ApiConfig.purchaseOrders).replace(
-        queryParameters: {
-          'limit': '1',
-          'search': seq.toString(),
-        },
+      final uri = Uri.parse(ApiConfig.salesOrders).replace(
+        queryParameters: {'limit': '1', 'search': seq.toString()},
       );
       final response = await http
           .get(uri, headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) {
-        await _resetToNewForm();
-        return;
-      }
+      if (response.statusCode != 200) { await _resetToNewForm(); return; }
       final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (data['success'] != true) {
-        await _resetToNewForm();
-        return;
-      }
+      if (data['success'] != true) { await _resetToNewForm(); return; }
       final List list = data['data'] ?? [];
-      if (list.isEmpty) {
-        await _resetToNewForm();
-        return;
-      }
+      if (list.isEmpty) { await _resetToNewForm(); return; }
       final summary = list.first as Map<String, dynamic>;
       final idVal = summary['id'];
       final id = idVal is int ? idVal : int.tryParse(idVal?.toString() ?? '');
-      if (id == null) {
-        await _resetToNewForm();
-        return;
-      }
+      if (id == null) { await _resetToNewForm(); return; }
 
-      // Fetch full details for that purchase order.
       final detailResp = await http.get(
-        Uri.parse('${ApiConfig.purchaseOrders}/$id'),
+        Uri.parse('${ApiConfig.salesOrders}/$id'),
         headers: {'Accept': 'application/json'},
       );
-      if (detailResp.statusCode != 200) {
-        await _resetToNewForm();
-        return;
-      }
+      if (detailResp.statusCode != 200) { await _resetToNewForm(); return; }
       final detailData = jsonDecode(detailResp.body) as Map<String, dynamic>;
-      if (detailData['success'] != true) {
-        await _resetToNewForm();
-        return;
-      }
-      final poData = detailData['data'] as Map<String, dynamic>;
-      final po = PurchaseOrder.fromJson(poData);
-      await _applyPurchaseOrderToState(po);
-      // Navigated vouchers should start in view-only mode.
+      if (detailData['success'] != true) { await _resetToNewForm(); return; }
+      final soData = detailData['data'] as Map<String, dynamic>;
+      final so = SalesOrder.fromJson(soData);
+      await _applySalesOrderToState(so);
       viewOnly.value = true;
     } catch (e) {
-      debugPrint('[PO FORM] Load by sequence error: $e');
+      debugPrint('[SO FORM] Load by sequence error: $e');
       await _resetToNewForm();
     } finally {
       isLoading.value = false;
@@ -657,50 +474,47 @@ class PurchaseOrderFormController extends GetxController {
   }
 
   Future<void> goToPreviousVoucher() async {
-    final current = currentPoSeq.value;
+    final current = currentSoSeq.value;
     if (current == null || current <= 1) return;
     await loadBySequence(current - 1);
   }
 
   Future<void> goToNextVoucher() async {
-    final current = currentPoSeq.value;
+    final current = currentSoSeq.value;
     if (current == null) return;
-
     final latest = await _fetchLatestSequence();
     if (latest != null && current >= latest) {
       await _resetToNewForm();
       return;
     }
-
     await loadBySequence(current + 1);
   }
 
-  Future<void> _loadPurchaseOrder() async {
-    if (poId == null) return;
+  Future<void> _loadSalesOrder() async {
+    if (soId == null) return;
     try {
       isLoading.value = true;
       final response = await http.get(
-        Uri.parse('${ApiConfig.purchaseOrders}/$poId'),
+        Uri.parse('${ApiConfig.salesOrders}/$soId'),
         headers: {'Accept': 'application/json'},
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         if (data['success'] == true) {
-          final poData = data['data'] as Map<String, dynamic>;
-          final po = PurchaseOrder.fromJson(poData);
-          financialYear.value = po.financialYear ?? '25-26';
-          supplierId.value = po.supplierId;
-          salesmanId.value = po.salesmanId;
-          departmentId.value = po.departmentId;
-          docDate.value = po.docDate;
-          expectedDate.value = po.expectedDate ?? '';
-          status.value = po.status;
-          narration.value = po.narration ?? '';
-          currentPoNumber.value = po.poNumber;
-          _loadChargesFromModel(po.chargesJson);
+          final soData = data['data'] as Map<String, dynamic>;
+          final so = SalesOrder.fromJson(soData);
+          financialYear.value = so.financialYear ?? '25-26';
+          customerId.value = so.customerId;
+          departmentId.value = so.departmentId;
+          docDate.value = so.docDate;
+          expectedDate.value = so.expectedDate ?? '';
+          status.value = so.status;
+          narration.value = so.narration ?? '';
+          currentSoNumber.value = so.soNumber;
+          _loadChargesFromModel(so.chargesJson);
           items.clear();
-          for (final item in po.items) {
-            items.add(POLineRow(
+          for (final item in so.items) {
+            items.add(SOLineRow(
               productId: item.productId,
               productName: item.productName,
               hsnCode: item.hsnCode,
@@ -715,25 +529,49 @@ class PurchaseOrderFormController extends GetxController {
               description: item.description ?? '',
             ));
           }
-          if (items.isEmpty) items.add(POLineRow());
+          if (items.isEmpty) items.add(SOLineRow());
           await _hydrateLineItemTaxes();
         }
       }
     } catch (e) {
-      debugPrint('[PO FORM] Load PO error: $e');
-      _showError('Failed to load purchase order');
+      debugPrint('[SO FORM] Load SO error: $e');
+      _showError('Failed to load sales order');
     } finally {
       isLoading.value = false;
     }
   }
 
   void setFinancialYear(String v) => financialYear.value = v;
-  void setSupplierId(int? v) => supplierId.value = v;
-  void setSupplier(int id, String name) {
-    supplierId.value = id;
-    supplierName.value = name;
+  void setCustomerId(int? v) => customerId.value = v;
+  void setCustomer(int id, String name) {
+    customerId.value = id;
+    customerName.value = name;
   }
-  void setSalesmanId(String? v) => salesmanId.value = v;
+
+  Future<List<PartyResult>> searchCustomers(String query) async {
+    try {
+      final uri = Uri.parse(ApiConfig.users).replace(queryParameters: {
+        'limit': '50',
+        'role': 'Customer',
+        if (query.trim().isNotEmpty) 'search': query.trim(),
+      });
+      final response = await http.get(uri, headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return [];
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) return [];
+      final List list = data['data'] ?? [];
+      return list.whereType<Map<String, dynamic>>().map((e) {
+        final rawId = e['id'];
+        final id = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
+        if (id == null) return null;
+        return PartyResult(
+          id: id,
+          name: e['name']?.toString() ?? 'Customer $id',
+          phone: e['contactNumber']?.toString(),
+        );
+      }).whereType<PartyResult>().toList();
+    } catch (_) { return []; }
+  }
   void setDepartmentId(String? v) => departmentId.value = v;
   void setDocDate(String v) => docDate.value = v;
   void setExpectedDate(String v) => expectedDate.value = v;
@@ -741,7 +579,7 @@ class PurchaseOrderFormController extends GetxController {
   void setNarration(String v) => narration.value = v;
 
   void addItem() {
-    final row = POLineRow();
+    final row = SOLineRow();
     if (unitTypes.isNotEmpty && row.unit.value.isEmpty) {
       row.unit.value = unitTypes.first;
     }
@@ -754,22 +592,18 @@ class PurchaseOrderFormController extends GetxController {
     }
   }
 
-  bool get isEditMode => poId != null;
+  bool get isEditMode => soId != null;
   bool get isReadOnly => viewOnly.value || status.value != 'DRAFT';
 
   double get itemsSubtotalExclTax {
     double value = 0;
-    for (final row in items) {
-      value += row.lineTotalExclTax;
-    }
+    for (final row in items) { value += row.lineTotalExclTax; }
     return value;
   }
 
   double get itemsTaxTotal {
     double value = 0;
-    for (final row in items) {
-      value += (row.lineTotal - row.lineTotalExclTax);
-    }
+    for (final row in items) { value += (row.lineTotal - row.lineTotalExclTax); }
     return value;
   }
 
@@ -794,8 +628,8 @@ class PurchaseOrderFormController extends GetxController {
 
   bool validateForm() {
     if (!formKey.currentState!.validate()) return false;
-    if (supplierId.value == null) {
-      _showError('Please select a supplier');
+    if (customerId.value == null) {
+      _showError('Please select a customer');
       return false;
     }
     if (docDate.value.trim().isEmpty) {
@@ -838,9 +672,7 @@ class PurchaseOrderFormController extends GetxController {
 
       final payload = {
         'financial_year': financialYear.value,
-        'supplier_id': supplierId.value,
-        if (salesmanId.value != null && salesmanId.value!.trim().isNotEmpty)
-          'salesman_id': salesmanId.value,
+        'customer_id': customerId.value,
         if (departmentId.value != null && departmentId.value!.trim().isNotEmpty)
           'department_id': departmentId.value,
         'doc_date': docDate.value,
@@ -848,13 +680,12 @@ class PurchaseOrderFormController extends GetxController {
         'status': status.value,
         if (narration.value.trim().isNotEmpty) 'narration': narration.value.trim(),
         'charges': charges
-          .map((row) => {
-              'name': row.name.value,
-              'amount': double.tryParse(row.amount.value) ?? 0,
-              if (row.remarks.value.trim().isNotEmpty)
-              'remarks': row.remarks.value.trim(),
-            })
-          .toList(),
+            .map((row) => {
+                  'name': row.name.value,
+                  'amount': double.tryParse(row.amount.value) ?? 0,
+                  if (row.remarks.value.trim().isNotEmpty) 'remarks': row.remarks.value.trim(),
+                })
+            .toList(),
         'items': validItems.asMap().entries.map((e) {
           final r = e.value;
           final productId = r.productId.value!;
@@ -873,8 +704,7 @@ class PurchaseOrderFormController extends GetxController {
           return {
             'product_id': productId,
             'line_no': e.key + 1,
-            if (r.hsnCode.value.trim().isNotEmpty)
-              'hsn_code': r.hsnCode.value.trim(),
+            if (r.hsnCode.value.trim().isNotEmpty) 'hsn_code': r.hsnCode.value.trim(),
             if (r.unit.value.trim().isNotEmpty) 'unit': r.unit.value.trim(),
             'quantity': qty,
             'price': price,
@@ -885,37 +715,25 @@ class PurchaseOrderFormController extends GetxController {
         }).toList(),
       };
 
-      final isCreate = poId == null;
-      final url = isCreate
-          ? ApiConfig.purchaseOrders
-          : '${ApiConfig.purchaseOrders}/$poId';
+      final isCreate = soId == null;
+      final url = isCreate ? ApiConfig.salesOrders : '${ApiConfig.salesOrders}/$soId';
 
       final response = isCreate
           ? await http.post(
               Uri.parse(url),
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              },
+              headers: {'Accept': 'application/json', 'Content-Type': 'application/json'},
               body: jsonEncode(payload),
             )
           : await http.put(
               Uri.parse(url),
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              },
+              headers: {'Accept': 'application/json', 'Content-Type': 'application/json'},
               body: jsonEncode(payload),
             );
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
 
-      if ((response.statusCode == 200 || response.statusCode == 201) &&
-          data['success'] == true) {
-        final successMessage =
-            isCreate ? 'Purchase order created' : 'Purchase order updated';
-
-        // Brief buffer so users see submit completion before navigation.
+      if ((response.statusCode == 200 || response.statusCode == 201) && data['success'] == true) {
+        final successMessage = isCreate ? 'Sales order created' : 'Sales order updated';
         await Future.delayed(const Duration(milliseconds: 450));
         await Fluttertoast.showToast(
           msg: successMessage,
@@ -925,13 +743,12 @@ class PurchaseOrderFormController extends GetxController {
           textColor: Colors.white,
           fontSize: 14,
         );
-
         Get.back(result: true);
       } else {
         _showError(data['message']?.toString() ?? 'Failed to save');
       }
     } catch (e) {
-      debugPrint('[PO FORM] Save error: $e');
+      debugPrint('[SO FORM] Save error: $e');
       _showError('Failed to save: $e');
     } finally {
       isSaving.value = false;
@@ -948,33 +765,27 @@ class PurchaseOrderFormController extends GetxController {
     );
   }
 
-  void _loadChargesFromModel(List<PurchaseOrderCharge> source) {
+  void _loadChargesFromModel(List<SalesOrderCharge> source) {
     if (source.isEmpty) {
       _ensureDefaultCharges(reset: true);
       return;
     }
     charges.assignAll(
-      source
-          .map(
-            (charge) => POChargeRow(
-              name: charge.name,
-              amount: charge.amount.toStringAsFixed(2),
-              remarks: charge.remarks ?? '',
-            ),
-          )
-          .toList(),
+      source.map((charge) => SOChargeRow(
+            name: charge.name,
+            amount: charge.amount.toStringAsFixed(2),
+            remarks: charge.remarks ?? '',
+          )).toList(),
     );
   }
 
   void _ensureDefaultCharges({bool reset = false}) {
     if (!reset && charges.isNotEmpty) return;
-    charges.assignAll([
-      POChargeRow(name: 'Hamali', amount: '0'),
-    ]);
+    charges.assignAll([SOChargeRow(name: 'Hamali', amount: '0')]);
   }
 
   void addChargeRow() {
-    charges.add(POChargeRow(name: chargeTypeNames.first, amount: '0'));
+    charges.add(SOChargeRow(name: chargeTypeNames.first, amount: '0'));
   }
 
   void removeChargeRow(int index) {
@@ -997,7 +808,7 @@ class PurchaseOrderFormController extends GetxController {
   }
 }
 
-class POLineRow {
+class SOLineRow {
   final productId = Rxn<int>();
   final productName = ''.obs;
   final hsnCode = ''.obs;
@@ -1008,9 +819,7 @@ class POLineRow {
   final price = '0'.obs;
   final discountPercent = ''.obs;
   final taxPercent = ''.obs;
-  // Whether the entered unit price is inclusive of tax (true) or exclusive (false).
   final isInclusiveTax = false.obs;
-  // Detailed tax breakdown (frontend only for now, default 0).
   final sgst = ''.obs;
   final cgst = ''.obs;
   final igst = ''.obs;
@@ -1022,7 +831,7 @@ class POLineRow {
   final unit = 'PCS'.obs;
   final description = ''.obs;
 
-  POLineRow({
+  SOLineRow({
     int? productId,
     String? productName,
     String? hsnCode,
@@ -1050,14 +859,11 @@ class POLineRow {
     if (description != null) this.description.value = description;
   }
 
-  /// Price excluding tax (stored).
   double get priceExclTax => double.tryParse(price.value) ?? 0;
 
-  /// Total tax percent from breakdown (sgst+cgst+igst+cess+roff) or taxPercent.
   double get _effectiveTaxPercent {
     final fromTaxPercent = double.tryParse(taxPercent.value) ?? 0;
     if (fromTaxPercent > 0) return fromTaxPercent;
-
     final sgst = double.tryParse(this.sgst.value) ?? 0;
     final cgst = double.tryParse(this.cgst.value) ?? 0;
     final igst = double.tryParse(this.igst.value) ?? 0;
@@ -1068,32 +874,23 @@ class POLineRow {
     return 0;
   }
 
-  /// Price including tax (computed).
   double get priceInclTax {
     final raw = double.tryParse(price.value) ?? 0;
     final t = _effectiveTaxPercent;
-    if (isInclusiveTax.value) {
-      return raw;
-    }
+    if (isInclusiveTax.value) return raw;
     return raw * (1 + t / 100);
   }
 
-  /// Line total excluding tax.
   double get lineTotalExclTax {
     final qty = double.tryParse(quantity.value) ?? 0;
-    final p = isInclusiveTax.value
-        ? _priceExclFromInclusive()
-        : (double.tryParse(price.value) ?? 0);
+    final p = isInclusiveTax.value ? _priceExclFromInclusive() : (double.tryParse(price.value) ?? 0);
     final d = double.tryParse(discountPercent.value) ?? 0;
     return qty * p * (1 - d / 100);
   }
 
-  /// Line total including tax.
   double get lineTotal {
     final qty = double.tryParse(quantity.value) ?? 0;
-    final pExcl = isInclusiveTax.value
-        ? _priceExclFromInclusive()
-        : (double.tryParse(price.value) ?? 0);
+    final pExcl = isInclusiveTax.value ? _priceExclFromInclusive() : (double.tryParse(price.value) ?? 0);
     final d = double.tryParse(discountPercent.value) ?? 0;
     final t = _effectiveTaxPercent;
     if (isInclusiveTax.value) {
@@ -1111,16 +908,12 @@ class POLineRow {
   }
 }
 
-class POChargeRow {
+class SOChargeRow {
   final name = ''.obs;
   final amount = '0'.obs;
   final remarks = ''.obs;
 
-  POChargeRow({
-    required String name,
-    String? amount,
-    String? remarks,
-  }) {
+  SOChargeRow({required String name, String? amount, String? remarks}) {
     if (name.isNotEmpty) this.name.value = name;
     if (amount != null) this.amount.value = amount;
     if (remarks != null) this.remarks.value = remarks;

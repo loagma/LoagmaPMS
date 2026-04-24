@@ -34,6 +34,14 @@ import '../screens/modules/product_package_form_screen.dart';
 import '../screens/modules/category_list_screen.dart';
 import '../screens/modules/category_form_screen.dart';
 import '../screens/modules/product_module_reports_screen.dart';
+import '../screens/modules/sales_home_screen.dart';
+import '../screens/modules/sales_module_reports_screen.dart';
+import '../screens/modules/sales_order_form_screen.dart';
+import '../screens/modules/sales_order_list_screen.dart';
+import '../screens/modules/sales_invoice_form_screen.dart';
+import '../screens/modules/sales_invoice_list_screen.dart';
+import '../screens/modules/sales_return_form_screen.dart';
+import '../screens/modules/sales_return_list_screen.dart';
 
 /// Central route names. Use these instead of raw strings.
 abstract class AppRoutes {
@@ -76,6 +84,14 @@ abstract class AppRoutes {
   static const String productPackageForm = '/product-package-form';
   static const String categoryList = '/categories';
   static const String categoryForm = '/category-form';
+  static const String sales = '/sales';
+  static const String salesOrders = '/sales-orders';
+  static const String salesOrderForm = '/sales-order-form';
+  static const String salesInvoiceList = '/sales-invoices';
+  static const String salesInvoice = '/sales-invoice';
+  static const String salesReturnList = '/sales-returns';
+  static const String salesReturnForm = '/sales-return';
+  static const String salesModuleReports = '/reports/sales-module';
 }
 
 /// All app routes. Used by [GetMaterialApp] in [main.dart].
@@ -202,4 +218,37 @@ final List<GetPage<dynamic>> appPages = [
   ),
   GetPage(name: AppRoutes.categoryList, page: () => const CategoryListScreen()),
   GetPage(name: AppRoutes.categoryForm, page: () => const CategoryFormScreen()),
+  GetPage(name: AppRoutes.sales, page: () => const SalesHomeScreen()),
+  GetPage(
+    name: AppRoutes.salesOrders,
+    page: () => const SalesOrderFormScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.salesOrderForm,
+    page: () => const SalesOrderFormScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.salesInvoiceList,
+    page: () => const SalesInvoiceListScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.salesInvoice,
+    page: () => SalesInvoiceFormScreen(
+      invoiceId: Get.arguments is int ? Get.arguments as int? : null,
+    ),
+  ),
+  GetPage(
+    name: AppRoutes.salesReturnList,
+    page: () => const SalesReturnListScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.salesReturnForm,
+    page: () => SalesReturnFormScreen(
+      returnId: Get.arguments is int ? Get.arguments as int? : null,
+    ),
+  ),
+  GetPage(
+    name: AppRoutes.salesModuleReports,
+    page: () => const SalesModuleReportsScreen(),
+  ),
 ];

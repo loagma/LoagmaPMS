@@ -11,13 +11,13 @@ class ApiConfig {
   ///   --dart-define=IS_PRODUCTION=true
   static const bool isProduction = bool.fromEnvironment(
     'IS_PRODUCTION',
-    defaultValue: true,
+    defaultValue: false,
   );
 
   /// Local base URL (emulator / device hitting your dev machine).
   /// 10.0.2.2 is Android emulator's "localhost". Replace with your LAN IP
   /// if you want a physical device to connect.
-  static const String _localBaseUrl = 'http://10.0.2.2:8000';
+  static const String _localBaseUrl = 'http://192.168.1.11:8000';
 
   /// Production base URL (change to your real domain).
   static const String _productionBaseUrl =
@@ -122,4 +122,22 @@ class ApiConfig {
 
   /// GET/POST ${ApiConfig.apiBaseUrl}/categories
   static String get categories => '$apiBaseUrl/categories';
+
+  /// GET/POST ${ApiConfig.apiBaseUrl}/sales-orders
+  static String get salesOrders => '$apiBaseUrl/sales-orders';
+
+  /// GET/POST ${ApiConfig.apiBaseUrl}/sales-invoices
+  static String get salesInvoices => '$apiBaseUrl/sales-invoices';
+
+  /// POST ${ApiConfig.apiBaseUrl}/sales-invoices
+  static String get createSalesInvoice => '$apiBaseUrl/sales-invoices';
+
+  /// GET/POST ${ApiConfig.apiBaseUrl}/sales-returns
+  static String get salesReturns => '$apiBaseUrl/sales-returns';
+
+  /// GET ${ApiConfig.apiBaseUrl}/sales-returns/series
+  static String get salesReturnSeries => '$apiBaseUrl/sales-returns/series';
+
+  /// POST ${ApiConfig.apiBaseUrl}/sales-returns
+  static String get createSalesReturn => '$apiBaseUrl/sales-returns';
 }
