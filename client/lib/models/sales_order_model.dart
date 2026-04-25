@@ -167,6 +167,8 @@ class SalesOrderItem {
   final String? hsnCode;
   final int? lineNo;
   final String? unit;
+  final String? packId;
+  final String? packLabel;
   final double quantity;
   final double usedQty;
   final double writeoffQty;
@@ -187,6 +189,8 @@ class SalesOrderItem {
     this.hsnCode,
     this.lineNo,
     this.unit,
+    this.packId,
+    this.packLabel,
     required this.quantity,
     this.usedQty = 0,
     this.writeoffQty = 0,
@@ -248,6 +252,8 @@ class SalesOrderItem {
               : null),
       lineNo: int.tryParse(json['line_no']?.toString() ?? ''),
       unit: json['unit']?.toString(),
+      packId: json['pack_id']?.toString(),
+      packLabel: json['pack_label']?.toString(),
       quantity: qty,
       usedQty: usedQty,
       writeoffQty: writeoffQty,

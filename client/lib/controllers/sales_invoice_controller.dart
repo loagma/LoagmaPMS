@@ -1213,38 +1213,54 @@ class SalesInvoiceController extends GetxController {
       _addLinkedSalesOrderMeta(soId, so.soNumber);
 
       for (final item in so.items) {
-        final qty = item.leftQty > 0 ? item.leftQty : item.quantity;
-        final row = SIItemRow();
-        row.sourceSalesOrderId.value = soId;
-        row.sourceSalesOrderItemId.value = item.id;
-        row.sourceSoNumber.value = so.soNumber;
-        row.product.value = Product(
-          id: item.productId,
-          name: item.productName?.trim().isEmpty == true
+        try {
+          final qty = item.leftQty > 0 ? item.leftQty : item.quantity;
+          final displayName = (item.productName?.trim().isEmpty ?? true)
               ? 'Product ${item.productId}'
-              : (item.productName ?? 'Product ${item.productId}'),
-          hsnCode: item.hsnCode,
-          productType: 'SINGLE',
-          defaultUnit: item.unit,
-        );
-        row.productName.value = row.product.value!.name;
-        row.productCode.value = '';
-        row.hsnCode.value = item.hsnCode ?? '';
-        row.alias.value = '${item.productName ?? ''} : ${item.unit ?? 'Nos'}';
-        row.setQuantity(qty.toStringAsFixed(2));
-        row.lastAcceptedQuantity.value = row.quantity.value;
-        row.orderedQty.value = item.quantity.toStringAsFixed(3);
-        row.usedQty.value = item.usedQty.toStringAsFixed(3);
-        row.leftQty.value = item.leftQty.toStringAsFixed(3);
-        row.writeoffQty.value = '0';
-        row.isWriteoff.value = false;
-        row.writeoffReason.value = '';
-        row.unitType.value = item.unit ?? (unitTypes.isNotEmpty ? unitTypes.first : 'Nos');
-        row.unitPrice.value = item.price.toStringAsFixed(2);
-        row.taxableAmount.value = (qty * item.price).toStringAsFixed(2);
-        await applyResolvedTaxesToInvoiceRow(row, productId: item.productId);
-        items.add(row);
-        addedCount++;
+              : item.productName!;
+          final row = SIItemRow();
+          row.sourceSalesOrderId.value = soId;
+          row.sourceSalesOrderItemId.value = item.id;
+          row.sourceSoNumber.value = so.soNumber;
+          row.product.value = Product(
+            id: item.productId,
+            name: displayName,
+            hsnCode: item.hsnCode,
+            productType: 'SINGLE',
+            defaultUnit: item.unit,
+          );
+          row.productName.value = displayName;
+          row.productCode.value = '';
+          row.hsnCode.value = item.hsnCode ?? '';
+          row.alias.value = '$displayName : ${item.unit ?? 'Nos'}';
+          row.setQuantity(qty.toStringAsFixed(2));
+          row.lastAcceptedQuantity.value = row.quantity.value;
+          row.orderedQty.value = item.quantity.toStringAsFixed(3);
+          row.usedQty.value = item.usedQty.toStringAsFixed(3);
+          row.leftQty.value = item.leftQty.toStringAsFixed(3);
+          row.writeoffQty.value = '0';
+          row.isWriteoff.value = false;
+          row.writeoffReason.value = '';
+          row.unitType.value = item.unit ?? (unitTypes.isNotEmpty ? unitTypes.first : 'Nos');
+          row.unitPrice.value = item.price.toStringAsFixed(2);
+          row.taxableAmount.value = (qty * item.price).toStringAsFixed(2);
+
+          // Preserve pack info from the order line
+          if (item.packId != null && item.packId!.isNotEmpty) {
+            row.selectedPackId.value = item.packId!;
+            row.selectedPackLabel.value = item.packLabel ?? item.unit ?? '';
+          }
+
+          // Add the row first so all items appear even if tax fetch is slow/fails
+          items.add(row);
+          addedCount++;
+
+          // Resolve taxes in background — won't block remaining items
+          applyResolvedTaxesToInvoiceRow(row, productId: item.productId)
+              .catchError((e) => debugPrint('[SO_LINK] Tax resolve failed for product ${item.productId}: $e'));
+        } catch (e) {
+          debugPrint('[SO_LINK] Skipping item ${item.id}: $e');
+        }
       }
 
       for (final charge in so.chargesJson) {

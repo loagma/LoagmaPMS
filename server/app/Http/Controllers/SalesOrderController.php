@@ -105,7 +105,6 @@ class SalesOrderController extends Controller
                     'oi.item_id',
                     'oi.order_id',
                     'oi.product_id',
-                    'oi.vendor_product_id',
                     'oi.pinfo',
                     'oi.quantity',
                     'oi.qty_delivered',
@@ -115,8 +114,29 @@ class SalesOrderController extends Controller
                 ])
                 ->get();
 
+            // Batch-fetch product names + hsn_code from the product table
+            $productIds = $items->pluck('product_id')->filter()->unique()->values()->toArray();
+            $productMap = [];
+            if (!empty($productIds)) {
+                $products = DB::table('product')
+                    ->whereIn('product_id', $productIds)
+                    ->select(['product_id', 'name', 'hsn_code', 'packs', 'default_pack_id'])
+                    ->get();
+                foreach ($products as $p) {
+                    $productMap[(int) $p->product_id] = [
+                        'name'     => trim((string) ($p->name ?? '')),
+                        'hsn_code' => trim((string) ($p->hsn_code ?? '')),
+                        'packs'    => $p->packs ?? null,
+                        'default_pack_id' => $p->default_pack_id ?? null,
+                    ];
+                }
+            }
+
             $header = $this->normalizeHeader($order);
-            $header['items'] = $items->map(fn ($item) => $this->normalizeItem($item))->values()->toArray();
+            $header['items'] = $items
+                ->map(fn ($item) => $this->normalizeItem($item, $productMap))
+                ->values()
+                ->toArray();
 
             return response()->json(['success' => true, 'data' => $header]);
         } catch (\Throwable $e) {
@@ -154,10 +174,14 @@ class SalesOrderController extends Controller
         ];
     }
 
-    private function normalizeItem(object $row): array
+    private function normalizeItem(object $row, array $productMap = []): array
     {
         $data = json_decode(json_encode($row), true) ?: [];
 
+        $productId = (int) ($data['product_id'] ?? 0);
+        $productInfo = $productMap[$productId] ?? [];
+
+        // Parse pinfo JSON (snapshot at order time)
         $pinfo = [];
         if (!empty($data['pinfo'])) {
             $decoded = json_decode((string) $data['pinfo'], true);
@@ -166,10 +190,15 @@ class SalesOrderController extends Controller
             }
         }
 
-        $productName = trim((string) ($pinfo['name'] ?? $pinfo['product_name'] ?? ''));
+        // Product name: prefer product table (authoritative), fall back to pinfo snapshot
+        $productName = $productInfo['name'] ?? '';
+        if ($productName === '') {
+            $productName = trim((string) ($pinfo['name'] ?? $pinfo['product_name'] ?? ''));
+        }
         $productCode = trim((string) ($pinfo['product_code'] ?? $pinfo['code'] ?? ''));
+        $hsnCode = $productInfo['hsn_code'] ?? $pinfo['hsn_code'] ?? $pinfo['hsn'] ?? null;
 
-        // Extract pack info – pinfo may have a 'packs' array or 'selected_pack'
+        // Extract pack info from pinfo (order-time snapshot) or product table packs
         $unit     = 'Nos';
         $packId   = null;
         $packLabel = null;
@@ -180,38 +209,73 @@ class SalesOrderController extends Controller
             $packId    = isset($sp['id']) ? (string) $sp['id'] : null;
             $packLabel = (string) ($sp['label'] ?? $sp['description'] ?? $unit);
         } elseif (!empty($pinfo['packs']) && is_array($pinfo['packs'])) {
-            $firstPack = $pinfo['packs'][0] ?? [];
-            $unit      = (string) ($firstPack['unit'] ?? $firstPack['description'] ?? 'Nos');
-            $packId    = isset($firstPack['id']) ? (string) $firstPack['id'] : null;
-            $packLabel = (string) ($firstPack['label'] ?? $firstPack['description'] ?? $unit);
-        } elseif (!empty($pinfo['unit'])) {
-            $unit = (string) $pinfo['unit'];
+            // pinfo has packs array — find the selected one or use first
+            $packsArr = $pinfo['packs'];
+            $defaultPackId = $pinfo['default_pack_id'] ?? null;
+            $selectedPack = null;
+            if ($defaultPackId !== null) {
+                foreach ($packsArr as $p) {
+                    if ((string) ($p['id'] ?? '') === (string) $defaultPackId) {
+                        $selectedPack = $p;
+                        break;
+                    }
+                }
+            }
+            $selectedPack = $selectedPack ?? ($packsArr[0] ?? []);
+            $unit      = (string) ($selectedPack['unit'] ?? $selectedPack['description'] ?? 'Nos');
+            $packId    = isset($selectedPack['id']) ? (string) $selectedPack['id'] : null;
+            $packLabel = (string) ($selectedPack['label'] ?? $selectedPack['description'] ?? $unit);
+        } elseif (!empty($productInfo['packs'])) {
+            // Fall back to product table packs
+            $packsJson = json_decode((string) $productInfo['packs'], true);
+            if (is_array($packsJson) && !empty($packsJson)) {
+                $defaultPackId = $productInfo['default_pack_id'] ?? null;
+                $selectedPack = null;
+                if ($defaultPackId !== null) {
+                    foreach ($packsJson as $p) {
+                        if ((string) ($p['id'] ?? '') === (string) $defaultPackId) {
+                            $selectedPack = $p;
+                            break;
+                        }
+                    }
+                }
+                $selectedPack = $selectedPack ?? ($packsJson[0] ?? []);
+                $unit      = (string) ($selectedPack['unit'] ?? $selectedPack['description'] ?? 'Nos');
+                $packId    = isset($selectedPack['id']) ? (string) $selectedPack['id'] : null;
+                $packLabel = (string) ($selectedPack['label'] ?? $selectedPack['description'] ?? $unit);
+            }
         }
 
-        $qty         = (float) ($data['quantity'] ?? 0);
+        $qty          = (float) ($data['quantity'] ?? 0);
         $qtyDelivered = (float) ($data['qty_delivered'] ?? 0);
         $qtyReturned  = (float) ($data['qty_returned'] ?? 0);
         $usedQty      = $qtyDelivered;
         $writeoffQty  = $qtyReturned;
         $leftQty      = max(0, $qty - $usedQty - $writeoffQty);
-        $price        = (float) ($data['item_price'] ?? 0);
+
+        // item_price is the unit price in orders_item
+        // item_total is qty * unit_price (line total)
+        $itemPrice = (float) ($data['item_price'] ?? 0);
+        $itemTotal = (float) ($data['item_total'] ?? 0);
+        // Derive unit price: if item_price > 0 use it directly, else derive from total / qty
+        $price = $itemPrice > 0 ? $itemPrice : ($qty > 0 ? round($itemTotal / $qty, 4) : 0);
 
         return [
-            'id'           => (int) ($data['item_id'] ?? 0),
+            'id'             => (int) ($data['item_id'] ?? 0),
             'sales_order_id' => (int) ($data['order_id'] ?? 0),
-            'product_id'   => (int) ($data['product_id'] ?? 0),
-            'product_name' => $productName ?: ('Product ' . ($data['product_id'] ?? '?')),
-            'product_code' => $productCode,
-            'unit'         => $unit,
-            'pack_id'      => $packId,
-            'pack_label'   => $packLabel,
-            'quantity'     => $qty,
-            'price'        => $price,
-            'used_qty'     => $usedQty,
-            'writeoff_qty' => $writeoffQty,
-            'left_qty'     => $leftQty,
-            'line_total'   => (float) ($data['item_total'] ?? ($qty * $price)),
-            'hsn_code'     => $pinfo['hsn_code'] ?? $pinfo['hsn'] ?? null,
+            'product_id'     => $productId,
+            'product_name'   => $productName ?: ('Product ' . $productId),
+            'product_code'   => $productCode,
+            'unit'           => $unit,
+            'pack_id'        => $packId,
+            'pack_label'     => $packLabel,
+            'quantity'       => $qty,
+            'price'          => $price,
+            'used_qty'       => $usedQty,
+            'writeoff_qty'   => $writeoffQty,
+            'left_qty'       => $leftQty,
+            'line_total'     => $itemTotal > 0 ? $itemTotal : round($qty * $price, 2),
+            'hsn_code'       => $hsnCode,
         ];
     }
 
