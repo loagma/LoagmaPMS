@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 
 import '../../controllers/sales_invoice_controller.dart';
 import '../../models/party_result.dart';
 import '../../models/product_model.dart';
+import '../../models/sales_order_model.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 import 'sales_return_form_screen.dart';
@@ -608,13 +612,66 @@ class _ItemsCard extends StatelessWidget {
     return ContentCard(
       title: 'Product Detail',
       child: Obx(() {
+        final linkedSoLabels = controller.linkedSoNumbers.isNotEmpty
+            ? controller.linkedSoNumbers.toList()
+            : controller.linkedSalesOrderIds.map((id) => 'ORD-$id').toList();
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Link Sales Order button + linked SO chips
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: controller.isReportMode
+                      ? null
+                      : () => _showLinkToSalesOrderDialog(context, controller),
+                  icon: const Icon(Icons.link_rounded, size: 16),
+                  label: const Text('Link Sales Order'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary, width: 1.2),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ],
+            ),
+            if (linkedSoLabels.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: linkedSoLabels
+                      .map(
+                        (soLabel) => Container(
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryLight.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.primaryLight),
+                          ),
+                          child: Text(
+                            soLabel,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primaryDark,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
             if (controller.items.isEmpty)
               const EmptyState(
                 icon: Icons.shopping_cart_outlined,
-                message: 'No items. Tap "Add Product" to add lines.',
+                message: 'No items. Tap "Add Product" or link a Sales Order.',
               )
             else
               ListView.builder(
@@ -634,7 +691,7 @@ class _ItemsCard extends StatelessWidget {
             Align(
               alignment: Alignment.topRight,
               child: OutlinedButton.icon(
-                onPressed: () => controller.addItemRow(),
+                onPressed: controller.isReportMode ? null : () => controller.addItemRow(),
                 icon: const Icon(Icons.add_rounded, size: 18),
                 label: const Text('Add Product'),
                 style: OutlinedButton.styleFrom(
@@ -1176,4 +1233,299 @@ class _SummaryCard extends StatelessWidget {
       ],
     );
   }
+}
+
+// ─── Link Sales Order Dialog ──────────────────────────────────────────────────
+
+Future<void> _showLinkToSalesOrderDialog(
+  BuildContext context,
+  SalesInvoiceController controller,
+) async {
+  final custId = controller.customerId.value;
+  if (custId == null) {
+    Get.snackbar(
+      'Select Customer',
+      'Please select a customer first to view their orders.',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.orange,
+      colorText: Colors.white,
+    );
+    return;
+  }
+
+  final list = await controller.fetchSalesOrdersForLink(customerId: custId);
+  if (!context.mounted) return;
+  await showDialog<void>(
+    context: context,
+    builder: (ctx) => _LinkToSODialog(
+      list: list,
+      customerId: custId,
+      controller: controller,
+      onClose: () => Navigator.of(ctx).pop(),
+    ),
+  );
+}
+
+class _LinkToSODialog extends StatefulWidget {
+  final List<Map<String, dynamic>> list;
+  final int customerId;
+  final SalesInvoiceController controller;
+  final VoidCallback onClose;
+
+  const _LinkToSODialog({
+    required this.list,
+    required this.customerId,
+    required this.controller,
+    required this.onClose,
+  });
+
+  @override
+  State<_LinkToSODialog> createState() => _LinkToSODialogState();
+}
+
+class _LinkToSODialogState extends State<_LinkToSODialog> {
+  bool _loading = false;
+  final TextEditingController _searchController = TextEditingController();
+  final List<Map<String, dynamic>> _items = [];
+  final Set<int> _selectedSoIds = <int>{};
+  Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _items.addAll(widget.list);
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String query) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () async {
+      final q = query.trim();
+      setState(() => _loading = true);
+      final results = await widget.controller.fetchSalesOrdersForLink(
+        search: q.isEmpty ? null : q,
+        customerId: widget.customerId,
+      );
+      if (!mounted) return;
+
+      final lower = q.toLowerCase();
+      final filtered = q.isEmpty
+          ? results
+          : results.where((so) {
+              final soNo = (so['so_number'] ?? '').toString().toLowerCase();
+              final idStr = (so['id'] ?? '').toString().toLowerCase();
+              return soNo.contains(lower) || idStr.contains(lower);
+            }).toList();
+
+      setState(() {
+        _loading = false;
+        _items
+          ..clear()
+          ..addAll(filtered);
+      });
+    });
+  }
+
+  Future<void> _onLinkSelected(BuildContext context) async {
+    if (_selectedSoIds.isEmpty) return;
+
+    final nav = Navigator.of(context);
+    setState(() => _loading = true);
+
+    final orderedIds = <int>[];
+    for (final so in _items) {
+      final id = so['id'] as int?;
+      if (id != null && _selectedSoIds.contains(id)) orderedIds.add(id);
+    }
+    for (final id in _selectedSoIds) {
+      if (!orderedIds.contains(id)) orderedIds.add(id);
+    }
+
+    final salesOrders = <SalesOrder>[];
+    for (final soId in orderedIds) {
+      final so = await widget.controller.fetchSalesOrderById(soId);
+      if (so != null) salesOrders.add(so);
+    }
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (salesOrders.isEmpty) {
+      Get.snackbar(
+        'Error',
+        'Could not load selected order details.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
+      return;
+    }
+    await widget.controller.loadFromSalesOrders(salesOrders);
+    nav.pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final horizontalInset = screenWidth < 600 ? 12.0 : 24.0;
+    final availableDialogWidth = screenWidth - (horizontalInset * 2);
+    final dialogWidth = availableDialogWidth > 520
+        ? 520.0
+        : (availableDialogWidth < 280 ? 280.0 : availableDialogWidth);
+    final dialogHeight = screenHeight < 720
+        ? 330.0
+        : (screenHeight * 0.52).clamp(330.0, 380.0);
+
+    return AlertDialog(
+      insetPadding: EdgeInsets.symmetric(horizontal: horizontalInset, vertical: 24),
+      contentPadding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      title: Row(
+        children: [
+          const Icon(Icons.link_rounded, color: AppColors.primary, size: 24),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _selectedSoIds.isEmpty
+                  ? 'Link Sales Order'
+                  : 'Link Sales Order (${_selectedSoIds.length} selected)',
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 18),
+            ),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: dialogWidth,
+        height: dialogHeight,
+        child: _loading
+            ? const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Loading orders...',
+                      style: TextStyle(color: AppColors.textMuted),
+                    ),
+                  ],
+                ),
+              )
+            : Column(
+                children: [
+                  TextField(
+                    controller: _searchController,
+                    decoration: _siInputDecoration(
+                      labelText: 'Search by Order # or ID',
+                      prefixIcon: const Icon(Icons.search),
+                    ),
+                    onChanged: _onSearchChanged,
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: _items.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'No orders found for this customer.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: AppColors.textMuted),
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: _items.length,
+                            itemBuilder: (context, index) {
+                              final so = _items[index];
+                              final id = so['id'] as int?;
+                              final soNumber = so['so_number']?.toString() ?? 'Order';
+                              final docDate = so['doc_date']?.toString() ?? '';
+                              final status = so['status']?.toString() ?? '';
+                              final total = so['total_amount'];
+                              if (id == null) return const SizedBox.shrink();
+                              final formattedDate = _formatSoDate(docDate);
+                              final totalStr = total != null
+                                  ? '₹ ${(total is num ? total.toDouble() : double.tryParse(total.toString()) ?? 0).toStringAsFixed(2)}'
+                                  : '';
+                              return ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: AppColors.primaryLight.withValues(alpha: 0.3),
+                                  child: const Icon(Icons.receipt_long_outlined, color: AppColors.primaryDark),
+                                ),
+                                title: Text(
+                                  soNumber,
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                                subtitle: Text(
+                                  [
+                                    if (formattedDate.isNotEmpty) formattedDate,
+                                    if (status.isNotEmpty) status,
+                                    if (totalStr.isNotEmpty) totalStr,
+                                  ].where((e) => e.isNotEmpty).join(' · '),
+                                  style: const TextStyle(fontSize: 12),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                trailing: Checkbox(
+                                  value: _selectedSoIds.contains(id),
+                                  onChanged: _loading
+                                      ? null
+                                      : (checked) {
+                                          setState(() {
+                                            if (checked == true) {
+                                              _selectedSoIds.add(id);
+                                            } else {
+                                              _selectedSoIds.remove(id);
+                                            }
+                                          });
+                                        },
+                                ),
+                                onTap: _loading
+                                    ? null
+                                    : () {
+                                        setState(() {
+                                          if (_selectedSoIds.contains(id)) {
+                                            _selectedSoIds.remove(id);
+                                          } else {
+                                            _selectedSoIds.add(id);
+                                          }
+                                        });
+                                      },
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _loading || _selectedSoIds.isEmpty
+              ? null
+              : () => _onLinkSelected(context),
+          child: const Text('Ok'),
+        ),
+        TextButton(
+          onPressed: _loading ? null : widget.onClose,
+          child: const Text('Cancel'),
+        ),
+      ],
+    );
+  }
+}
+
+String _formatSoDate(String rawValue) {
+  final raw = rawValue.trim();
+  if (raw.isEmpty) return '';
+  final parsed = DateTime.tryParse(raw);
+  if (parsed == null) return raw.length >= 10 ? raw.substring(0, 10) : raw;
+  return DateFormat('dd MMM yyyy').format(parsed.toLocal());
 }

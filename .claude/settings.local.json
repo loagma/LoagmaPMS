@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(flutter analyze *)",
-      "Bash(grep -E \"\\\\.\\(php|sql\\)$\")"
+      "Bash(grep -E \"\\\\.\\(php|sql\\)$\")",
+      "Bash(grep -E \"\\\\.\\(dart|php|js|ts\\)$\")"
     ]
   }
 }

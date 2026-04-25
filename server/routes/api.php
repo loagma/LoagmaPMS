@@ -22,6 +22,8 @@ use App\Http\Controllers\ProductPackageController;
 use App\Http\Controllers\MasterDataController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\SalesOrderController;
+use App\Http\Controllers\SalesInvoiceController;
 
 Route::get('/health', [HealthController::class, 'index']);
 Route::get('/products', [ProductController::class, 'index']);
@@ -138,6 +140,17 @@ Route::get('/product-packages', [ProductPackageController::class, 'index']);
 Route::post('/product-packages', [ProductPackageController::class, 'store']);
 Route::get('/product-packages/{id}', [ProductPackageController::class, 'show'])->where('id', '[0-9]+');
 Route::put('/product-packages/{id}', [ProductPackageController::class, 'update'])->where('id', '[0-9]+');
+
+// Sales Order routes (reads from legacy loagma_new.orders table)
+Route::get('/sales-orders', [SalesOrderController::class, 'index']);
+Route::get('/sales-orders/{id}', [SalesOrderController::class, 'show'])->where('id', '[0-9]+');
+
+// Sales Invoice routes
+Route::get('/sales-invoices/series', [SalesInvoiceController::class, 'series']);
+Route::get('/sales-invoices', [SalesInvoiceController::class, 'index']);
+Route::post('/sales-invoices', [SalesInvoiceController::class, 'store']);
+Route::get('/sales-invoices/{id}', [SalesInvoiceController::class, 'show'])->where('id', '[0-9]+');
+Route::put('/sales-invoices/{id}', [SalesInvoiceController::class, 'update'])->where('id', '[0-9]+');
 
 // Category routes (parent_cat_id=0: category, parent_cat_id>0: subcategory)
 Route::get('/categories', [CategoryController::class, 'index']);

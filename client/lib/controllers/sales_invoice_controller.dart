@@ -11,6 +11,7 @@ import '../api_config.dart';
 import '../constants/charge_constants.dart';
 import '../models/party_result.dart';
 import '../models/product_model.dart';
+import '../models/sales_order_model.dart';
 import '../theme/app_colors.dart';
 import '../services/customer_api_service.dart';
 import 'sales_invoice_list_controller.dart';
@@ -1020,6 +1021,7 @@ class SalesInvoiceController extends GetxController {
             'alias': row.alias.value,
             'unit': row.unitType.value,
             if (row.selectedPackId.value.trim().isNotEmpty) 'pack_id': row.selectedPackId.value.trim(),
+            if (row.selectedPackLabel.value.trim().isNotEmpty) 'pack_label': row.selectedPackLabel.value.trim(),
             'quantity': qty,
             if (row.sourceSalesOrderItemId.value != null)
               'source_sales_order_item_id': row.sourceSalesOrderItemId.value,
@@ -1111,6 +1113,168 @@ class SalesInvoiceController extends GetxController {
   }
 
   Future<void> saveDraft() => _saveInvoice('DRAFT');
+
+  // ─── Link Sales Order ───────────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> fetchSalesOrdersForLink({
+    int? customerId,
+    String? search,
+  }) async {
+    try {
+      final uri = Uri.parse(ApiConfig.salesOrders).replace(
+        queryParameters: {
+          'limit': '50',
+          'exclude_closed': '1',
+          if (customerId != null) 'customer_id': customerId.toString(),
+          if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+        },
+      );
+      final response = await http.get(uri, headers: {'Accept': 'application/json'});
+      if (response.statusCode != 200) return [];
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) return [];
+      final List list = data['data'] ?? [];
+      return list
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .where((e) {
+            final st = (e['status']?.toString().toUpperCase() ?? '');
+            return st != 'CANCELLED' && st != 'REJECTED' && st != 'RETURNED';
+          })
+          .map((e) => {
+                'id': e['id'],
+                'customer_id': e['customer_id'],
+                'so_number': e['so_number']?.toString(),
+                'doc_date': e['doc_date']?.toString(),
+                'status': e['status']?.toString(),
+                'total_amount': e['total_amount'],
+              })
+          .toList();
+    } catch (e) {
+      debugPrint('[SALES_INVOICE] Fetch SO list error: $e');
+      return [];
+    }
+  }
+
+  Future<SalesOrder?> fetchSalesOrderById(int soId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.salesOrders}/$soId'),
+        headers: {'Accept': 'application/json'},
+      );
+      if (response.statusCode != 200) return null;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) return null;
+      final soData = data['data'] as Map<String, dynamic>?;
+      if (soData == null) return null;
+      return SalesOrder.fromJson(soData);
+    } catch (e) {
+      debugPrint('[SALES_INVOICE] Fetch SO error: $e');
+      return null;
+    }
+  }
+
+  Future<void> loadFromSalesOrders(List<SalesOrder> orders) async {
+    if (orders.isEmpty) return;
+
+    final existingCustomer = customerId.value;
+    final targetCustomer = orders.first.customerId;
+
+    if (orders.any((o) => o.customerId != targetCustomer)) {
+      _showError('Please select sales orders from the same customer');
+      return;
+    }
+    if (existingCustomer != null && existingCustomer != targetCustomer) {
+      _showError('Selected orders do not match current customer');
+      return;
+    }
+
+    if (existingCustomer == null) {
+      setCustomer(targetCustomer, orders.first.customerName ?? 'Customer');
+    }
+
+    if (narration.value.trim().isEmpty) {
+      final firstNarration = orders.first.narration?.trim() ?? '';
+      if (firstNarration.isNotEmpty) setNarration(firstNarration);
+    }
+
+    // Clear the lone empty placeholder row
+    if (items.length == 1 && items.first.product.value == null) {
+      items.first.dispose();
+      items.clear();
+    }
+
+    final importedCharges = <SIChargeRow>[];
+    var addedCount = 0;
+
+    for (final so in orders) {
+      final soId = so.id;
+      if (soId == null) continue;
+      _addLinkedSalesOrderMeta(soId, so.soNumber);
+
+      for (final item in so.items) {
+        final qty = item.leftQty > 0 ? item.leftQty : item.quantity;
+        final row = SIItemRow();
+        row.sourceSalesOrderId.value = soId;
+        row.sourceSalesOrderItemId.value = item.id;
+        row.sourceSoNumber.value = so.soNumber;
+        row.product.value = Product(
+          id: item.productId,
+          name: item.productName?.trim().isEmpty == true
+              ? 'Product ${item.productId}'
+              : (item.productName ?? 'Product ${item.productId}'),
+          hsnCode: item.hsnCode,
+          productType: 'SINGLE',
+          defaultUnit: item.unit,
+        );
+        row.productName.value = row.product.value!.name;
+        row.productCode.value = '';
+        row.hsnCode.value = item.hsnCode ?? '';
+        row.alias.value = '${item.productName ?? ''} : ${item.unit ?? 'Nos'}';
+        row.setQuantity(qty.toStringAsFixed(2));
+        row.lastAcceptedQuantity.value = row.quantity.value;
+        row.orderedQty.value = item.quantity.toStringAsFixed(3);
+        row.usedQty.value = item.usedQty.toStringAsFixed(3);
+        row.leftQty.value = item.leftQty.toStringAsFixed(3);
+        row.writeoffQty.value = '0';
+        row.isWriteoff.value = false;
+        row.writeoffReason.value = '';
+        row.unitType.value = item.unit ?? (unitTypes.isNotEmpty ? unitTypes.first : 'Nos');
+        row.unitPrice.value = item.price.toStringAsFixed(2);
+        row.taxableAmount.value = (qty * item.price).toStringAsFixed(2);
+        await applyResolvedTaxesToInvoiceRow(row, productId: item.productId);
+        items.add(row);
+        addedCount++;
+      }
+
+      for (final charge in so.chargesJson) {
+        importedCharges.add(
+          SIChargeRow()
+            ..name.value = charge.name.trim().isEmpty ? 'Others' : charge.name.trim()
+            ..amount.value = charge.amount.toStringAsFixed(2)
+            ..remarks.value = charge.remarks?.trim() ?? '',
+        );
+      }
+    }
+
+    if (items.isEmpty) addItemRow();
+
+    charges
+      ..clear()
+      ..addAll(importedCharges);
+    if (charges.isEmpty) addChargeRow();
+
+    _showSuccess('Added $addedCount items from ${orders.length} sales order(s)');
+  }
+
+  void _addLinkedSalesOrderMeta(int soId, String? soNumber) {
+    if (!linkedSalesOrderIds.contains(soId)) {
+      linkedSalesOrderIds.add(soId);
+      linkedSoNumbers.add(soNumber ?? 'ORD-$soId');
+    }
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
 
   Future<void> confirmPost() async {
     final confirmed = await Get.dialog<bool>(
