@@ -1002,6 +1002,7 @@ class SalesInvoiceController extends GetxController {
             if (row.hsnCode.value.trim().isNotEmpty) 'hsn_code': row.hsnCode.value,
             'alias': row.alias.value,
             'unit': row.unitType.value,
+            if (row.selectedPackId.value.trim().isNotEmpty) 'pack_id': row.selectedPackId.value.trim(),
             'quantity': qty,
             if (row.sourceSalesOrderItemId.value != null)
               'source_sales_order_item_id': row.sourceSalesOrderItemId.value,
@@ -1177,6 +1178,8 @@ class SIItemRow {
   final autoTaxRecompute = false.obs;
   final value = '0'.obs;
   final saleAccount = 'Def Sales Accounts'.obs;
+  final selectedPackId = ''.obs;
+  final selectedPackLabel = ''.obs;
 
   void setQuantity(String value) {
     quantity.value = value;

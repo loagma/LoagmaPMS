@@ -940,66 +940,66 @@ class _HeaderCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: _sectionGap),
-          Obx(() {
-            final selectedId = controller.vendorId.value;
-            final selectedName = controller.vendorName.value;
-            return FormField<int>(
-              initialValue: selectedId,
-              validator: (v) => v == null ? 'Please select Vendor' : null,
-              builder: (state) => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  InkWell(
-                    onTap: controller.isReportMode
-                        ? null
-                        : () async {
-                            final party = await showDialog<PartyResult>(
-                              context: context,
-                              builder: (_) => PartySearchDialog(
-                                title: 'Select Supplier',
-                                hint: 'Search by name, phone or ID...',
-                                headerIcon: Icons.local_shipping_outlined,
-                                searchFn: controller.searchSuppliers,
-                              ),
-                            );
-                            if (party != null) {
-                              controller.setVendor(party.id, party.name);
-                              state.didChange(party.id);
-                              state.validate();
-                            }
-                          },
-                    child: InputDecorator(
-                      decoration: _pvInputDecoration(labelText: 'Supplier *'),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
+          FormField<int>(
+            initialValue: controller.vendorId.value,
+            validator: (v) => v == null ? 'Please select Vendor' : null,
+            builder: (state) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                InkWell(
+                  onTap: controller.isReportMode
+                      ? null
+                      : () async {
+                          final party = await showDialog<PartyResult>(
+                            context: context,
+                            builder: (_) => PartySearchDialog(
+                              title: 'Select Supplier',
+                              hint: 'Search by name, phone or ID...',
+                              headerIcon: Icons.local_shipping_outlined,
+                              searchFn: controller.searchSuppliers,
+                            ),
+                          );
+                          if (party != null) {
+                            controller.setVendor(party.id, party.name);
+                            state.didChange(party.id);
+                            state.validate();
+                          }
+                        },
+                  child: InputDecorator(
+                    decoration: _pvInputDecoration(labelText: 'Supplier *'),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Obx(() {
+                            final selectedId = controller.vendorId.value;
+                            final selectedName = controller.vendorName.value;
+                            return Text(
                               selectedId == null ? 'Tap to select...' : selectedName,
                               style: TextStyle(
                                 fontSize: 14,
                                 color: selectedId == null ? Colors.grey : null,
                               ),
                               overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (!controller.isReportMode)
-                            const Icon(Icons.search, size: 18, color: Colors.grey),
-                        ],
-                      ),
+                            );
+                          }),
+                        ),
+                        if (!controller.isReportMode)
+                          const Icon(Icons.search, size: 18, color: Colors.grey),
+                      ],
                     ),
                   ),
-                  if (state.hasError)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 12, top: 4),
-                      child: Text(
-                        state.errorText!,
-                        style: const TextStyle(color: Colors.red, fontSize: 12),
-                      ),
+                ),
+                if (state.hasError)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 12, top: 4),
+                    child: Text(
+                      state.errorText!,
+                      style: const TextStyle(color: Colors.red, fontSize: 12),
                     ),
-                ],
-              ),
-            );
-          }),
+                  ),
+              ],
+            ),
+          ),
           const SizedBox(height: _sectionGap),
           Obx(() {
             final linkedPoLabels = controller.linkedPoNumbers.isNotEmpty

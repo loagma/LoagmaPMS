@@ -238,14 +238,12 @@ class _HeaderCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Obx(() {
-            final selectedId = controller.customerId.value;
-            final selectedName = controller.customerName.value;
-            final locked = controller.isReadOnly || controller.isEditMode;
-            return FormField<int>(
-              initialValue: selectedId,
-              validator: (v) => v == null ? 'Please select customer' : null,
-              builder: (state) => Column(
+          FormField<int>(
+            initialValue: controller.customerId.value,
+            validator: (v) => v == null ? 'Please select customer' : null,
+            builder: (state) {
+              final locked = controller.isReadOnly || controller.isEditMode;
+              return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   InkWell(
@@ -271,14 +269,18 @@ class _HeaderCard extends StatelessWidget {
                       child: Row(
                         children: [
                           Expanded(
-                            child: Text(
-                              selectedId == null ? 'Tap to select...' : selectedName,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: selectedId == null ? Colors.grey : null,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                            child: Obx(() {
+                              final selectedId = controller.customerId.value;
+                              final selectedName = controller.customerName.value;
+                              return Text(
+                                selectedId == null ? 'Tap to select...' : selectedName,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: selectedId == null ? Colors.grey : null,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              );
+                            }),
                           ),
                           if (!locked)
                             const Icon(Icons.search, size: 18, color: Colors.grey),
@@ -295,9 +297,9 @@ class _HeaderCard extends StatelessWidget {
                       ),
                     ),
                 ],
-              ),
-            );
-          }),
+              );
+            },
+          ),
           const SizedBox(height: _headerFieldGap),
           Row(
             children: [

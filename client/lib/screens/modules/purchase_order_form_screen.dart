@@ -608,66 +608,66 @@ class _HeaderCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: _sectionGap),
-          Obx(() {
-            final selectedId = controller.supplierId.value;
-            final selectedName = controller.supplierName.value;
-            return FormField<int>(
-              initialValue: selectedId,
-              validator: (v) => v == null ? 'Please select supplier' : null,
-              builder: (state) => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  InkWell(
-                    onTap: controller.isReadOnly
-                        ? null
-                        : () async {
-                            final party = await showDialog<PartyResult>(
-                              context: context,
-                              builder: (_) => PartySearchDialog(
-                                title: 'Select Supplier',
-                                hint: 'Search by name, phone or ID...',
-                                headerIcon: Icons.local_shipping_outlined,
-                                searchFn: controller.searchSuppliers,
-                              ),
-                            );
-                            if (party != null) {
-                              controller.setSupplier(party.id, party.name);
-                              state.didChange(party.id);
-                              state.validate();
-                            }
-                          },
-                    child: InputDecorator(
-                      decoration: _poInputDecoration(labelText: 'Supplier *'),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
+          FormField<int>(
+            initialValue: controller.supplierId.value,
+            validator: (v) => v == null ? 'Please select supplier' : null,
+            builder: (state) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                InkWell(
+                  onTap: controller.isReadOnly
+                      ? null
+                      : () async {
+                          final party = await showDialog<PartyResult>(
+                            context: context,
+                            builder: (_) => PartySearchDialog(
+                              title: 'Select Supplier',
+                              hint: 'Search by name, phone or ID...',
+                              headerIcon: Icons.local_shipping_outlined,
+                              searchFn: controller.searchSuppliers,
+                            ),
+                          );
+                          if (party != null) {
+                            controller.setSupplier(party.id, party.name);
+                            state.didChange(party.id);
+                            state.validate();
+                          }
+                        },
+                  child: InputDecorator(
+                    decoration: _poInputDecoration(labelText: 'Supplier *'),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Obx(() {
+                            final selectedId = controller.supplierId.value;
+                            final selectedName = controller.supplierName.value;
+                            return Text(
                               selectedId == null ? 'Tap to select...' : selectedName,
                               style: TextStyle(
                                 fontSize: 14,
                                 color: selectedId == null ? Colors.grey : null,
                               ),
                               overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (!controller.isReadOnly)
-                            const Icon(Icons.search, size: 18, color: Colors.grey),
-                        ],
-                      ),
+                            );
+                          }),
+                        ),
+                        if (!controller.isReadOnly)
+                          const Icon(Icons.search, size: 18, color: Colors.grey),
+                      ],
                     ),
                   ),
-                  if (state.hasError)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 12, top: 4),
-                      child: Text(
-                        state.errorText!,
-                        style: const TextStyle(color: Colors.red, fontSize: 12),
-                      ),
+                ),
+                if (state.hasError)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 12, top: 4),
+                    child: Text(
+                      state.errorText!,
+                      style: const TextStyle(color: Colors.red, fontSize: 12),
                     ),
-                ],
-              ),
-            );
-          }),
+                  ),
+              ],
+            ),
+          ),
           const SizedBox(height: _sectionGap),
           Row(
             children: [

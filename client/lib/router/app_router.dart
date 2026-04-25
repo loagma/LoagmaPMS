@@ -34,6 +34,8 @@ import '../screens/modules/product_package_form_screen.dart';
 import '../screens/modules/category_list_screen.dart';
 import '../screens/modules/category_form_screen.dart';
 import '../screens/modules/product_module_reports_screen.dart';
+import '../screens/modules/customer_list_screen.dart';
+import '../screens/modules/customer_form_screen.dart';
 import '../screens/modules/sales_home_screen.dart';
 import '../screens/modules/sales_module_reports_screen.dart';
 import '../screens/modules/sales_order_form_screen.dart';
@@ -84,6 +86,8 @@ abstract class AppRoutes {
   static const String productPackageForm = '/product-package-form';
   static const String categoryList = '/categories';
   static const String categoryForm = '/category-form';
+  static const String customers = '/customers';
+  static const String customerForm = '/customer-form';
   static const String sales = '/sales';
   static const String salesOrders = '/sales-orders';
   static const String salesOrderForm = '/sales-order-form';
@@ -218,6 +222,13 @@ final List<GetPage<dynamic>> appPages = [
   ),
   GetPage(name: AppRoutes.categoryList, page: () => const CategoryListScreen()),
   GetPage(name: AppRoutes.categoryForm, page: () => const CategoryFormScreen()),
+  GetPage(name: AppRoutes.customers, page: () => const CustomerListScreen()),
+  GetPage(
+    name: AppRoutes.customerForm,
+    page: () => CustomerFormScreen(
+      customerId: Get.arguments is int ? Get.arguments as int? : null,
+    ),
+  ),
   GetPage(name: AppRoutes.sales, page: () => const SalesHomeScreen()),
   GetPage(
     name: AppRoutes.salesOrders,

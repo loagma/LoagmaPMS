@@ -82,6 +82,12 @@ class _SalesTile {
 
 List<_SalesTile> get _salesTiles => [
   _SalesTile(
+    title: 'Customers',
+    subtitle: 'View and manage customers',
+    icon: Icons.people_outline_rounded,
+    onTap: () => Get.toNamed(AppRoutes.customers),
+  ),
+  _SalesTile(
     title: 'Sales Order',
     subtitle: 'Create sales order',
     icon: Icons.receipt_long_outlined,

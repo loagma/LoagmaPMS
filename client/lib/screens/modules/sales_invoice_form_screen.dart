@@ -474,55 +474,57 @@ class _HeaderCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: _sectionGap),
-          Obx(() {
-            final selectedName = controller.customerName.value;
-            final selectedId = controller.customerId.value;
-            return FormField<int>(
-              initialValue: selectedId,
-              validator: (v) => v == null ? 'Please select Customer' : null,
-              builder: (state) => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  InkWell(
-                    onTap: controller.isReportMode ? null : () async {
-                      final party = await showDialog<PartyResult>(
-                        context: context,
-                        builder: (_) => PartySearchDialog(
-                          title: 'Select Customer',
-                          hint: 'Search by name, phone or ID...',
-                          searchFn: controller.searchCustomers,
-                        ),
-                      );
-                      if (party != null) {
-                        controller.setCustomer(party.id, party.name);
-                        state.didChange(party.id);
-                        state.validate();
-                      }
-                    },
-                    child: InputDecorator(
-                      decoration: _siInputDecoration(labelText: 'Customer *'),
-                      child: Row(
-                        children: [
-                          Expanded(child: Text(
-                            selectedId == null ? 'Tap to select...' : selectedName,
-                            style: TextStyle(color: selectedId == null ? Colors.grey : null),
-                            overflow: TextOverflow.ellipsis,
-                          )),
-                          if (!controller.isReportMode)
-                            const Icon(Icons.search, size: 18, color: AppColors.textMuted),
-                        ],
+          FormField<int>(
+            initialValue: controller.customerId.value,
+            validator: (v) => v == null ? 'Please select Customer' : null,
+            builder: (state) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                InkWell(
+                  onTap: controller.isReportMode ? null : () async {
+                    final party = await showDialog<PartyResult>(
+                      context: context,
+                      builder: (_) => PartySearchDialog(
+                        title: 'Select Customer',
+                        hint: 'Search by name, phone or ID...',
+                        searchFn: controller.searchCustomers,
                       ),
+                    );
+                    if (party != null) {
+                      controller.setCustomer(party.id, party.name);
+                      state.didChange(party.id);
+                      state.validate();
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: _siInputDecoration(labelText: 'Customer *'),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Obx(() {
+                            final selectedId = controller.customerId.value;
+                            final selectedName = controller.customerName.value;
+                            return Text(
+                              selectedId == null ? 'Tap to select...' : selectedName,
+                              style: TextStyle(color: selectedId == null ? Colors.grey : null),
+                              overflow: TextOverflow.ellipsis,
+                            );
+                          }),
+                        ),
+                        if (!controller.isReportMode)
+                          const Icon(Icons.search, size: 18, color: AppColors.textMuted),
+                      ],
                     ),
                   ),
-                  if (state.hasError)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 12, top: 4),
-                      child: Text(state.errorText!, style: const TextStyle(color: Colors.red, fontSize: 12)),
-                    ),
-                ],
-              ),
-            );
-          }),
+                ),
+                if (state.hasError)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 12, top: 4),
+                    child: Text(state.errorText!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+                  ),
+              ],
+            ),
+          ),
           const SizedBox(height: _sectionGap),
           Obx(() => TextFormField(
                 initialValue: controller.narration.value,
@@ -858,6 +860,29 @@ class _ProductPickerField extends StatelessWidget {
     required this.excludeIds,
   });
 
+  void _applySelection(SIItemRow target, ProductSelection sel) {
+    target.product.value = sel.product;
+    target.productName.value = sel.product.name;
+    target.productCode.value = sel.product.code ?? '${sel.product.id}';
+    target.hsnCode.value = sel.product.hsnCode ?? '';
+    target.alias.value = '${sel.product.name} : ${target.unitType.value}';
+    if (sel.selectedPack != null) {
+      target.selectedPackId.value = sel.selectedPack!.id;
+      target.selectedPackLabel.value = sel.selectedPack!.label;
+      if (sel.selectedPack!.unit != null && controller.unitTypes.contains(sel.selectedPack!.unit)) {
+        target.unitType.value = sel.selectedPack!.unit!;
+      }
+      if (sel.selectedPack!.price != null) {
+        target.unitPrice.value = sel.selectedPack!.price!.toString();
+      }
+    } else {
+      final unit = sel.product.defaultUnit?.toString();
+      if (unit != null && unit.isNotEmpty && controller.unitTypes.contains(unit)) {
+        target.unitType.value = unit;
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return FormField<Product>(
@@ -868,41 +893,54 @@ class _ProductPickerField extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             InkWell(
-              onTap: () async {
-                final product = await showDialog<Product>(
-                  context: context,
-                  builder: (ctx) => ProductSearchDialog(
-                    title: 'Select Product',
-                    searchFn: controller.searchProductsAsModels,
-                    excludeIds: excludeIds,
-                  ),
-                );
-                if (product != null) {
-                  row.product.value = product;
-                  row.productName.value = product.name;
-                  row.productCode.value = product.code ?? '${product.id}';
-                  row.hsnCode.value = product.hsnCode ?? '';
-                  row.alias.value = '${product.name} : ${row.unitType.value}';
-                  final unit = product.defaultUnit?.toString();
-                  if (unit != null && unit.isNotEmpty && controller.unitTypes.contains(unit)) {
-                    row.unitType.value = unit;
-                  }
-                  await controller.applyResolvedTaxesToInvoiceRow(row, productId: product.id);
-                  state.didChange(product);
-                }
-              },
+              onTap: controller.isReportMode
+                  ? null
+                  : () async {
+                      final selections = await showDialog<List<ProductSelection>>(
+                        context: context,
+                        builder: (ctx) => ProductSearchDialog(
+                          title: 'Select Products',
+                          searchFn: controller.searchProductsAsModels,
+                          excludeIds: excludeIds,
+                          allowMultiSelect: true,
+                        ),
+                      );
+                      if (selections == null || selections.isEmpty) return;
+
+                      // Fill the current (triggering) row with the first selection
+                      final first = selections.first;
+                      _applySelection(row, first);
+                      await controller.applyResolvedTaxesToInvoiceRow(row, productId: first.product.id);
+                      state.didChange(first.product);
+
+                      // Add new rows for remaining selections
+                      for (int i = 1; i < selections.length; i++) {
+                        controller.addItemRow();
+                        final newRow = controller.items.last;
+                        _applySelection(newRow, selections[i]);
+                        await controller.applyResolvedTaxesToInvoiceRow(newRow, productId: selections[i].product.id);
+                      }
+                    },
               child: InputDecorator(
                 decoration: _siInputDecoration(labelText: 'Product *'),
                 child: Row(
                   children: [
                     Expanded(
-                      child: Obx(() => Text(
-                            row.product.value == null ? 'Tap to search...' : row.product.value!.name,
-                            style: TextStyle(color: row.product.value == null ? Colors.grey : null),
-                            overflow: TextOverflow.ellipsis,
-                          )),
+                      child: Obx(() {
+                        final name = row.product.value?.name ?? '';
+                        final packLabel = row.selectedPackLabel.value;
+                        final displayText = name.isEmpty
+                            ? 'Tap to search...'
+                            : (packLabel.isNotEmpty ? '$name · $packLabel' : name);
+                        return Text(
+                          displayText,
+                          style: TextStyle(color: row.product.value == null ? Colors.grey : null),
+                          overflow: TextOverflow.ellipsis,
+                        );
+                      }),
                     ),
-                    const Icon(Icons.search, size: 18, color: AppColors.textMuted),
+                    if (!controller.isReportMode)
+                      const Icon(Icons.search, size: 18, color: AppColors.textMuted),
                   ],
                 ),
               ),

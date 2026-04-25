@@ -499,65 +499,65 @@ class _HeaderCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: _sectionGap),
-          Obx(() {
-            final selectedId = controller.customerId.value;
-            final selectedName = controller.customerName.value;
-            return FormField<int>(
-              initialValue: selectedId,
-              validator: (v) => v == null ? 'Please select customer' : null,
-              builder: (state) => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  InkWell(
-                    onTap: controller.isReadOnly
-                        ? null
-                        : () async {
-                            final party = await showDialog<PartyResult>(
-                              context: context,
-                              builder: (_) => PartySearchDialog(
-                                title: 'Select Customer',
-                                hint: 'Search by name, phone or ID...',
-                                searchFn: controller.searchCustomers,
-                              ),
-                            );
-                            if (party != null) {
-                              controller.setCustomer(party.id, party.name);
-                              state.didChange(party.id);
-                              state.validate();
-                            }
-                          },
-                    child: InputDecorator(
-                      decoration: _soInputDecoration(labelText: 'Customer *'),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
+          FormField<int>(
+            initialValue: controller.customerId.value,
+            validator: (v) => v == null ? 'Please select customer' : null,
+            builder: (state) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                InkWell(
+                  onTap: controller.isReadOnly
+                      ? null
+                      : () async {
+                          final party = await showDialog<PartyResult>(
+                            context: context,
+                            builder: (_) => PartySearchDialog(
+                              title: 'Select Customer',
+                              hint: 'Search by name, phone or ID...',
+                              searchFn: controller.searchCustomers,
+                            ),
+                          );
+                          if (party != null) {
+                            controller.setCustomer(party.id, party.name);
+                            state.didChange(party.id);
+                            state.validate();
+                          }
+                        },
+                  child: InputDecorator(
+                    decoration: _soInputDecoration(labelText: 'Customer *'),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Obx(() {
+                            final selectedId = controller.customerId.value;
+                            final selectedName = controller.customerName.value;
+                            return Text(
                               selectedId == null ? 'Tap to select...' : selectedName,
                               style: TextStyle(
                                 fontSize: 14,
                                 color: selectedId == null ? Colors.grey : null,
                               ),
                               overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (!controller.isReadOnly)
-                            const Icon(Icons.search, size: 18, color: Colors.grey),
-                        ],
-                      ),
+                            );
+                          }),
+                        ),
+                        if (!controller.isReadOnly)
+                          const Icon(Icons.search, size: 18, color: Colors.grey),
+                      ],
                     ),
                   ),
-                  if (state.hasError)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 12, top: 4),
-                      child: Text(
-                        state.errorText!,
-                        style: const TextStyle(color: Colors.red, fontSize: 12),
-                      ),
+                ),
+                if (state.hasError)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 12, top: 4),
+                    child: Text(
+                      state.errorText!,
+                      style: const TextStyle(color: Colors.red, fontSize: 12),
                     ),
-                ],
-              ),
-            );
-          }),
+                  ),
+              ],
+            ),
+          ),
           const SizedBox(height: _sectionGap),
           Obx(() {
             final list = controller.departments;
@@ -1101,20 +1101,54 @@ class _ProductPicker extends StatelessWidget {
               onTap: readOnly
                   ? null
                   : () async {
-                      final product = await showDialog<Product>(
+                      final selections = await showDialog<List<ProductSelection>>(
                         context: context,
                         builder: (ctx) => ProductSearchDialog(
-                          title: 'Select Product',
+                          title: 'Select Products',
                           searchFn: controller.searchProductsAsModels,
+                          allowMultiSelect: true,
                         ),
                       );
-                      if (product != null) {
-                        row.productId.value = product.id;
-                        row.productName.value = product.name;
-                        row.hsnCode.value = product.hsnCode ?? '';
-                        await controller.applyProductTaxesToRow(row, product.id);
-                        state.didChange(product.id);
-                        state.validate();
+                      if (selections == null || selections.isEmpty) return;
+
+                      // Fill the current (triggering) row with the first selection
+                      final first = selections.first;
+                      row.productId.value = first.product.id;
+                      row.productName.value = first.product.name;
+                      row.hsnCode.value = first.product.hsnCode ?? '';
+                      if (first.selectedPack != null) {
+                        row.selectedPackId.value = first.selectedPack!.id;
+                        row.selectedPackLabel.value = first.selectedPack!.label;
+                        if (first.selectedPack!.unit != null) {
+                          row.unit.value = first.selectedPack!.unit!;
+                        }
+                        if (first.selectedPack!.price != null) {
+                          row.price.value = first.selectedPack!.price!.toString();
+                        }
+                      }
+                      await controller.applyProductTaxesToRow(row, first.product.id);
+                      state.didChange(first.product.id);
+                      state.validate();
+
+                      // Add new rows for remaining selections
+                      for (int i = 1; i < selections.length; i++) {
+                        final sel = selections[i];
+                        controller.addItem();
+                        final newRow = controller.items.last;
+                        newRow.productId.value = sel.product.id;
+                        newRow.productName.value = sel.product.name;
+                        newRow.hsnCode.value = sel.product.hsnCode ?? '';
+                        if (sel.selectedPack != null) {
+                          newRow.selectedPackId.value = sel.selectedPack!.id;
+                          newRow.selectedPackLabel.value = sel.selectedPack!.label;
+                          if (sel.selectedPack!.unit != null) {
+                            newRow.unit.value = sel.selectedPack!.unit!;
+                          }
+                          if (sel.selectedPack!.price != null) {
+                            newRow.price.value = sel.selectedPack!.price!.toString();
+                          }
+                        }
+                        await controller.applyProductTaxesToRow(newRow, sel.product.id);
                       }
                     },
               child: InputDecorator(
@@ -1122,11 +1156,18 @@ class _ProductPicker extends StatelessWidget {
                 child: Row(
                   children: [
                     Expanded(
-                      child: Obx(() => Text(
-                            row.productName.value.isEmpty ? 'Tap to search...' : row.productName.value,
-                            style: TextStyle(color: row.productId.value == null ? Colors.grey : null),
-                            overflow: TextOverflow.ellipsis,
-                          )),
+                      child: Obx(() {
+                        final name = row.productName.value;
+                        final packLabel = row.selectedPackLabel.value;
+                        final displayText = name.isEmpty
+                            ? 'Tap to search...'
+                            : (packLabel.isNotEmpty ? '$name · $packLabel' : name);
+                        return Text(
+                          displayText,
+                          style: TextStyle(color: row.productId.value == null ? Colors.grey : null),
+                          overflow: TextOverflow.ellipsis,
+                        );
+                      }),
                     ),
                     if (!readOnly) const Icon(Icons.search, size: 18, color: AppColors.textMuted),
                   ],

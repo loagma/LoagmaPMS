@@ -344,6 +344,10 @@ class ProductSearchDialog extends StatefulWidget {
   final bool supplierToggleValue;
   final ValueChanged<bool>? onSupplierToggle;
 
+  /// When true, enables multi-product selection.
+  /// Dialog returns [List<ProductSelection>] instead of a single [Product].
+  final bool allowMultiSelect;
+
   const ProductSearchDialog({
     super.key,
     required this.searchFn,
@@ -352,6 +356,7 @@ class ProductSearchDialog extends StatefulWidget {
     this.showSupplierToggle = false,
     this.supplierToggleValue = false,
     this.onSupplierToggle,
+    this.allowMultiSelect = false,
   });
 
   @override
@@ -363,6 +368,12 @@ class _ProductSearchDialogState extends State<ProductSearchDialog> {
   List<Product> _results = [];
   bool _loading = false;
   Timer? _debounce;
+
+  // multi-select state: "productId_packId" → ProductSelection
+  // For products with no packs, key is "productId_"
+  final Map<String, ProductSelection> _selected = {};
+
+  String _selKey(int productId, String packId) => '${productId}_$packId';
 
   @override
   void initState() {
@@ -395,6 +406,46 @@ class _ProductSearchDialogState extends State<ProductSearchDialog> {
     });
   }
 
+  // Used for products with no packs
+  void _toggleProduct(Product product) {
+    final key = _selKey(product.id, '');
+    setState(() {
+      if (_selected.containsKey(key)) {
+        _selected.remove(key);
+      } else {
+        _selected[key] = ProductSelection(product: product, selectedPack: null);
+      }
+    });
+  }
+
+  // Toggle a specific pack — each pack gets its own line item
+  void _togglePack(Product product, ProductPack pack) {
+    final key = _selKey(product.id, pack.id);
+    setState(() {
+      if (_selected.containsKey(key)) {
+        _selected.remove(key);
+      } else {
+        _selected[key] = ProductSelection(product: product, selectedPack: pack);
+      }
+    });
+  }
+
+  Set<String> _selectedPackIds(int productId) {
+    return _selected.entries
+        .where((e) => e.key.startsWith('${productId}_'))
+        .map((e) => e.value.selectedPack?.id ?? '')
+        .toSet();
+  }
+
+  bool _isProductSelected(int productId) {
+    return _selected.keys.any((k) => k.startsWith('${productId}_'));
+  }
+
+  void _confirmSelection() {
+    if (_selected.isEmpty) return;
+    Navigator.pop(context, _selected.values.toList());
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -418,7 +469,8 @@ class _ProductSearchDialogState extends State<ProductSearchDialog> {
             _buildSearchField(),
             const Divider(height: 1),
             Expanded(child: _buildList()),
-            if (widget.showSupplierToggle) _buildSupplierToggle(),
+            if (widget.allowMultiSelect) _buildMultiSelectFooter(isPhone: isPhone),
+            if (widget.showSupplierToggle && !widget.allowMultiSelect) _buildSupplierToggle(),
           ],
         ),
       ),
@@ -448,6 +500,19 @@ class _ProductSearchDialogState extends State<ProductSearchDialog> {
               ),
             ),
           ),
+          if (widget.allowMultiSelect && _selected.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${_selected.length} selected',
+                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.close, color: Colors.white70),
             onPressed: () => Navigator.pop(context),
@@ -532,9 +597,58 @@ class _ProductSearchDialogState extends State<ProductSearchDialog> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       itemCount: _results.length,
       separatorBuilder: (_, __) => const Divider(height: 1, indent: 12, endIndent: 12),
-      itemBuilder: (context, i) => _ProductCard(
-        product: _results[i],
-        onSelect: (p) => Navigator.pop(context, p),
+      itemBuilder: (context, i) {
+        final product = _results[i];
+        if (widget.allowMultiSelect) {
+          final selectedPackIds = _selectedPackIds(product.id);
+          return _ProductCard(
+            product: product,
+            allowMultiSelect: true,
+            isSelected: _isProductSelected(product.id),
+            selectedPackIds: selectedPackIds,
+            onToggleSelect: () => _toggleProduct(product),
+            onPackToggled: (pack) => _togglePack(product, pack),
+            onSelect: (_) {},
+          );
+        }
+        return _ProductCard(
+          product: product,
+          onSelect: (p) => Navigator.pop(context, p),
+        );
+      },
+    );
+  }
+
+  Widget _buildMultiSelectFooter({bool isPhone = false}) {
+    final count = _selected.length;
+    return Container(
+      padding: EdgeInsets.fromLTRB(16, 10, 16, isPhone ? 20 : 12),
+      decoration: BoxDecoration(
+        color: count > 0 ? AppColors.primary.withValues(alpha: 0.06) : Colors.grey[50],
+        border: const Border(top: BorderSide(color: AppColors.border)),
+        borderRadius: isPhone
+            ? BorderRadius.zero
+            : const BorderRadius.vertical(bottom: Radius.circular(16)),
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: count > 0 ? _confirmSelection : null,
+          icon: const Icon(Icons.check_circle_outline, size: 18),
+          label: Text(
+            count == 0 ? 'Select products above' : 'Add $count item${count == 1 ? '' : 's'}',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: Colors.grey[200],
+            disabledForegroundColor: Colors.grey[500],
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            elevation: count > 0 ? 2 : 0,
+          ),
+        ),
       ),
     );
   }
@@ -582,7 +696,24 @@ class _ProductCard extends StatelessWidget {
   final Product product;
   final ValueChanged<Product> onSelect;
 
-  const _ProductCard({required this.product, required this.onSelect});
+  // multi-select extras
+  final bool allowMultiSelect;
+  final bool isSelected;
+  // Set of pack IDs currently selected for this product
+  final Set<String> selectedPackIds;
+  final VoidCallback? onToggleSelect;
+  // Called when a pack chip is tapped — toggles that pack's selection
+  final ValueChanged<ProductPack>? onPackToggled;
+
+  const _ProductCard({
+    required this.product,
+    required this.onSelect,
+    this.allowMultiSelect = false,
+    this.isSelected = false,
+    this.selectedPackIds = const {},
+    this.onToggleSelect,
+    this.onPackToggled,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -590,14 +721,33 @@ class _ProductCard extends StatelessWidget {
     final unitLabel = _unitLabel(product.defaultUnit);
 
     return InkWell(
-      onTap: () => onSelect(product),
+      onTap: allowMultiSelect ? null : () => onSelect(product),
       borderRadius: BorderRadius.circular(8),
-      child: Padding(
+      child: Container(
+        color: isSelected ? AppColors.primaryLighter.withValues(alpha: 0.35) : null,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _ImagePlaceholder(productName: product.name),
+            Stack(
+              children: [
+                _ImagePlaceholder(productName: product.name),
+                if (allowMultiSelect && isSelected)
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      decoration: const BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.check, size: 13, color: Colors.white),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -644,23 +794,38 @@ class _ProductCard extends StatelessWidget {
                     Wrap(
                       spacing: 6,
                       runSpacing: 4,
-                      children: product.packs.take(4).map((pack) {
-                        final isDefault = pack.id == product.defaultPackId;
-                        return _PackChip(pack: pack, isDefault: isDefault);
+                      children: product.packs.map((pack) {
+                        final isPackSelected = allowMultiSelect
+                            ? selectedPackIds.contains(pack.id)
+                            : pack.id == product.defaultPackId;
+                        return _PackChip(
+                          pack: pack,
+                          isSelected: isPackSelected,
+                          onTap: allowMultiSelect
+                              ? () => onPackToggled?.call(pack)
+                              : null,
+                        );
                       }).toList(),
                     ),
                   ] else ...[
                     const SizedBox(height: 6),
                     _PackChip(
-                      isDefault: true,
+                      isSelected: allowMultiSelect ? isSelected : true,
                       fallbackLabel: unitLabel ?? '1 Unit',
+                      onTap: allowMultiSelect ? onToggleSelect : null,
                     ),
                   ],
                 ],
               ),
             ),
             const SizedBox(width: 8),
-            _SelectButton(onTap: () => onSelect(product)),
+            if (!allowMultiSelect)
+              _SelectButton(onTap: () => onSelect(product))
+            else if (!hasPackages)
+              _MultiSelectButton(
+                isSelected: isSelected,
+                onTap: onToggleSelect ?? () {},
+              ),
           ],
         ),
       ),
@@ -744,35 +909,44 @@ class _InfoChip extends StatelessWidget {
 
 class _PackChip extends StatelessWidget {
   final ProductPack? pack;
-  final bool isDefault;
+  final bool isSelected;
   final String fallbackLabel;
+  final VoidCallback? onTap;
 
   const _PackChip({
     this.pack,
-    this.isDefault = false,
+    this.isSelected = false,
     this.fallbackLabel = '1 Unit',
+    this.onTap,
   });
 
   String get _label {
     if (pack == null) return fallbackLabel;
+    final desc = pack!.label.trim();
+    // Build weight string if available
+    String? weightStr;
     if (pack!.weight != null) {
       final w = pack!.weight!;
       final wStr = w % 1 == 0 ? w.toInt().toString() : w.toString();
       final u = pack!.unit ?? 'Kg';
-      return '$wStr $u';
+      weightStr = '$wStr $u';
     }
-    return pack!.label;
+    // If description looks like a real name (not just "1 Unit" style fallback), combine it with weight
+    if (desc.isNotEmpty && weightStr != null) return '$desc - $weightStr';
+    if (desc.isNotEmpty) return desc;
+    if (weightStr != null) return weightStr;
+    return fallbackLabel;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final chip = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: isDefault ? AppColors.primary : Colors.white,
+        color: isSelected ? AppColors.primary : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDefault ? AppColors.primary : AppColors.primaryLight,
+          color: isSelected ? AppColors.primary : AppColors.primaryLight,
           width: 1.2,
         ),
       ),
@@ -781,9 +955,14 @@ class _PackChip extends StatelessWidget {
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
-          color: isDefault ? Colors.white : AppColors.primaryDark,
+          color: isSelected ? Colors.white : AppColors.primaryDark,
         ),
       ),
+    );
+    if (onTap == null) return chip;
+    return GestureDetector(
+      onTap: onTap,
+      child: chip,
     );
   }
 }
@@ -810,6 +989,37 @@ class _SelectButton extends StatelessWidget {
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MultiSelectButton extends StatelessWidget {
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _MultiSelectButton({required this.isSelected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.primaryLight,
+            width: 1.5,
+          ),
+        ),
+        child: Icon(
+          isSelected ? Icons.check : Icons.add,
+          size: 18,
+          color: isSelected ? Colors.white : AppColors.primaryDark,
         ),
       ),
     );

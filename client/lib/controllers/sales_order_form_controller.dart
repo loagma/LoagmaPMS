@@ -706,6 +706,7 @@ class SalesOrderFormController extends GetxController {
             'line_no': e.key + 1,
             if (r.hsnCode.value.trim().isNotEmpty) 'hsn_code': r.hsnCode.value.trim(),
             if (r.unit.value.trim().isNotEmpty) 'unit': r.unit.value.trim(),
+            if (r.selectedPackId.value.trim().isNotEmpty) 'pack_id': r.selectedPackId.value.trim(),
             'quantity': qty,
             'price': price,
             if (discount != null && discount > 0) 'discount_percent': discount,
@@ -830,6 +831,8 @@ class SOLineRow {
   final isTaxLoading = false.obs;
   final unit = 'PCS'.obs;
   final description = ''.obs;
+  final selectedPackId = ''.obs;
+  final selectedPackLabel = ''.obs;
 
   SOLineRow({
     int? productId,
