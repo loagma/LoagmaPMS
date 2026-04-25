@@ -8,6 +8,9 @@ return new class extends Migration
 {
     public function up(): void
     {
+        Schema::dropIfExists('sales_invoice_items');
+        Schema::dropIfExists('sales_invoices');
+
         Schema::create('sales_invoices', function (Blueprint $table) {
             $table->id();
             $table->string('doc_no_prefix', 20)->default('25-26/');
