@@ -524,6 +524,39 @@ class SalesInvoiceController extends GetxController {
     return null;
   }
 
+  final _productCache = <int, Product>{};
+
+  Future<Product?> _fetchProductById(int productId) async {
+    if (_productCache.containsKey(productId)) return _productCache[productId];
+
+    // Check already-loaded list first
+    final found = products.firstWhereOrNull((p) => p.id == productId);
+    if (found != null) {
+      _productCache[productId] = found;
+      return found;
+    }
+
+    try {
+      final response = await http
+          .get(
+            Uri.parse('${ApiConfig.products}/$productId'),
+            headers: {'Accept': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) return null;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) return null;
+      final raw = data['data'];
+      if (raw is! Map<String, dynamic>) return null;
+      final product = Product.fromJson(raw);
+      _productCache[productId] = product;
+      return product;
+    } catch (e) {
+      debugPrint('[SALES_INVOICE] Fetch product $productId error: $e');
+      return null;
+    }
+  }
+
   Future<List<Map<String, dynamic>>> _fetchProductTaxRows(int productId) async {
     final cached = _productTaxCache[productId];
     if (cached != null) return cached;
@@ -1215,24 +1248,69 @@ class SalesInvoiceController extends GetxController {
       for (final item in so.items) {
         try {
           final qty = item.leftQty > 0 ? item.leftQty : item.quantity;
-          final displayName = (item.productName?.trim().isEmpty ?? true)
-              ? 'Product ${item.productId}'
-              : item.productName!;
           final row = SIItemRow();
           row.sourceSalesOrderId.value = soId;
           row.sourceSalesOrderItemId.value = item.id;
           row.sourceSoNumber.value = so.soNumber;
-          row.product.value = Product(
-            id: item.productId,
-            name: displayName,
-            hsnCode: item.hsnCode,
-            productType: 'SINGLE',
-            defaultUnit: item.unit,
-          );
-          row.productName.value = displayName;
-          row.productCode.value = '';
-          row.hsnCode.value = item.hsnCode ?? '';
-          row.alias.value = '$displayName : ${item.unit ?? 'Nos'}';
+
+          // Fetch the real Product object so we get the correct name, code, HSN, packs
+          final product = await _fetchProductById(item.productId);
+
+          if (product != null) {
+            row.product.value = product;
+            row.productName.value = product.name;
+            row.productCode.value = product.code ?? '${product.id}';
+            row.hsnCode.value = product.hsnCode ?? item.hsnCode ?? '';
+
+            // Resolve pack: prefer the pack that was on the order (by packId), else defaultPackId, else first pack
+            ProductPack? selectedPack;
+            if (item.packId != null && item.packId!.isNotEmpty) {
+              selectedPack = product.packs.firstWhereOrNull((p) => p.id == item.packId);
+            }
+            selectedPack ??= product.packs.firstWhereOrNull((p) => p.id == product.defaultPackId);
+            selectedPack ??= product.packs.isNotEmpty ? product.packs.first : null;
+
+            if (selectedPack != null) {
+              row.selectedPackId.value = selectedPack.id;
+              row.selectedPackLabel.value = selectedPack.label;
+              if (selectedPack.unit != null && unitTypes.contains(selectedPack.unit)) {
+                row.unitType.value = selectedPack.unit!;
+              } else {
+                row.unitType.value = item.unit ?? (unitTypes.isNotEmpty ? unitTypes.first : 'Nos');
+              }
+            } else {
+              final unit = product.defaultUnit ?? item.unit;
+              if (unit != null && unit.isNotEmpty && unitTypes.contains(unit)) {
+                row.unitType.value = unit;
+              } else {
+                row.unitType.value = item.unit ?? (unitTypes.isNotEmpty ? unitTypes.first : 'Nos');
+              }
+            }
+
+            row.alias.value = '${product.name} : ${row.unitType.value}';
+          } else {
+            // Fallback when product fetch fails — use order's own data
+            final displayName = (item.productName?.trim().isNotEmpty ?? false)
+                ? item.productName!
+                : 'Product ${item.productId}';
+            row.product.value = Product(
+              id: item.productId,
+              name: displayName,
+              hsnCode: item.hsnCode,
+              productType: 'SINGLE',
+              defaultUnit: item.unit,
+            );
+            row.productName.value = displayName;
+            row.productCode.value = '${item.productId}';
+            row.hsnCode.value = item.hsnCode ?? '';
+            row.unitType.value = item.unit ?? (unitTypes.isNotEmpty ? unitTypes.first : 'Nos');
+            row.alias.value = '$displayName : ${row.unitType.value}';
+            if (item.packId != null && item.packId!.isNotEmpty) {
+              row.selectedPackId.value = item.packId!;
+              row.selectedPackLabel.value = item.packLabel ?? item.unit ?? '';
+            }
+          }
+
           row.setQuantity(qty.toStringAsFixed(2));
           row.lastAcceptedQuantity.value = row.quantity.value;
           row.orderedQty.value = item.quantity.toStringAsFixed(3);
@@ -1241,15 +1319,9 @@ class SalesInvoiceController extends GetxController {
           row.writeoffQty.value = '0';
           row.isWriteoff.value = false;
           row.writeoffReason.value = '';
-          row.unitType.value = item.unit ?? (unitTypes.isNotEmpty ? unitTypes.first : 'Nos');
+          // Use the price from the order (preserves agreed price, not product default)
           row.unitPrice.value = item.price.toStringAsFixed(2);
           row.taxableAmount.value = (qty * item.price).toStringAsFixed(2);
-
-          // Preserve pack info from the order line
-          if (item.packId != null && item.packId!.isNotEmpty) {
-            row.selectedPackId.value = item.packId!;
-            row.selectedPackLabel.value = item.packLabel ?? item.unit ?? '';
-          }
 
           // Add the row first so all items appear even if tax fetch is slow/fails
           items.add(row);
