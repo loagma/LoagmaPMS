@@ -2,10 +2,9 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 
-import '../api_config.dart';
 import '../models/customer_model.dart';
+import '../services/customer_api_service.dart';
 import '../theme/app_colors.dart';
 
 class CustomerListController extends GetxController {
@@ -39,36 +38,18 @@ class CustomerListController extends GetxController {
         customers.clear();
       }
 
-      final uri = Uri.parse(ApiConfig.users).replace(
-        queryParameters: {
-          'role': 'Customer',
-          'limit': limit.toString(),
-          'page': currentPage.value.toString(),
-          if (searchQuery.value.isNotEmpty) 'search': searchQuery.value,
-        },
+      final parsed = await CustomerApiService.fetchCustomers(
+        page: currentPage.value,
+        limit: limit,
+        search: searchQuery.value,
       );
-
-      final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
-          .timeout(const Duration(seconds: 30));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        if (data['success'] == true) {
-          final List items = data['data'] ?? [];
-          final parsed = items
-              .whereType<Map<String, dynamic>>()
-              .map((e) => Customer.fromJson(e))
-              .toList();
-          if (loadMore) {
-            customers.addAll(parsed);
-          } else {
-            customers.value = parsed;
-          }
-          hasMore.value = parsed.length >= limit;
-          if (hasMore.value) currentPage.value++;
-        }
+      if (loadMore) {
+        customers.addAll(parsed);
+      } else {
+        customers.value = parsed;
       }
+      hasMore.value = parsed.length >= limit;
+      if (hasMore.value) currentPage.value++;
     } catch (e) {
       debugPrint('[CUSTOMERS] Fetch error: $e');
       Get.snackbar(

@@ -214,11 +214,9 @@ class _SalesOrderReportView extends StatelessWidget {
       final soNumber = controller.currentSoNumber.value.trim().isEmpty
           ? (controller.currentSoSeq.value?.toString() ?? '-')
           : controller.currentSoNumber.value.trim();
-      final customer = controller.customers.firstWhere(
-        (c) => c['id'] == controller.customerId.value,
-        orElse: () => <String, dynamic>{},
-      );
-      final customerName = customer['name']?.toString() ?? 'Customer';
+      final customerLabel = controller.customerDisplayLabel.isEmpty
+          ? 'Customer'
+          : controller.customerDisplayLabel;
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -229,7 +227,7 @@ class _SalesOrderReportView extends StatelessWidget {
               children: [
                 _metaRow('SO Number', soNumber),
                 _metaRow('Status', controller.status.value),
-                _metaRow('Customer', customerName),
+                _metaRow('Customer', customerLabel),
                 _metaRow('Document Date', _normalizeDate(controller.docDate.value)),
                 _metaRow('Expected Date', _normalizeDate(controller.expectedDate.value)),
                 _metaRow('Financial Year', controller.financialYear.value.trim().isEmpty ? '-' : controller.financialYear.value.trim()),
@@ -518,7 +516,12 @@ class _HeaderCard extends StatelessWidget {
                             ),
                           );
                           if (party != null) {
-                            controller.setCustomer(party.id, party.name);
+                            controller.setCustomer(
+                              party.id,
+                              party.name,
+                              phone: party.phone,
+                              shopName: party.shopName,
+                            );
                             state.didChange(party.id);
                             state.validate();
                           }
@@ -530,14 +533,33 @@ class _HeaderCard extends StatelessWidget {
                         Expanded(
                           child: Obx(() {
                             final selectedId = controller.customerId.value;
-                            final selectedName = controller.customerName.value;
-                            return Text(
-                              selectedId == null ? 'Tap to select...' : selectedName,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: selectedId == null ? Colors.grey : null,
-                              ),
-                              overflow: TextOverflow.ellipsis,
+                            if (selectedId == null) {
+                              return Text(
+                                'Tap to select...',
+                                style: const TextStyle(fontSize: 14, color: Colors.grey),
+                                overflow: TextOverflow.ellipsis,
+                              );
+                            }
+                            final title = controller.customerDisplayTitle;
+                            final subtitle = controller.customerDisplaySubtitle;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  title,
+                                  style: const TextStyle(fontSize: 14),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (subtitle.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    subtitle,
+                                    style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ],
                             );
                           }),
                         ),

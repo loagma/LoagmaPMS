@@ -217,6 +217,15 @@ class _CustomerCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if (customer.shopName != null && customer.shopName!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        customer.shopName!,
+                        style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                     if (customer.contactNumber != null && customer.contactNumber!.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Row(

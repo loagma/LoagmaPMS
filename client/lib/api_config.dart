@@ -11,13 +11,13 @@ class ApiConfig {
   ///   --dart-define=IS_PRODUCTION=true
   static const bool isProduction = bool.fromEnvironment(
     'IS_PRODUCTION',
-    defaultValue: true,
+    defaultValue: false,
   );
 
   /// Local base URL (emulator / device hitting your dev machine).
   /// 10.0.2.2 is Android emulator's "localhost". Replace with your LAN IP
   /// if you want a physical device to connect.
-  static const String _localBaseUrl = 'http://192.168.1.11:8000';
+  static const String _localBaseUrl = 'http://10.0.2.2:8000';
 
   /// Production base URL (change to your real domain).
   static const String _productionBaseUrl =
@@ -76,6 +76,9 @@ class ApiConfig {
 
   /// GET/POST ${ApiConfig.apiBaseUrl}/suppliers
   static String get suppliers => '$apiBaseUrl/suppliers';
+
+  /// GET/POST ${ApiConfig.apiBaseUrl}/customers
+  static String get customers => '$apiBaseUrl/customers';
 
   /// GET ${ApiConfig.apiBaseUrl}/business-types
   static String get businessTypes => '$apiBaseUrl/business-types';

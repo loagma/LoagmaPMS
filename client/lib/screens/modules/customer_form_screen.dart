@@ -117,6 +117,17 @@ class _BasicInfoCard extends StatelessWidget {
                     v == null || v.trim().isEmpty ? 'Required' : null,
                 onChanged: (v) => controller.name.value = v,
               )),
+          const SizedBox(height: 12),
+          Obx(() => TextFormField(
+                key: ValueKey('shop_${controller.shopName.value.isEmpty}'),
+                initialValue: controller.shopName.value,
+                decoration: AppInputDecoration.standard(
+                  labelText: 'Shop Name',
+                  hintText: 'Business or shop name',
+                ),
+                textCapitalization: TextCapitalization.words,
+                onChanged: (v) => controller.shopName.value = v,
+              )),
         ],
       ),
     );

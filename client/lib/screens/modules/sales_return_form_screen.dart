@@ -259,7 +259,12 @@ class _HeaderCard extends StatelessWidget {
                               ),
                             );
                             if (party != null) {
-                              await controller.setCustomerWithName(party.id, party.name);
+                              await controller.setCustomerWithName(
+                                party.id,
+                                party.name,
+                                phone: party.phone,
+                                shopName: party.shopName,
+                              );
                               state.didChange(party.id);
                               state.validate();
                             }
@@ -269,16 +274,49 @@ class _HeaderCard extends StatelessWidget {
                       child: Row(
                         children: [
                           Expanded(
-                            child: Obx(() {
+                          child: Obx(() {
                               final selectedId = controller.customerId.value;
-                              final selectedName = controller.customerName.value;
-                              return Text(
-                                selectedId == null ? 'Tap to select...' : selectedName,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: selectedId == null ? Colors.grey : null,
-                                ),
-                                overflow: TextOverflow.ellipsis,
+                              if (selectedId == null) {
+                                return const Text(
+                                  'Tap to select...',
+                                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                                  overflow: TextOverflow.ellipsis,
+                                );
+                              }
+                              final parts = <String>[];
+                              if (controller.customerName.value.trim().isNotEmpty) {
+                                parts.add(controller.customerName.value.trim());
+                              }
+                              if (controller.customerShopName.value.trim().isNotEmpty) {
+                                parts.add(controller.customerShopName.value.trim());
+                              }
+                              if (controller.customerPhone.value.trim().isNotEmpty) {
+                                parts.add(controller.customerPhone.value.trim());
+                              }
+                              final subtitle = [
+                                if (controller.customerShopName.value.trim().isNotEmpty)
+                                  controller.customerShopName.value.trim(),
+                                if (controller.customerPhone.value.trim().isNotEmpty)
+                                  controller.customerPhone.value.trim(),
+                              ].join(' • ');
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    parts.isEmpty ? 'Customer' : parts.first,
+                                    style: const TextStyle(fontSize: 14),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (subtitle.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      subtitle,
+                                      style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ],
                               );
                             }),
                           ),
@@ -643,7 +681,20 @@ class _SalesReturnReportView extends StatelessWidget {
               children: [
                 _metaRow('Return No', docNo.trim().isEmpty ? '-' : docNo),
                 _metaRow('Status', controller.status.value),
-                _metaRow('Customer', controller.customerName.value.isEmpty ? '-' : controller.customerName.value),
+                _metaRow(
+                  'Customer',
+                  [
+                    if (controller.customerName.value.isNotEmpty) controller.customerName.value,
+                    if (controller.customerShopName.value.isNotEmpty) controller.customerShopName.value,
+                    if (controller.customerPhone.value.isNotEmpty) controller.customerPhone.value,
+                  ].join(' • ').trim().isEmpty
+                      ? '-'
+                      : [
+                          if (controller.customerName.value.isNotEmpty) controller.customerName.value,
+                          if (controller.customerShopName.value.isNotEmpty) controller.customerShopName.value,
+                          if (controller.customerPhone.value.isNotEmpty) controller.customerPhone.value,
+                        ].join(' • '),
+                ),
                 _metaRow('Source SI', controller.sourceSiNumber.value.isEmpty ? '-' : controller.sourceSiNumber.value),
                 _metaRow('Return Date', controller.docDate.value.isEmpty ? '-' : controller.docDate.value),
                 _metaRow('Reason', controller.reason.value.isEmpty ? '-' : controller.reason.value, isLast: true),

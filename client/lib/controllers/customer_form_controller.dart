@@ -5,8 +5,9 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 
-import '../api_config.dart';
 import '../models/customer_model.dart';
+import '../services/customer_api_service.dart';
+import '../api_config.dart';
 
 class CustomerFormController extends GetxController {
   final formKey = GlobalKey<FormState>();
@@ -16,6 +17,7 @@ class CustomerFormController extends GetxController {
   final isSaving = false.obs;
 
   final name = ''.obs;
+  final shopName = ''.obs;
   final email = ''.obs;
   final contactNumber = ''.obs;
   final alternatePhone = ''.obs;
@@ -42,30 +44,22 @@ class CustomerFormController extends GetxController {
   Future<void> _loadCustomer() async {
     try {
       isLoading.value = true;
-      final response = await http
-          .get(
-            Uri.parse('${ApiConfig.users}/$customerId'),
-            headers: {'Accept': 'application/json'},
-          )
-          .timeout(const Duration(seconds: 15));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        if (data['success'] == true) {
-          final c = Customer.fromJson(data['data'] as Map<String, dynamic>);
-          name.value = c.name;
-          email.value = c.email ?? '';
-          contactNumber.value = c.contactNumber ?? '';
-          alternatePhone.value = c.alternatePhone ?? '';
-          gstNo.value = c.gstNo ?? '';
-          panNo.value = c.panNo ?? '';
-          addressLine1.value = c.addressLine1 ?? '';
-          city.value = c.city ?? '';
-          state.value = c.state ?? '';
-          country.value = c.country ?? '';
-          pincode.value = c.pincode ?? '';
-          notes.value = c.notes ?? '';
-          status.value = c.status;
-        }
+      final c = await CustomerApiService.fetchCustomerById(customerId!);
+      if (c != null) {
+        name.value = c.name;
+        shopName.value = c.shopName ?? '';
+        email.value = c.email ?? '';
+        contactNumber.value = c.contactNumber ?? '';
+        alternatePhone.value = c.alternatePhone ?? '';
+        gstNo.value = c.gstNo ?? '';
+        panNo.value = c.panNo ?? '';
+        addressLine1.value = c.addressLine1 ?? '';
+        city.value = c.city ?? '';
+        state.value = c.state ?? '';
+        country.value = c.country ?? '';
+        pincode.value = c.pincode ?? '';
+        notes.value = c.notes ?? '';
+        status.value = c.status;
       }
     } catch (e) {
       debugPrint('[CUSTOMER FORM] Load error: $e');
@@ -80,13 +74,19 @@ class CustomerFormController extends GetxController {
     try {
       final payload = {
         'name': name.value.trim(),
-        'role': 'Customer',
+        if (shopName.value.trim().isNotEmpty) 'shop_name': shopName.value.trim(),
+        if (shopName.value.trim().isNotEmpty) 'shopName': shopName.value.trim(),
         'status': status.value,
         if (email.value.trim().isNotEmpty) 'email': email.value.trim(),
+        if (contactNumber.value.trim().isNotEmpty) 'phone': contactNumber.value.trim(),
         if (contactNumber.value.trim().isNotEmpty) 'contactNumber': contactNumber.value.trim(),
+        if (alternatePhone.value.trim().isNotEmpty) 'alternate_phone': alternatePhone.value.trim(),
         if (alternatePhone.value.trim().isNotEmpty) 'alternatePhone': alternatePhone.value.trim(),
+        if (gstNo.value.trim().isNotEmpty) 'gst_no': gstNo.value.trim(),
         if (gstNo.value.trim().isNotEmpty) 'gstNo': gstNo.value.trim(),
+        if (panNo.value.trim().isNotEmpty) 'pan_no': panNo.value.trim(),
         if (panNo.value.trim().isNotEmpty) 'panNo': panNo.value.trim(),
+        if (addressLine1.value.trim().isNotEmpty) 'address_line1': addressLine1.value.trim(),
         if (addressLine1.value.trim().isNotEmpty) 'addressLine1': addressLine1.value.trim(),
         if (city.value.trim().isNotEmpty) 'city': city.value.trim(),
         if (state.value.trim().isNotEmpty) 'state': state.value.trim(),
@@ -96,8 +96,8 @@ class CustomerFormController extends GetxController {
       };
 
       final url = isEditMode
-          ? '${ApiConfig.users}/$customerId'
-          : ApiConfig.users;
+          ? '${ApiConfig.customers}/$customerId'
+          : ApiConfig.customers;
 
       final response = isEditMode
           ? await http.put(

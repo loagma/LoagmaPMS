@@ -7,6 +7,7 @@ import '../api_config.dart';
 import '../models/party_result.dart';
 import '../models/sales_return_model.dart';
 import '../theme/app_colors.dart';
+import '../services/customer_api_service.dart';
 
 class SalesReturnFormController extends GetxController {
   final formKey = GlobalKey<FormState>();
@@ -26,6 +27,8 @@ class SalesReturnFormController extends GetxController {
   final sourceSiNumber = ''.obs;
   final customerId = Rxn<int>();
   final customerName = ''.obs;
+  final customerPhone = ''.obs;
+  final customerShopName = ''.obs;
   final docDate = ''.obs;
   final reason = ''.obs;
   final status = 'DRAFT'.obs;
@@ -99,31 +102,16 @@ class SalesReturnFormController extends GetxController {
 
   Future<void> _loadCustomers() async {
     try {
-      Future<List<Map<String, dynamic>>> fetch(Uri uri) async {
-        final response = await http
-            .get(uri, headers: {'Accept': 'application/json'})
-            .timeout(const Duration(seconds: 15));
-        if (response.statusCode != 200) return [];
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        if (data['success'] != true) return [];
-        final List items = data['data'] ?? [];
-        return items
-            .map((e) => {
-                  'id': (e as Map)['id'],
-                  'name': (e)['name']?.toString() ?? 'User ${(e)['id'] ?? ''}',
-                })
-            .where((e) => e['id'] != null)
-            .toList();
-      }
-
-      final filteredUri = Uri.parse(ApiConfig.users)
-          .replace(queryParameters: {'role': 'Customer', 'limit': '500'});
-      var list = await fetch(filteredUri);
-      if (list.isEmpty) {
-        final fallbackUri = Uri.parse(ApiConfig.users).replace(queryParameters: {'limit': '500'});
-        list = await fetch(fallbackUri);
-      }
-      customers.value = list;
+      final list = await CustomerApiService.fetchCustomers(limit: 500);
+      customers.value = list
+          .map((c) => {
+                'id': c.id,
+                'name': c.name,
+                'phone': c.contactNumber ?? '',
+                'shop_name': c.shopName ?? '',
+                'display_name': c.displayName,
+              })
+          .toList();
     } catch (e) {
       debugPrint('[SR FORM] Load customers error: $e');
     }
@@ -131,27 +119,10 @@ class SalesReturnFormController extends GetxController {
 
   Future<List<PartyResult>> searchCustomers(String query) async {
     try {
-      final uri = Uri.parse(ApiConfig.users).replace(queryParameters: {
-        'limit': '50',
-        'role': 'Customer',
-        if (query.trim().isNotEmpty) 'search': query.trim(),
-      });
-      final response = await http.get(uri, headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) return [];
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (data['success'] != true) return [];
-      final List list = data['data'] ?? [];
-      return list.whereType<Map<String, dynamic>>().map((e) {
-        final rawId = e['id'];
-        final id = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
-        if (id == null) return null;
-        return PartyResult(
-          id: id,
-          name: e['name']?.toString() ?? 'Customer $id',
-          phone: e['contactNumber']?.toString(),
-        );
-      }).whereType<PartyResult>().toList();
-    } catch (_) { return []; }
+      return await CustomerApiService.searchPartyResults(query: query, limit: 50);
+    } catch (_) {
+      return [];
+    }
   }
 
   String _customerNameById(int? cId) {
@@ -163,22 +134,55 @@ class SalesReturnFormController extends GetxController {
     return '';
   }
 
-  Future<void> setCustomerWithName(int id, String name) async {
+  Future<void> setCustomerWithName(
+    int id,
+    String name, {
+    String? phone,
+    String? shopName,
+  }) async {
     if (customerId.value == id) return;
     customerId.value = id;
     customerName.value = name;
+    customerPhone.value = phone ?? '';
+    customerShopName.value = shopName ?? '';
     sourceSiIdSelected.value = null;
     sourceSiNumber.value = '';
     items.clear();
     charges.clear();
     docNoNumber.value = '';
     await _loadNextDocNoNumberForCustomer(id);
+    await _hydrateCustomerDetails(id);
+  }
+
+  String get customerDisplayTitle =>
+      customerName.value.trim().isEmpty ? '-' : customerName.value.trim();
+
+  String get customerDisplaySubtitle {
+    final parts = <String>[];
+    final shop = customerShopName.value.trim();
+    final phone = customerPhone.value.trim();
+    if (shop.isNotEmpty) parts.add(shop);
+    if (phone.isNotEmpty) parts.add(phone);
+    return parts.join(' • ');
+  }
+
+  String get customerDisplayLabel {
+    final parts = <String>[];
+    final name = customerName.value.trim();
+    final shop = customerShopName.value.trim();
+    final phone = customerPhone.value.trim();
+    if (name.isNotEmpty) parts.add(name);
+    if (shop.isNotEmpty) parts.add(shop);
+    if (phone.isNotEmpty) parts.add(phone);
+    return parts.join(' • ');
   }
 
   Future<void> setCustomer(int? cId) async {
     if (customerId.value == cId) return;
     customerId.value = cId;
     customerName.value = _customerNameById(cId);
+    customerPhone.value = '';
+    customerShopName.value = '';
     sourceSiIdSelected.value = null;
     sourceSiNumber.value = '';
     items.clear();
@@ -186,7 +190,16 @@ class SalesReturnFormController extends GetxController {
     docNoNumber.value = '';
     if (cId != null) {
       await _loadNextDocNoNumberForCustomer(cId);
+      await _hydrateCustomerDetails(cId);
     }
+  }
+
+  Future<void> _hydrateCustomerDetails(int id) async {
+    final customer = await CustomerApiService.fetchCustomerById(id);
+    if (customer == null || customerId.value != id) return;
+    customerName.value = customer.name;
+    customerPhone.value = customer.contactNumber ?? '';
+    customerShopName.value = customer.shopName ?? '';
   }
 
   Future<void> _loadUnitTypes() async {
@@ -277,8 +290,11 @@ class SalesReturnFormController extends GetxController {
               siData['doc_no']?.toString() ?? siData['doc_no_number']?.toString() ?? '';
           customerId.value = _safeInt(siData['customer_id']);
           customerName.value = siData['customer_name']?.toString() ?? '';
+          customerPhone.value = '';
+          customerShopName.value = '';
           if (customerId.value != null) {
             await _loadNextDocNoNumberForCustomer(customerId.value!);
+            await _hydrateCustomerDetails(customerId.value!);
           }
 
           items.clear();
@@ -334,6 +350,8 @@ class SalesReturnFormController extends GetxController {
           sourceSiIdSelected.value = sr.header.sourceSalesInvoiceId;
           customerId.value = sr.header.customerId;
           customerName.value = sr.header.customerName ?? '';
+          customerPhone.value = '';
+          customerShopName.value = '';
           docDate.value = sr.header.docDate;
           reason.value = sr.header.reason ?? '';
           status.value = sr.header.status ?? 'DRAFT';

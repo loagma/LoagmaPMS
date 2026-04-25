@@ -10,6 +10,7 @@ import '../constants/charge_constants.dart';
 import '../models/party_result.dart';
 import '../models/product_model.dart';
 import '../models/sales_order_model.dart';
+import '../services/customer_api_service.dart';
 
 class SalesOrderFormController extends GetxController {
   final formKey = GlobalKey<FormState>();
@@ -28,6 +29,8 @@ class SalesOrderFormController extends GetxController {
   final financialYear = '25-26'.obs;
   final customerId = Rxn<int>();
   final customerName = ''.obs;
+  final customerPhone = ''.obs;
+  final customerShopName = ''.obs;
   final departmentId = Rxn<String>();
   final docDate = ''.obs;
   final expectedDate = ''.obs;
@@ -229,36 +232,42 @@ class SalesOrderFormController extends GetxController {
 
   Future<void> _loadCustomers() async {
     try {
-      Future<List<Map<String, dynamic>>> fetch(Uri uri) async {
-        final response = await http.get(
-          uri,
-          headers: {'Accept': 'application/json'},
-        );
-        if (response.statusCode != 200) return [];
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        if (data['success'] != true) return [];
-        final List list = data['data'] ?? [];
-        return list
-            .map((e) => {
-                  'id': (e as Map)['id'],
-                  'name': (e)['name']?.toString() ?? 'User ${(e)['id'] ?? ''}',
-                })
-            .where((e) => e['id'] != null)
-            .toList();
-      }
-
-      final filteredUri = Uri.parse(ApiConfig.users)
-          .replace(queryParameters: {'role': 'Customer', 'limit': '500'});
-      var list = await fetch(filteredUri);
-      if (list.isEmpty) {
-        final fallbackUri = Uri.parse(ApiConfig.users)
-            .replace(queryParameters: {'limit': '500'});
-        list = await fetch(fallbackUri);
-      }
-      customers.value = list;
+      final list = await CustomerApiService.fetchCustomers(limit: 500);
+      customers.value = list
+          .map((c) => {
+                'id': c.id,
+                'name': c.name,
+                'phone': c.contactNumber ?? '',
+                'shop_name': c.shopName ?? '',
+                'display_name': c.displayName,
+              })
+          .toList();
     } catch (e) {
       debugPrint('[SO FORM] Load customers error: $e');
     }
+  }
+
+  String get customerDisplayTitle =>
+      customerName.value.trim().isEmpty ? '-' : customerName.value.trim();
+
+  String get customerDisplaySubtitle {
+    final parts = <String>[];
+    final shop = customerShopName.value.trim();
+    final phone = customerPhone.value.trim();
+    if (shop.isNotEmpty) parts.add(shop);
+    if (phone.isNotEmpty) parts.add(phone);
+    return parts.join(' • ');
+  }
+
+  String get customerDisplayLabel {
+    final parts = <String>[];
+    final name = customerName.value.trim();
+    final shop = customerShopName.value.trim();
+    final phone = customerPhone.value.trim();
+    if (name.isNotEmpty) parts.add(name);
+    if (shop.isNotEmpty) parts.add(shop);
+    if (phone.isNotEmpty) parts.add(phone);
+    return parts.join(' • ');
   }
 
   Future<void> _loadDepartments() async {
@@ -377,6 +386,8 @@ class SalesOrderFormController extends GetxController {
     financialYear.value = so.financialYear ?? '25-26';
     customerId.value = so.customerId;
     customerName.value = so.customerName ?? '';
+    customerPhone.value = '';
+    customerShopName.value = '';
     departmentId.value = so.departmentId;
     docDate.value = so.docDate;
     expectedDate.value = so.expectedDate ?? '';
@@ -390,6 +401,7 @@ class SalesOrderFormController extends GetxController {
       }
     }
     _loadChargesFromModel(so.chargesJson);
+    unawaited(_hydrateCustomerDetails(so.customerId));
     items.clear();
     for (final item in so.items) {
       items.add(SOLineRow(
@@ -421,6 +433,9 @@ class SalesOrderFormController extends GetxController {
 
   Future<void> _resetToNewForm() async {
     customerId.value = null;
+    customerName.value = '';
+    customerPhone.value = '';
+    customerShopName.value = '';
     departmentId.value = null;
     docDate.value = '';
     expectedDate.value = '';
@@ -543,34 +558,28 @@ class SalesOrderFormController extends GetxController {
 
   void setFinancialYear(String v) => financialYear.value = v;
   void setCustomerId(int? v) => customerId.value = v;
-  void setCustomer(int id, String name) {
+  void setCustomer(int id, String name, {String? phone, String? shopName}) {
     customerId.value = id;
     customerName.value = name;
+    customerPhone.value = phone ?? '';
+    customerShopName.value = shopName ?? '';
   }
 
   Future<List<PartyResult>> searchCustomers(String query) async {
     try {
-      final uri = Uri.parse(ApiConfig.users).replace(queryParameters: {
-        'limit': '50',
-        'role': 'Customer',
-        if (query.trim().isNotEmpty) 'search': query.trim(),
-      });
-      final response = await http.get(uri, headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) return [];
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (data['success'] != true) return [];
-      final List list = data['data'] ?? [];
-      return list.whereType<Map<String, dynamic>>().map((e) {
-        final rawId = e['id'];
-        final id = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
-        if (id == null) return null;
-        return PartyResult(
-          id: id,
-          name: e['name']?.toString() ?? 'Customer $id',
-          phone: e['contactNumber']?.toString(),
-        );
-      }).whereType<PartyResult>().toList();
-    } catch (_) { return []; }
+      return await CustomerApiService.searchPartyResults(query: query, limit: 50);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> _hydrateCustomerDetails(int? id) async {
+    if (id == null) return;
+    final customer = await CustomerApiService.fetchCustomerById(id);
+    if (customer == null || customerId.value != id) return;
+    customerName.value = customer.name;
+    customerPhone.value = customer.contactNumber ?? '';
+    customerShopName.value = customer.shopName ?? '';
   }
   void setDepartmentId(String? v) => departmentId.value = v;
   void setDocDate(String v) => docDate.value = v;

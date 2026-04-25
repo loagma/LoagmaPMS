@@ -242,9 +242,12 @@ class _InvoiceReportView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() {
-      final docNo = '${controller.docNoPrefix.value}${controller.docNoNumber.value.trim()}';
-      final rows = controller.items;
+      return Obx(() {
+        final docNo = '${controller.docNoPrefix.value}${controller.docNoNumber.value.trim()}';
+        final rows = controller.items;
+      final customerLabel = controller.customerDisplayLabel.isEmpty
+          ? 'Customer'
+          : controller.customerDisplayLabel;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -254,7 +257,7 @@ class _InvoiceReportView extends StatelessWidget {
               children: [
                 _metaRow('Invoice No', docNo.trim().isEmpty ? '-' : docNo),
                 _metaRow('Status', controller.status.value),
-                _metaRow('Customer', controller.customerName.value.trim().isEmpty ? '-' : controller.customerName.value.trim()),
+                _metaRow('Customer', customerLabel),
                 _metaRow('Document Date', _normalizeDate(controller.docDate.value)),
                 _metaRow('Bill No', controller.billNo.value.trim().isEmpty ? '-' : controller.billNo.value.trim()),
                 _metaRow('Bill Date', _normalizeDate(controller.billDate.value)),
@@ -491,7 +494,12 @@ class _HeaderCard extends StatelessWidget {
                       ),
                     );
                     if (party != null) {
-                      controller.setCustomer(party.id, party.name);
+                      controller.setCustomer(
+                        party.id,
+                        party.name,
+                        phone: party.phone,
+                        shopName: party.shopName,
+                      );
                       state.didChange(party.id);
                       state.validate();
                     }
@@ -503,11 +511,33 @@ class _HeaderCard extends StatelessWidget {
                         Expanded(
                           child: Obx(() {
                             final selectedId = controller.customerId.value;
-                            final selectedName = controller.customerName.value;
-                            return Text(
-                              selectedId == null ? 'Tap to select...' : selectedName,
-                              style: TextStyle(color: selectedId == null ? Colors.grey : null),
-                              overflow: TextOverflow.ellipsis,
+                            if (selectedId == null) {
+                              return const Text(
+                                'Tap to select...',
+                                style: TextStyle(color: Colors.grey),
+                                overflow: TextOverflow.ellipsis,
+                              );
+                            }
+                            final title = controller.customerDisplayTitle;
+                            final subtitle = controller.customerDisplaySubtitle;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  title,
+                                  style: const TextStyle(fontSize: 14),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (subtitle.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    subtitle,
+                                    style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ],
                             );
                           }),
                         ),

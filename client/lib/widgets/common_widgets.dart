@@ -1279,6 +1279,19 @@ class _PartyCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (result.shopName != null && result.shopName!.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      result.shopName!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                   const SizedBox(height: 3),
                   Row(
                     children: [

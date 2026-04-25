@@ -12,6 +12,7 @@ import '../constants/charge_constants.dart';
 import '../models/party_result.dart';
 import '../models/product_model.dart';
 import '../theme/app_colors.dart';
+import '../services/customer_api_service.dart';
 import 'sales_invoice_list_controller.dart';
 
 class SalesInvoiceController extends GetxController {
@@ -27,6 +28,8 @@ class SalesInvoiceController extends GetxController {
   final docNoNumber = ''.obs;
   final customerId = Rxn<int>();
   final customerName = ''.obs;
+  final customerPhone = ''.obs;
+  final customerShopName = ''.obs;
   final docDate = ''.obs;
   final billNo = ''.obs;
   final narration = ''.obs;
@@ -568,32 +571,42 @@ class SalesInvoiceController extends GetxController {
 
   Future<void> _loadCustomers() async {
     try {
-      Future<List<Map<String, dynamic>>> fetch(Uri uri) async {
-        final response = await http.get(uri, headers: {'Accept': 'application/json'});
-        if (response.statusCode != 200) return [];
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        if (data['success'] != true) return [];
-        final List list = data['data'] ?? [];
-        return list
-            .map((e) => {
-                  'id': (e as Map)['id'],
-                  'name': (e)['name']?.toString() ?? 'User ${(e)['id'] ?? ''}',
-                })
-            .where((e) => e['id'] != null)
-            .toList();
-      }
-
-      final filteredUri = Uri.parse(ApiConfig.users)
-          .replace(queryParameters: {'role': 'Customer', 'limit': '500'});
-      var list = await fetch(filteredUri);
-      if (list.isEmpty) {
-        final fallbackUri = Uri.parse(ApiConfig.users).replace(queryParameters: {'limit': '500'});
-        list = await fetch(fallbackUri);
-      }
-      customers.value = list;
+      final list = await CustomerApiService.fetchCustomers(limit: 500);
+      customers.value = list
+          .map((c) => {
+                'id': c.id,
+                'name': c.name,
+                'phone': c.contactNumber ?? '',
+                'shop_name': c.shopName ?? '',
+                'display_name': c.displayName,
+              })
+          .toList();
     } catch (e) {
       debugPrint('[SALES_INVOICE] Customers error: $e');
     }
+  }
+
+  String get customerDisplayTitle =>
+      customerName.value.trim().isEmpty ? '-' : customerName.value.trim();
+
+  String get customerDisplaySubtitle {
+    final parts = <String>[];
+    final shop = customerShopName.value.trim();
+    final phone = customerPhone.value.trim();
+    if (shop.isNotEmpty) parts.add(shop);
+    if (phone.isNotEmpty) parts.add(phone);
+    return parts.join(' • ');
+  }
+
+  String get customerDisplayLabel {
+    final parts = <String>[];
+    final name = customerName.value.trim();
+    final shop = customerShopName.value.trim();
+    final phone = customerPhone.value.trim();
+    if (name.isNotEmpty) parts.add(name);
+    if (shop.isNotEmpty) parts.add(shop);
+    if (phone.isNotEmpty) parts.add(phone);
+    return parts.join(' • ');
   }
 
   Future<void> _loadUnitTypes() async {
@@ -719,6 +732,8 @@ class SalesInvoiceController extends GetxController {
     docNoNumber.value = '';
     customerId.value = null;
     customerName.value = '';
+    customerPhone.value = '';
+    customerShopName.value = '';
     docDate.value = _formatDate(DateTime.now());
     billNo.value = '';
     narration.value = '';
@@ -754,6 +769,8 @@ class SalesInvoiceController extends GetxController {
     currentSeq.value = base;
     customerId.value = _safeInt(v['customer_id']);
     customerName.value = v['customer_name']?.toString() ?? '';
+    customerPhone.value = '';
+    customerShopName.value = '';
     docDate.value = v['doc_date']?.toString().split(' ').first ?? _formatDate(DateTime.now());
     billNo.value = v['bill_no']?.toString() ?? '';
     narration.value = v['narration']?.toString() ?? '';
@@ -817,6 +834,9 @@ class SalesInvoiceController extends GetxController {
     }
     if (items.isEmpty) addItemRow();
     if (charges.isEmpty) addChargeRow();
+    if (customerId.value != null) {
+      unawaited(_hydrateCustomerDetails(customerId.value!));
+    }
   }
 
   Future<void> loadInvoiceBySequence(int seq) async {
@@ -865,32 +885,29 @@ class SalesInvoiceController extends GetxController {
 
   void setDocNoPrefix(String v) => docNoPrefix.value = v;
   void setDocNoNumber(String v) => docNoNumber.value = v;
-  void setCustomer(int? id, String name) { customerId.value = id; customerName.value = name; }
+  void setCustomer(int? id, String name, {String? phone, String? shopName}) {
+    customerId.value = id;
+    customerName.value = name;
+    customerPhone.value = phone ?? '';
+    customerShopName.value = shopName ?? '';
+  }
 
   Future<List<PartyResult>> searchCustomers(String query) async {
     try {
-      final uri = Uri.parse(ApiConfig.users).replace(queryParameters: {
-        'limit': '50',
-        'role': 'Customer',
-        if (query.trim().isNotEmpty) 'search': query.trim(),
-      });
-      final response = await http.get(uri, headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) return [];
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (data['success'] != true) return [];
-      final List list = data['data'] ?? [];
-      return list.whereType<Map<String, dynamic>>().map((e) {
-        final rawId = e['id'];
-        final id = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
-        if (id == null) return null;
-        return PartyResult(
-          id: id,
-          name: e['name']?.toString() ?? 'Customer $id',
-          phone: e['contactNumber']?.toString(),
-        );
-      }).whereType<PartyResult>().toList();
-    } catch (_) { return []; }
+      return await CustomerApiService.searchPartyResults(query: query, limit: 50);
+    } catch (_) {
+      return [];
+    }
   }
+
+  Future<void> _hydrateCustomerDetails(int id) async {
+    final customer = await CustomerApiService.fetchCustomerById(id);
+    if (customer == null || customerId.value != id) return;
+    customerName.value = customer.name;
+    customerPhone.value = customer.contactNumber ?? '';
+    customerShopName.value = customer.shopName ?? '';
+  }
+
   void setDocDate(String v) => docDate.value = v;
   void setBillNo(String v) => billNo.value = v;
   void setNarration(String v) => narration.value = v;
