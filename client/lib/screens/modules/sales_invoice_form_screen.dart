@@ -1354,9 +1354,9 @@ class _LinkToSODialogState extends State<_LinkToSODialog> {
     }
 
     if (!mounted) return;
-    setState(() => _loading = false);
 
     if (salesOrders.isEmpty) {
+      setState(() => _loading = false);
       Get.snackbar(
         'Error',
         'Could not load selected order details.',
@@ -1366,7 +1366,12 @@ class _LinkToSODialogState extends State<_LinkToSODialog> {
       );
       return;
     }
+
+    // Keep loading=true while populating form rows (product fetches happen here)
     await widget.controller.loadFromSalesOrders(salesOrders);
+
+    if (!mounted) return;
+    setState(() => _loading = false);
     nav.pop();
   }
 

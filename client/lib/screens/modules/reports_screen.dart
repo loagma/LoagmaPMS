@@ -84,6 +84,15 @@ class ReportsScreen extends StatelessWidget {
                 },
               ),
               _ReportCard(
+                title: 'Sales Module',
+                subtitle: 'Orders, invoices and return reports',
+                icon: Icons.storefront_outlined,
+                hasSubmodules: true,
+                onTap: () {
+                  Get.toNamed(AppRoutes.salesModuleReports);
+                },
+              ),
+              _ReportCard(
                 title: 'Purchase Module',
                 subtitle: 'Purchase order, voucher and return reports',
                 icon: Icons.shopping_cart_checkout_outlined,

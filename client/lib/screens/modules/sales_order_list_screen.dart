@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 
 import '../../controllers/sales_order_list_controller.dart';
 import '../../models/sales_order_model.dart';
@@ -7,13 +8,94 @@ import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 import 'sales_order_form_screen.dart';
 
-class SalesOrderListScreen extends StatelessWidget {
+class SalesOrderListScreen extends StatefulWidget {
   const SalesOrderListScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final controller = Get.put(SalesOrderListController());
+  State<SalesOrderListScreen> createState() => _SalesOrderListScreenState();
+}
 
+class _SalesOrderListScreenState extends State<SalesOrderListScreen> {
+  late final SalesOrderListController controller;
+  bool _filtersExpanded = false;
+  String _localFrom = '';
+  String _localTo = '';
+  String _localStatus = '';
+
+  static const _statusOptions = [
+    '',
+    'DRAFT',
+    'CONFIRMED',
+    'PARTIALLY_INVOICED',
+    'CLOSED',
+    'CANCELLED',
+  ];
+  static const _statusLabels = {
+    '': 'All',
+    'DRAFT': 'Draft',
+    'CONFIRMED': 'Confirmed',
+    'PARTIALLY_INVOICED': 'Partially Invoiced',
+    'CLOSED': 'Closed',
+    'CANCELLED': 'Cancelled',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.put(SalesOrderListController());
+  }
+
+  bool get _hasActiveFilters =>
+      _localFrom.isNotEmpty || _localTo.isNotEmpty || _localStatus.isNotEmpty;
+
+  Future<void> _pickDate(BuildContext context, {required bool isFrom}) async {
+    final initial = isFrom
+        ? (_localFrom.isNotEmpty ? DateTime.tryParse(_localFrom) ?? DateTime.now() : DateTime.now())
+        : (_localTo.isNotEmpty ? DateTime.tryParse(_localTo) ?? DateTime.now() : DateTime.now());
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(primary: AppColors.primary),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked == null) return;
+    setState(() {
+      final formatted = DateFormat('yyyy-MM-dd').format(picked);
+      if (isFrom) {
+        _localFrom = formatted;
+      } else {
+        _localTo = formatted;
+      }
+    });
+  }
+
+  void _applyFilters() {
+    controller.fetchSalesOrders(
+      status: _localStatus.isEmpty ? null : _localStatus,
+      fromDate: _localFrom.isEmpty ? null : _localFrom,
+      toDate: _localTo.isEmpty ? null : _localTo,
+    );
+    setState(() => _filtersExpanded = false);
+  }
+
+  void _resetFilters() {
+    setState(() {
+      _localFrom = '';
+      _localTo = '';
+      _localStatus = '';
+      _filtersExpanded = false;
+    });
+    controller.clearSearch();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: ModuleAppBar(
@@ -28,77 +110,229 @@ class SalesOrderListScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: Obx(() {
-        if (controller.isLoading.value && controller.salesOrders.isEmpty) {
-          return const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+      body: Column(
+        children: [
+          // Search + filter toggle row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Row(
               children: [
-                CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                Expanded(
+                  child: Obx(() => TextField(
+                    controller: controller.searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Search by SO number…',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: controller.searchQuery.value.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: controller.clearSearch,
+                            )
+                          : null,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    onSubmitted: controller.onSearch,
+                  )),
                 ),
-                SizedBox(height: 16),
-                Text(
-                  'Loading sales orders...',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 14),
+                const SizedBox(width: 8),
+                Stack(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.filter_list_rounded,
+                        color: _hasActiveFilters ? Colors.orange : AppColors.textMuted,
+                      ),
+                      tooltip: 'Filters',
+                      onPressed: () => setState(() => _filtersExpanded = !_filtersExpanded),
+                    ),
+                    if (_hasActiveFilters)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Colors.orange,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
-          );
-        }
+          ),
 
-        if (controller.salesOrders.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: ContentCard(
-                child: EmptyState(
-                  icon: Icons.shopping_cart_outlined,
-                  message: 'No sales orders yet.',
-                  actionLabel: 'Create Sales Order',
-                  onAction: () => Get.to(() => const SalesOrderFormScreen())?.then((_) {
-                    controller.refresh();
-                  }),
-                ),
-              ),
-            ),
-          );
-        }
+          // Collapsible filter bar
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            child: _filtersExpanded
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.primaryLight.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _DateButton(
+                                  label: _localFrom.isEmpty ? 'From Date' : _localFrom,
+                                  icon: Icons.calendar_today_outlined,
+                                  onTap: () => _pickDate(context, isFrom: true),
+                                  isSet: _localFrom.isNotEmpty,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _DateButton(
+                                  label: _localTo.isEmpty ? 'To Date' : _localTo,
+                                  icon: Icons.calendar_today_outlined,
+                                  onTap: () => _pickDate(context, isFrom: false),
+                                  isSet: _localTo.isNotEmpty,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  value: _localStatus,
+                                  decoration: InputDecoration(
+                                    labelText: 'Status',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                    isDense: true,
+                                  ),
+                                  items: _statusOptions
+                                      .map((s) => DropdownMenuItem(
+                                            value: s,
+                                            child: Text(
+                                              _statusLabels[s]!,
+                                              style: const TextStyle(fontSize: 13),
+                                            ),
+                                          ))
+                                      .toList(),
+                                  onChanged: (v) => setState(() => _localStatus = v ?? ''),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              TextButton(
+                                onPressed: _applyFilters,
+                                style: TextButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Text('Apply'),
+                              ),
+                              const SizedBox(width: 6),
+                              TextButton(
+                                onPressed: _resetFilters,
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppColors.textMuted,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Text('Reset'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
 
-        return Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: TextField(
-                controller: controller.searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search by SO number...',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: controller.searchQuery.value.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: controller.clearSearch,
-                        )
-                      : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+          const SizedBox(height: 8),
+
+          // List
+          Expanded(
+            child: Obx(() {
+              if (controller.isLoading.value && controller.salesOrders.isEmpty) {
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'Loading sales orders…',
+                        style: TextStyle(color: AppColors.textMuted, fontSize: 14),
+                      ),
+                    ],
                   ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
+                );
+              }
+
+              if (controller.salesOrders.isEmpty) {
+                return RefreshIndicator(
+                  onRefresh: controller.refresh,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: SizedBox(
+                      height: MediaQuery.of(context).size.height - 300,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: ContentCard(
+                          child: EmptyState(
+                            icon: Icons.shopping_cart_outlined,
+                            message: 'No sales orders found.',
+                            actionLabel: 'Create Sales Order',
+                            onAction: () =>
+                                Get.to(() => const SalesOrderFormScreen())?.then((_) {
+                              controller.refresh();
+                            }),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-                onSubmitted: controller.onSearch,
-              ),
-            ),
-            Expanded(
-              child: RefreshIndicator(
+                );
+              }
+
+              return RefreshIndicator(
                 onRefresh: controller.refresh,
                 color: AppColors.primary,
                 child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: controller.salesOrders.length,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                  itemCount: controller.salesOrders.length +
+                      (controller.hasMore.value ? 1 : 0),
                   itemBuilder: (context, index) {
+                    if (index == controller.salesOrders.length) {
+                      if (!controller.isLoading.value) {
+                        controller.fetchSalesOrders(loadMore: true);
+                      }
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                      );
+                    }
                     final so = controller.salesOrders[index];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
@@ -115,16 +349,17 @@ class SalesOrderListScreen extends StatelessWidget {
                             )?.then((_) => controller.refresh());
                           }
                         },
-                        onDeleteOrCancel: (ctx) => _showDeleteCancelDialog(ctx, controller, so),
+                        onDeleteOrCancel: (ctx) =>
+                            _showDeleteCancelDialog(ctx, controller, so),
                       ),
                     );
                   },
                 ),
-              ),
-            ),
-          ],
-        );
-      }),
+              );
+            }),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Get.to(() => const SalesOrderFormScreen())?.then((_) {
           controller.refresh();
@@ -138,7 +373,13 @@ class SalesOrderListScreen extends StatelessWidget {
   }
 }
 
-void _showDeleteCancelDialog(BuildContext context, SalesOrderListController controller, SalesOrder so) {
+// ──────────────────────────────────────────────────────────────────────────────
+
+void _showDeleteCancelDialog(
+  BuildContext context,
+  SalesOrderListController controller,
+  SalesOrder so,
+) {
   final isDraft = so.status.toUpperCase() == 'DRAFT';
   showDialog(
     context: context,
@@ -164,6 +405,50 @@ void _showDeleteCancelDialog(BuildContext context, SalesOrderListController cont
   );
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+
+class _DateButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool isSet;
+
+  const _DateButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    required this.isSet,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 14, color: isSet ? AppColors.primary : AppColors.textMuted),
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          color: isSet ? AppColors.primary : AppColors.textMuted,
+        ),
+        overflow: TextOverflow.ellipsis,
+      ),
+      style: OutlinedButton.styleFrom(
+        side: BorderSide(
+          color: isSet
+              ? AppColors.primary
+              : AppColors.primaryLight.withValues(alpha: 0.5),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+
 class _SOCard extends StatelessWidget {
   final SalesOrder so;
   final Color statusColor;
@@ -184,10 +469,7 @@ class _SOCard extends StatelessWidget {
       try {
         final dt = DateTime.tryParse(raw);
         if (dt == null) return raw;
-        final y = dt.year.toString().padLeft(4, '0');
-        final m = dt.month.toString().padLeft(2, '0');
-        final d = dt.day.toString().padLeft(2, '0');
-        return '$y-$m-$d';
+        return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
       } catch (_) {
         return raw;
       }
@@ -250,10 +532,7 @@ class _SOCard extends StatelessWidget {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: statusColor.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20),
@@ -293,10 +572,7 @@ class _SOCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Text(
                     _formatDocDate(so.docDate),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textMuted,
-                    ),
+                    style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
                   ),
                   const Spacer(),
                   if (so.totalAmount != null)
