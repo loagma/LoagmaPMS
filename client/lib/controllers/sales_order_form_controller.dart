@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 
 import '../api_config.dart';
 import '../constants/charge_constants.dart';
+import '../controllers/auth_controller.dart';
 import '../models/party_result.dart';
 import '../models/product_model.dart';
 import '../models/sales_order_model.dart';
@@ -41,6 +42,8 @@ class SalesOrderFormController extends GetxController {
 
   final items = <SOLineRow>[].obs;
 
+  int? _adminVendorId;
+
   final isLoading = false.obs;
   final isSaving = false.obs;
 
@@ -53,6 +56,7 @@ class SalesOrderFormController extends GetxController {
     super.onInit();
     viewOnly.value = startInViewOnly;
     _ensureDefaultCharges();
+    _loadAdminVendorId();
     _loadCustomers();
     _loadDepartments();
     _loadUnitTypes();
@@ -65,14 +69,18 @@ class SalesOrderFormController extends GetxController {
     }
   }
 
+  Future<void> _loadAdminVendorId() async {
+    _adminVendorId = await AuthController.getAdminId();
+  }
+
   Future<List<Map<String, dynamic>>> _searchAllProducts(String query) async {
     try {
-      final uri = Uri.parse(ApiConfig.products).replace(
-        queryParameters: {
-          'limit': '50',
-          if (query.trim().isNotEmpty) 'search': query.trim(),
-        },
-      );
+      final params = <String, String>{
+        'limit': '50',
+        if (query.trim().isNotEmpty) 'search': query.trim(),
+        if (_adminVendorId != null) 'admin_vendor_id': _adminVendorId.toString(),
+      };
+      final uri = Uri.parse(ApiConfig.vendorProducts).replace(queryParameters: params);
       final response = await http
           .get(uri, headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: 15));

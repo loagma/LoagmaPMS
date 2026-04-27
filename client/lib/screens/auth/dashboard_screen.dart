@@ -259,25 +259,58 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
-class _DashboardDrawer extends StatelessWidget {
+class _DashboardDrawer extends StatefulWidget {
   const _DashboardDrawer({required this.onLogout});
 
   final Future<void> Function() onLogout;
 
   @override
+  State<_DashboardDrawer> createState() => _DashboardDrawerState();
+}
+
+class _DashboardDrawerState extends State<_DashboardDrawer> {
+  String? _staffName;
+  String? _staffRole;
+  String? _staffMobile;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSession();
+  }
+
+  Future<void> _loadSession() async {
+    final name   = await AuthController.getStaffName();
+    final role   = await AuthController.getRole();
+    final mobile = await AuthController.getStoredMobile();
+    if (mounted) {
+      setState(() {
+        _staffName   = name;
+        _staffRole   = role;
+        _staffMobile = mobile;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final Future<void> Function() onLogout = widget.onLogout;
     return Drawer(
       backgroundColor: AppColors.background,
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            DrawerHeader(
-              margin: EdgeInsets.zero,
-              padding: const EdgeInsets.all(24),
+            Container(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey.withValues(alpha: 0.15)),
+                ),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     children: [
@@ -319,6 +352,83 @@ class _DashboardDrawer extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (_staffName != null) ...[
+                    const SizedBox(height: 14),
+                    const Divider(height: 1, thickness: 1),
+                    const SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Center(
+                            child: Text(
+                              _staffName![0].toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _staffName!,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textDark,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 3),
+                              Row(
+                                children: [
+                                  if (_staffRole != null)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(5),
+                                      ),
+                                      child: Text(
+                                        _staffRole!.toUpperCase(),
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.primaryDark,
+                                          letterSpacing: 0.4,
+                                        ),
+                                      ),
+                                    ),
+                                  if (_staffRole != null && _staffMobile != null)
+                                    const SizedBox(width: 6),
+                                  if (_staffMobile != null)
+                                    Text(
+                                      _staffMobile!,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.textMuted,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

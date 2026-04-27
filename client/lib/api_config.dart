@@ -5,33 +5,16 @@
 class ApiConfig {
   ApiConfig._();
 
-  /// Whether to use production URLs instead of local.
-  ///
-  /// Set at build/run time with:
-  ///   --dart-define=IS_PRODUCTION=true
-  static const bool isProduction = bool.fromEnvironment(
-    'IS_PRODUCTION',
-    defaultValue: false,
-  );
-
-  /// Local base URL (emulator / device hitting your dev machine).
-  /// 10.0.2.2 is Android emulator's "localhost". Replace with your LAN IP
-  /// if you want a physical device to connect.
   static const String _localBaseUrl = 'http://192.168.1.4:8000';
+  static const String _productionBaseUrl = 'https://loagmapms-hd5u.onrender.com';
 
-  /// Production base URL (change to your real domain).
-  static const String _productionBaseUrl =
-      'https://loagmapms-hd5u.onrender.com';
+  /// Pass --dart-define=USE_LOCAL=true to hit local server during dev.
+  /// Default is production.
+  static const bool _useLocal = bool.fromEnvironment('USE_LOCAL', defaultValue: true);
+  static const String _envOverride = String.fromEnvironment('API_BASE_URL');
 
-  /// Base URL for the backend (no trailing slash).
-  ///
-  /// Priority:
-  /// 1) If `API_BASE_URL` is provided via --dart-define, it wins.
-  /// 2) Otherwise, uses production or local based on [isProduction].
-  static const String baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: isProduction ? _productionBaseUrl : _localBaseUrl,
-  );
+  static String get baseUrl =>
+      _envOverride.isNotEmpty ? _envOverride : (_useLocal ? _localBaseUrl : _productionBaseUrl);
 
   static const String _apiPrefix = '/api';
 

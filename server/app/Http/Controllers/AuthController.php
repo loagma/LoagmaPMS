@@ -57,10 +57,14 @@ class AuthController extends Controller
                 ], 404);
             }
 
-            if ($staff->is_locked) {
+            // Strict cast — PDO returns tinyint as string from some drivers
+            $isLocked = (int) $staff->is_locked;
+
+            if ($isLocked === 1) {
                 return response()->json([
-                    'success' => false,
-                    'message' => 'This account is locked. Contact your admin.',
+                    'success'  => false,
+                    'message'  => 'This account is locked. Contact your admin.',
+                    '_debug'   => ['is_locked_raw' => $staff->is_locked, 'deli_id' => $staff->deli_id],
                 ], 403);
             }
 

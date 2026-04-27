@@ -10,29 +10,26 @@ use Illuminate\Support\Facades\Log;
 class VendorProductController extends Controller
 {
     /**
-     * Get list of vendor products with pagination and search
-     * 
      * GET /api/vendor-products
-     * 
-     * @param Request $request
-     * @return JsonResponse
+     *
+     * Optional query params:
+     *   admin_vendor_id  – filter by vendor (deli_staff.admin_id)
+     *   search           – product name / product_id substring
+     *   limit / page     – pagination
      */
     public function index(Request $request): JsonResponse
     {
         try {
             $limit = (int) $request->query('limit', 10);
-            $page = (int) $request->query('page', 1);
-            $search = trim((string) $request->query('search', ''));
-            
-            // Validate limit
+            $page  = (int) $request->query('page', 1);
+            $search        = trim((string) $request->query('search', ''));
+            $adminVendorId = trim((string) $request->query('admin_vendor_id', ''));
+
             if ($limit < 1 || $limit > 100) {
                 $limit = 10;
             }
-            
-            // Calculate offset
             $offset = ($page - 1) * $limit;
-            
-            // Build query
+
             $query = DB::table('vendor_products as vp')
                 ->join('product as p', 'vp.product_id', '=', 'p.product_id')
                 ->select(
@@ -40,108 +37,122 @@ class VendorProductController extends Controller
                     'vp.admin_vendor_id',
                     'vp.product_id',
                     'p.name as product_name',
+                    'p.hsn_code',
+                    'p.gst_percent',
+                    'p.inventory_type',
+                    'p.inventory_unit_type',
                     'vp.packs',
                     'vp.default_pack_id',
                     'vp.status',
                     'vp.in_stock',
                     'vp.created_at'
                 );
-            
-            // Apply search filter (case-insensitive, multi-word AND logic)
-            if ($search !== '') {
-                $searchTerms = preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY);
 
-                if (!empty($searchTerms)) {
-                    foreach ($searchTerms as $term) {
-                        $likeTerm = '%' . addcslashes(strtolower($term), '\\%_') . '%';
-                        $query->where(function ($q) use ($likeTerm) {
-                            $q->whereRaw('LOWER(p.name) LIKE ?', [$likeTerm])
-                                ->orWhereRaw('CAST(vp.product_id AS CHAR) LIKE ?', [$likeTerm]);
-                        });
-                    }
+            // Filter by vendor when admin_vendor_id is supplied
+            if ($adminVendorId !== '') {
+                $query->where('vp.admin_vendor_id', (int) $adminVendorId);
+            }
+
+            // Multi-word AND search across product name and product_id
+            if ($search !== '') {
+                $terms = preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY);
+                foreach ($terms as $term) {
+                    $like = '%' . addcslashes(strtolower($term), '\\%_') . '%';
+                    $query->where(function ($q) use ($like) {
+                        $q->whereRaw('LOWER(p.name) LIKE ?', [$like])
+                          ->orWhereRaw('CAST(vp.product_id AS CHAR) LIKE ?', [$like]);
+                    });
                 }
             }
-            
-            // Get total count for pagination info
-            $total = $query->count();
-            
-            // Apply pagination
-            $vendorProducts = $query
-                ->orderBy('vp.id', 'desc')
-                ->limit($limit)
-                ->offset($offset)
-                ->get();
-            
-            // Format response
-            $data = $vendorProducts->map(function ($vp) {
-                // Parse packs to calculate actual in_stock status
+
+            // Fetch without pagination first to deduplicate by product_id
+            $vendorProducts = (clone $query)->orderBy('p.name')->get();
+
+            // Deduplicate: one product entry per product_id, merging packs
+            $byProductId = [];
+            foreach ($vendorProducts as $vp) {
+                $pid   = $vp->product_id;
                 $packs = json_decode($vp->packs, true) ?? [];
-                $hasStock = false;
-                
-                if (!empty($packs)) {
-                    // Handle both array format and object format
-                    $packsArray = is_array($packs) && !isset($packs[0]) 
-                        ? array_values($packs) // Convert object to array
-                        : $packs;
-                    
-                    foreach ($packsArray as $pack) {
-                        if (is_array($pack) && isset($pack['stk']) && $pack['stk'] > 0) {
-                            $hasStock = true;
-                            break;
-                        }
-                    }
+
+                // Normalise object-keyed map → array
+                $packsArray = (is_array($packs) && !isset($packs[0]))
+                    ? array_values($packs)
+                    : $packs;
+
+                $reshapedPacks = [];
+                foreach ($packsArray as $pack) {
+                    if (!is_array($pack)) continue;
+                    $inStk = isset($pack['in_stk']) ? (int) $pack['in_stk'] : 1;
+                    if ($inStk === 0) continue;
+                    $packId = trim((string) ($pack['pi'] ?? ''));
+                    if ($packId === '') continue;
+                    $reshapedPacks[$packId] = [
+                        'id'           => $packId,
+                        'description'  => trim((string) ($pack['ps'] ?? $packId)),
+                        'unit'         => trim((string) ($pack['pu'] ?? '')),
+                        'market_price' => isset($pack['op']) ? (float) $pack['op'] : null,
+                    ];
                 }
-                
-                return [
-                    'id' => $vp->id,
-                    'admin_vendor_id' => $vp->admin_vendor_id,
-                    'product_id' => $vp->product_id,
-                    'product_name' => $vp->product_name,
-                    'packs' => $vp->packs,
-                    'default_pack_id' => $vp->default_pack_id,
-                    'status' => $vp->status,
-                    'in_stock' => $hasStock ? '1' : '0', // Calculate based on actual pack stock
-                    'created_at' => $vp->created_at,
-                ];
-            });
-            
+
+                if (!isset($byProductId[$pid])) {
+                    $byProductId[$pid] = [
+                        'product_id'          => $pid,
+                        'name'                => $vp->product_name,
+                        'hsn_code'            => $vp->hsn_code,
+                        'gst_percent'         => $vp->gst_percent,
+                        'inventory_type'      => $vp->inventory_type,
+                        'inventory_unit_type' => $vp->inventory_unit_type,
+                        'packs'               => $reshapedPacks,
+                        'default_pack_id'     => $vp->default_pack_id,
+                        'vendor_product_id'   => $vp->id,
+                        'admin_vendor_id'     => $vp->admin_vendor_id,
+                    ];
+                } else {
+                    // Merge packs from additional vendor rows (union by pack id)
+                    $byProductId[$pid]['packs'] += $reshapedPacks;
+                }
+            }
+
+            // Re-index packs as plain arrays and apply pagination
+            $allProducts = array_values(array_map(function ($item) {
+                $item['packs'] = array_values($item['packs']);
+                return $item;
+            }, $byProductId));
+
+            $total = count($allProducts);
+            $data  = array_slice($allProducts, $offset, $limit);
+
             return response()->json([
-                'success' => true,
-                'data' => $data,
+                'success'    => true,
+                'data'       => $data,
                 'pagination' => [
-                    'total' => $total,
-                    'page' => $page,
-                    'limit' => $limit,
-                    'total_pages' => ceil($total / $limit),
+                    'total'       => $total,
+                    'page'        => $page,
+                    'limit'       => $limit,
+                    'total_pages' => (int) ceil($total / max($limit, 1)),
                 ],
             ]);
-            
+
         } catch (\Exception $e) {
             Log::error('Vendor products list failed', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch vendor products',
-                'error' => $e->getMessage()
             ], 500);
         }
     }
-    
+
     /**
-     * Get a single vendor product by ID
-     * 
      * GET /api/vendor-products/{id}
-     * 
-     * @param int $id
-     * @return JsonResponse
      */
     public function show(int $id): JsonResponse
     {
         try {
-            $vendorProduct = DB::table('vendor_products as vp')
+            $vp = DB::table('vendor_products as vp')
                 ->join('product as p', 'vp.product_id', '=', 'p.product_id')
                 ->where('vp.id', $id)
                 ->select(
@@ -149,6 +160,10 @@ class VendorProductController extends Controller
                     'vp.admin_vendor_id',
                     'vp.product_id',
                     'p.name as product_name',
+                    'p.hsn_code',
+                    'p.gst_percent',
+                    'p.inventory_type',
+                    'p.inventory_unit_type',
                     'vp.packs',
                     'vp.default_pack_id',
                     'vp.status',
@@ -156,57 +171,59 @@ class VendorProductController extends Controller
                     'vp.created_at'
                 )
                 ->first();
-            
-            if (!$vendorProduct) {
+
+            if (!$vp) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Vendor product not found'
+                    'message' => 'Vendor product not found',
                 ], 404);
             }
-            
-            // Parse packs to calculate actual in_stock status
-            $packs = json_decode($vendorProduct->packs, true) ?? [];
-            $hasStock = false;
-            
-            if (!empty($packs)) {
-                // Handle both array format and object format
-                $packsArray = is_array($packs) && !isset($packs[0]) 
-                    ? array_values($packs) // Convert object to array
-                    : $packs;
-                
-                foreach ($packsArray as $pack) {
-                    if (is_array($pack) && isset($pack['stk']) && $pack['stk'] > 0) {
-                        $hasStock = true;
-                        break;
-                    }
-                }
+
+            $packs       = json_decode($vp->packs, true) ?? [];
+            $packsArray  = (is_array($packs) && !isset($packs[0]))
+                ? array_values($packs)
+                : $packs;
+            $reshapedPacks = [];
+
+            foreach ($packsArray as $pack) {
+                if (!is_array($pack)) continue;
+                $inStk = isset($pack['in_stk']) ? (int) $pack['in_stk'] : 1;
+                if ($inStk === 0) continue;
+                $id2 = trim((string) ($pack['pi'] ?? ''));
+                if ($id2 === '') continue;
+                $reshapedPacks[] = [
+                    'id'           => $id2,
+                    'description'  => trim((string) ($pack['ps'] ?? $id2)),
+                    'unit'         => trim((string) ($pack['pu'] ?? '')),
+                    'market_price' => isset($pack['op']) ? (float) $pack['op'] : null,
+                ];
             }
-            
+
             return response()->json([
                 'success' => true,
-                'data' => [
-                    'id' => $vendorProduct->id,
-                    'admin_vendor_id' => $vendorProduct->admin_vendor_id,
-                    'product_id' => $vendorProduct->product_id,
-                    'product_name' => $vendorProduct->product_name,
-                    'packs' => $vendorProduct->packs,
-                    'default_pack_id' => $vendorProduct->default_pack_id,
-                    'status' => $vendorProduct->status,
-                    'in_stock' => $hasStock ? '1' : '0', // Calculate based on actual pack stock
-                    'created_at' => $vendorProduct->created_at,
+                'data'    => [
+                    'product_id'          => $vp->product_id,
+                    'name'                => $vp->product_name,
+                    'hsn_code'            => $vp->hsn_code,
+                    'gst_percent'         => $vp->gst_percent,
+                    'inventory_type'      => $vp->inventory_type,
+                    'inventory_unit_type' => $vp->inventory_unit_type,
+                    'packs'               => $reshapedPacks,
+                    'default_pack_id'     => $vp->default_pack_id,
+                    'vendor_product_id'   => $vp->id,
+                    'admin_vendor_id'     => $vp->admin_vendor_id,
                 ],
             ]);
-            
+
         } catch (\Exception $e) {
             Log::error('Vendor product fetch failed', [
-                'id' => $id,
-                'error' => $e->getMessage()
+                'id'    => $id,
+                'error' => $e->getMessage(),
             ]);
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch vendor product',
-                'error' => $e->getMessage()
             ], 500);
         }
     }
