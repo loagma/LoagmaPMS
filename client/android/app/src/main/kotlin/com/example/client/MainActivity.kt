@@ -1,4 +1,4 @@
-package com.example.client
+package com.loagma.pms
 
 import io.flutter.embedding.android.FlutterActivity
 

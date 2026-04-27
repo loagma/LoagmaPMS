@@ -33,7 +33,7 @@ class DashboardScreen extends StatelessWidget {
       ),
     );
     if (context.mounted && logout == true) {
-      await AuthController.setLoggedIn(false);
+      await AuthController.clearSession();
       try {
         Get.find<AuthController>().reset();
       } catch (_) {}

@@ -98,7 +98,8 @@ class SalesInvoiceListController extends GetxController {
                 : (item['doc_no']?.toString() ?? '');
             final rawTotal = item['net_total'];
             double? netTotal;
-            if (rawTotal is num) netTotal = rawTotal.toDouble();
+            if (rawTotal is int) netTotal = rawTotal.toDouble();
+            if (rawTotal is double) netTotal = rawTotal;
             if (rawTotal is String) netTotal = double.tryParse(rawTotal);
             return SalesInvoiceSummary(
               id: item['id'] ?? 0,

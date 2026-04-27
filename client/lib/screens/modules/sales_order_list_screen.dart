@@ -367,7 +367,7 @@ class _SalesOrderListScreenState extends State<SalesOrderListScreen> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_rounded),
-        label: const Text('New SO'),
+        label: const Text(''),
       ),
     );
   }

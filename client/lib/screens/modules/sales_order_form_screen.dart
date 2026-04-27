@@ -1177,6 +1177,37 @@ class _ProductPicker extends StatelessWidget {
                 decoration: _soInputDecoration(labelText: 'Product *'),
                 child: Row(
                   children: [
+                    Obx(() {
+                      final name = row.productName.value;
+                      final hasProduct = row.productId.value != null && name.isNotEmpty;
+                      final initial = hasProduct ? name.trim()[0].toUpperCase() : null;
+                      return AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 180),
+                        child: hasProduct
+                            ? Container(
+                                key: ValueKey(name),
+                                width: 32,
+                                height: 32,
+                                margin: const EdgeInsets.only(right: 8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryLighter,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: AppColors.primaryLight, width: 1),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    initial!,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.primaryDark,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : const SizedBox.shrink(key: ValueKey('empty')),
+                      );
+                    }),
                     Expanded(
                       child: Obx(() {
                         final name = row.productName.value;

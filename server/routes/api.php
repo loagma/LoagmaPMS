@@ -22,10 +22,14 @@ use App\Http\Controllers\ProductPackageController;
 use App\Http\Controllers\MasterDataController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\SalesOrderController;
 use App\Http\Controllers\SalesInvoiceController;
 
 Route::get('/health', [HealthController::class, 'index']);
+
+// Deli-staff authentication
+Route::post('/auth/login', [AuthController::class, 'login']);
 Route::get('/products', [ProductController::class, 'index']);
 Route::post('/products', [ProductController::class, 'store']);
 Route::get('/products/{id}', [ProductController::class, 'show'])->where('id', '[0-9]+');
