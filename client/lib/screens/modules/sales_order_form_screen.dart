@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/sales_order_form_controller.dart';
+import '../../models/customer_model.dart';
 import '../../models/party_result.dart';
 import '../../models/product_model.dart';
+import '../../services/customer_api_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 import 'sales_order_list_screen.dart';
@@ -80,14 +82,17 @@ class SalesOrderFormScreen extends StatelessWidget {
       backgroundColor: AppColors.background,
       floatingActionButton: Obx(() {
         if (controller.viewOnly.value || controller.isReadOnly) return const SizedBox.shrink();
-        return FloatingActionButton(
-          heroTag: 'so_add_item_fab',
-          onPressed: controller.addItem,
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          tooltip: 'Add Product',
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: const Icon(Icons.add_rounded, size: 28),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 80),
+          child: FloatingActionButton(
+            heroTag: 'so_add_item_fab',
+            onPressed: controller.addItem,
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            tooltip: 'Add Product',
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            child: const Icon(Icons.add_rounded, size: 32),
+          ),
         );
       }),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
@@ -409,6 +414,267 @@ class _SalesOrderReportView extends StatelessWidget {
   }
 }
 
+Future<void> _showCustomerDetailSheet(
+  BuildContext context,
+  int customerId,
+  SalesOrderFormController controller,
+) async {
+  await showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => _CustomerDetailSheet(
+      customerId: customerId,
+      controller: controller,
+    ),
+  );
+}
+
+class _CustomerDetailSheet extends StatefulWidget {
+  final int customerId;
+  final SalesOrderFormController controller;
+
+  const _CustomerDetailSheet({
+    required this.customerId,
+    required this.controller,
+  });
+
+  @override
+  State<_CustomerDetailSheet> createState() => _CustomerDetailSheetState();
+}
+
+class _CustomerDetailSheetState extends State<_CustomerDetailSheet> {
+  Customer? _customer;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final c = await CustomerApiService.fetchCustomerById(widget.customerId);
+    if (mounted) setState(() { _customer = c; _loading = false; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      expand: false,
+      builder: (_, scrollCtrl) => Container(
+        decoration: BoxDecoration(
+          color: theme.scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  const Text('Customer Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _customer == null
+                      ? const Center(child: Text('Unable to load customer details'))
+                      : _buildContent(scrollCtrl),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(ScrollController scrollCtrl) {
+    final c = _customer!;
+    final isEdit = !widget.controller.isReadOnly;
+
+    return ListView(
+      controller: scrollCtrl,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      children: [
+        _CustomerInfoHeader(customer: c),
+        const SizedBox(height: 16),
+        _infoSection('Contact', [
+          if (c.contactNumber?.isNotEmpty == true) _infoRow(Icons.phone, 'Phone', c.contactNumber!),
+          if (c.alternatePhone?.isNotEmpty == true) _infoRow(Icons.phone_android, 'Alternate', c.alternatePhone!),
+          if (c.email?.isNotEmpty == true) _infoRow(Icons.email_outlined, 'Email', c.email!),
+        ]),
+        if (_hasAddress(c)) ...[
+          const SizedBox(height: 12),
+          _infoSection('Address', [
+            if (c.addressLine1?.isNotEmpty == true) _infoRow(Icons.location_on_outlined, 'Address', c.addressLine1!),
+            if (c.city?.isNotEmpty == true || c.state?.isNotEmpty == true)
+              _infoRow(Icons.map_outlined, 'City / State',
+                  [c.city, c.state].where((s) => s?.isNotEmpty == true).join(', ')),
+            if (c.pincode?.isNotEmpty == true) _infoRow(Icons.pin_drop_outlined, 'Pincode', c.pincode!),
+          ]),
+        ],
+        if (c.gstNo?.isNotEmpty == true || c.panNo?.isNotEmpty == true) ...[
+          const SizedBox(height: 12),
+          _infoSection('Tax Info', [
+            if (c.gstNo?.isNotEmpty == true) _infoRow(Icons.receipt_long_outlined, 'GST No', c.gstNo!),
+            if (c.panNo?.isNotEmpty == true) _infoRow(Icons.credit_card_outlined, 'PAN No', c.panNo!),
+          ]),
+        ],
+        if (isEdit) ...[
+          const SizedBox(height: 20),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.swap_horiz_rounded),
+            label: const Text('Change Customer'),
+            onPressed: () async {
+              Navigator.of(context).pop();
+              final party = await showDialog<PartyResult>(
+                context: context,
+                builder: (_) => PartySearchDialog(
+                  title: 'Select Customer',
+                  hint: 'Search by name, phone or ID...',
+                  searchFn: widget.controller.searchCustomers,
+                ),
+              );
+              if (party != null) {
+                widget.controller.setCustomer(
+                  party.id,
+                  party.name,
+                  phone: party.phone,
+                  shopName: party.shopName,
+                );
+              }
+            },
+          ),
+        ],
+      ],
+    );
+  }
+
+  bool _hasAddress(Customer c) =>
+      c.addressLine1?.isNotEmpty == true ||
+      c.city?.isNotEmpty == true ||
+      c.state?.isNotEmpty == true ||
+      c.pincode?.isNotEmpty == true;
+
+  Widget _infoSection(String title, List<Widget> rows) {
+    if (rows.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
+        const SizedBox(height: 6),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade200),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(children: rows),
+        ),
+      ],
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: AppColors.textMuted),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 72,
+            child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+          ),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CustomerInfoHeader extends StatelessWidget {
+  final Customer customer;
+  const _CustomerInfoHeader({required this.customer});
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = _initials(customer.name.isNotEmpty ? customer.name : (customer.shopName ?? '?'));
+    final statusColor = customer.status == 'ACTIVE' ? Colors.green : Colors.orange;
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 28,
+          backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+          child: Text(initials, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.primary)),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (customer.name.isNotEmpty)
+                Text(customer.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              if (customer.shopName?.isNotEmpty == true)
+                Text(customer.shopName!, style: const TextStyle(fontSize: 13, color: AppColors.textMuted)),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Text('ID: ${customer.id}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      customer.status,
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: statusColor),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    return name.isNotEmpty ? name[0].toUpperCase() : '?';
+  }
+}
+
 class _HeaderCard extends StatelessWidget {
   final SalesOrderFormController controller;
 
@@ -517,28 +783,32 @@ class _HeaderCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 InkWell(
-                  onTap: controller.isReadOnly
-                      ? null
-                      : () async {
-                          final party = await showDialog<PartyResult>(
-                            context: context,
-                            builder: (_) => PartySearchDialog(
-                              title: 'Select Customer',
-                              hint: 'Search by name, phone or ID...',
-                              searchFn: controller.searchCustomers,
-                            ),
-                          );
-                          if (party != null) {
-                            controller.setCustomer(
-                              party.id,
-                              party.name,
-                              phone: party.phone,
-                              shopName: party.shopName,
-                            );
-                            state.didChange(party.id);
-                            state.validate();
-                          }
-                        },
+                  onTap: () async {
+                    final selectedId = controller.customerId.value;
+                    if (selectedId != null) {
+                      await _showCustomerDetailSheet(context, selectedId, controller);
+                      return;
+                    }
+                    if (controller.isReadOnly) return;
+                    final party = await showDialog<PartyResult>(
+                      context: context,
+                      builder: (_) => PartySearchDialog(
+                        title: 'Select Customer',
+                        hint: 'Search by name, phone or ID...',
+                        searchFn: controller.searchCustomers,
+                      ),
+                    );
+                    if (party != null) {
+                      controller.setCustomer(
+                        party.id,
+                        party.name,
+                        phone: party.phone,
+                        shopName: party.shopName,
+                      );
+                      state.didChange(party.id);
+                      state.validate();
+                    }
+                  },
                   child: InputDecorator(
                     decoration: _soInputDecoration(labelText: 'Customer *'),
                     child: Row(

@@ -19,7 +19,6 @@ class SalesOrderFormController extends GetxController {
   final int? soId;
   final bool startInViewOnly;
 
-  final customers = <Map<String, dynamic>>[].obs;
   final departments = <Map<String, dynamic>>[].obs;
   final products = <Map<String, dynamic>>[].obs;
   final unitTypes = <String>[].obs;
@@ -57,7 +56,6 @@ class SalesOrderFormController extends GetxController {
     viewOnly.value = startInViewOnly;
     _ensureDefaultCharges();
     _loadAdminVendorId();
-    _loadCustomers();
     _loadDepartments();
     _loadUnitTypes();
     if (soId != null) {
@@ -237,23 +235,6 @@ class SalesOrderFormController extends GetxController {
     final now = DateTime.now();
     docDate.value =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-  }
-
-  Future<void> _loadCustomers() async {
-    try {
-      final list = await CustomerApiService.fetchCustomers(limit: 500);
-      customers.value = list
-          .map((c) => {
-                'id': c.id,
-                'name': c.name,
-                'phone': c.contactNumber ?? '',
-                'shop_name': c.shopName ?? '',
-                'display_name': c.displayName,
-              })
-          .toList();
-    } catch (e) {
-      debugPrint('[SO FORM] Load customers error: $e');
-    }
   }
 
   String get customerDisplayTitle =>

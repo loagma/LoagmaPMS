@@ -145,9 +145,11 @@ Route::post('/product-packages', [ProductPackageController::class, 'store']);
 Route::get('/product-packages/{id}', [ProductPackageController::class, 'show'])->where('id', '[0-9]+');
 Route::put('/product-packages/{id}', [ProductPackageController::class, 'update'])->where('id', '[0-9]+');
 
-// Sales Order routes (reads from legacy loagma_new.orders table)
+// Sales Order routes
 Route::get('/sales-orders', [SalesOrderController::class, 'index']);
+Route::post('/sales-orders', [SalesOrderController::class, 'store']);
 Route::get('/sales-orders/{id}', [SalesOrderController::class, 'show'])->where('id', '[0-9]+');
+Route::put('/sales-orders/{id}', [SalesOrderController::class, 'update'])->where('id', '[0-9]+');
 
 // Sales Invoice routes
 Route::get('/sales-invoices/series', [SalesInvoiceController::class, 'series']);

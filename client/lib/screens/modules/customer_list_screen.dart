@@ -5,6 +5,7 @@ import '../../controllers/customer_list_controller.dart';
 import '../../models/customer_model.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
+import 'customer_detail_screen.dart';
 import 'customer_form_screen.dart';
 
 class CustomerListScreen extends StatelessWidget {
@@ -153,7 +154,7 @@ class CustomerListScreen extends StatelessWidget {
                         statusColor: controller.statusColor(customer.status),
                         onTap: () async {
                           final result = await Get.to(
-                            () => CustomerFormScreen(customerId: customer.id),
+                            () => CustomerDetailScreen(customer: customer),
                           );
                           if (result == true) controller.refresh();
                         },

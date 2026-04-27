@@ -110,6 +110,22 @@ class PurchaseVoucherScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      floatingActionButton: Obx(() {
+        if (controller.isReportMode) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 80),
+          child: FloatingActionButton(
+            heroTag: 'pv_add_item_fab',
+            onPressed: controller.addItemRow,
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            tooltip: 'Add Product',
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: const Icon(Icons.add_rounded, size: 28),
+          ),
+        );
+      }),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       appBar: ModuleAppBar(
         title: controller.isEditMode ? 'Purchase Voucher' : 'Purchase Voucher',
         subtitle: 'Record purchase invoice',
@@ -1215,25 +1231,6 @@ class _ItemsCard extends StatelessWidget {
                   );
                 },
               ),
-            const SizedBox(height: 4),
-            Align(
-              alignment: Alignment.topRight,
-              child: OutlinedButton.icon(
-                onPressed: () => controller.addItemRow(),
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Add Product'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  side: const BorderSide(color: AppColors.primary, width: 1.2),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
-            ),
           ],
         );
       }),
