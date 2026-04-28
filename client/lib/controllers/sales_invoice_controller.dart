@@ -661,38 +661,16 @@ class SalesInvoiceController extends GetxController {
 
   Future<void> _loadProducts() async {
     try {
-      final response = await http
-          .get(Uri.parse('${ApiConfig.products}?limit=50'), headers: {'Accept': 'application/json'})
-          .timeout(const Duration(seconds: 30));
-      if (response.statusCode == 200) {
-        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-        if (decoded['success'] == true) {
-          final List data = decoded['data'] ?? [];
-          products.value = data.map((e) => Product.fromJson(e as Map<String, dynamic>)).toList();
-        }
-      }
+      products.value = await _fetchProductsWithFallback();
     } catch (e) {
       debugPrint('[SALES_INVOICE] Products error: $e');
     }
   }
 
   Future<void> loadProductsForCustomer({String? search, bool? includeAll}) async {
-    // For sales, always use generic products list (no customer-specific products endpoint)
+    // Use vendor-products for SO/SI parity (supports keyword-aware backend search).
     try {
-      final base = ApiConfig.products;
-      final uri = search != null && search.trim().isNotEmpty
-          ? Uri.parse(base).replace(queryParameters: {'limit': '50', 'search': search.trim()})
-          : Uri.parse('$base?limit=50');
-      final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
-          .timeout(const Duration(seconds: 30));
-      if (response.statusCode == 200) {
-        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-        if (decoded['success'] == true) {
-          final List data = decoded['data'] ?? [];
-          products.value = data.map((e) => Product.fromJson(e as Map<String, dynamic>)).toList();
-        }
-      }
+      products.value = await _fetchProductsWithFallback(search: search);
     } catch (e) {
       debugPrint('[SALES_INVOICE] Products error: $e');
     }
@@ -701,8 +679,70 @@ class SalesInvoiceController extends GetxController {
   Future<void> searchProducts(String query) => loadProductsForCustomer(search: query);
 
   Future<List<Product>> searchProductsAsModels(String query) async {
-    await loadProductsForCustomer(search: query.isEmpty ? null : query);
-    return List<Product>.from(products);
+    try {
+      return await _fetchProductsWithFallback(search: query);
+    } catch (e) {
+      debugPrint('[SALES_INVOICE] searchProductsAsModels error: $e');
+      return [];
+    }
+  }
+
+  Future<List<Product>> _fetchProductsWithFallback({String? search}) async {
+    final primary = await _fetchProductsFromEndpoint(
+      base: ApiConfig.vendorProducts,
+      search: search,
+      sourceTag: 'vendor-products',
+    );
+    if (primary != null) return primary;
+
+    final fallback = await _fetchProductsFromEndpoint(
+      base: ApiConfig.products,
+      search: search,
+      sourceTag: 'products-fallback',
+    );
+    return fallback ?? <Product>[];
+  }
+
+  Future<List<Product>?> _fetchProductsFromEndpoint({
+    required String base,
+    required String sourceTag,
+    String? search,
+  }) async {
+    try {
+      final uri = search != null && search.trim().isNotEmpty
+          ? Uri.parse(base).replace(queryParameters: {'limit': '50', 'search': search.trim()})
+          : Uri.parse('$base?limit=50');
+      final response = await http
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 30));
+      if (response.statusCode != 200) return <Product>[];
+
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      if (decoded['success'] != true) return <Product>[];
+
+      final raw = decoded['data'];
+      if (raw is! List) return <Product>[];
+
+      final parsed = <Product>[];
+      for (final item in raw) {
+        try {
+          if (item is Map<String, dynamic>) {
+            parsed.add(Product.fromJson(item));
+          } else if (item is Map) {
+            parsed.add(Product.fromJson(Map<String, dynamic>.from(item)));
+          }
+        } catch (_) {
+          // Skip invalid product rows so one bad record does not break search.
+        }
+      }
+      return parsed;
+    } on FormatException catch (e) {
+      debugPrint('[SALES_INVOICE] $sourceTag decode error: $e');
+      return null;
+    } catch (e) {
+      debugPrint('[SALES_INVOICE] $sourceTag fetch error: $e');
+      return <Product>[];
+    }
   }
 
   Future<void> _loadNextDocNoNumberForNew() async {

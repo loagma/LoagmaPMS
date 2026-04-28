@@ -53,13 +53,14 @@ class VendorProductController extends Controller
                 $query->where('vp.admin_vendor_id', (int) $adminVendorId);
             }
 
-            // Multi-word AND search across product name and product_id
+            // Multi-word AND search across product name, keywords, and product_id
             if ($search !== '') {
                 $terms = preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY);
                 foreach ($terms as $term) {
                     $like = '%' . addcslashes(strtolower($term), '\\%_') . '%';
                     $query->where(function ($q) use ($like) {
                         $q->whereRaw('LOWER(p.name) LIKE ?', [$like])
+                          ->orWhereRaw('LOWER(p.keywords) LIKE ?', [$like])
                           ->orWhereRaw('CAST(vp.product_id AS CHAR) LIKE ?', [$like]);
                     });
                 }
@@ -86,10 +87,16 @@ class VendorProductController extends Controller
                     if ($inStk === 0) continue;
                     $packId = trim((string) ($pack['pi'] ?? ''));
                     if ($packId === '') continue;
+                    $desc = trim((string) ($pack['ps'] ?? $packId));
+                    $unit = trim((string) ($pack['pu'] ?? ''));
+                    // Strip non-UTF-8 bytes so json_encode never fails on these strings
+                    $desc = mb_convert_encoding($desc, 'UTF-8', 'UTF-8');
+                    $unit = mb_convert_encoding($unit, 'UTF-8', 'UTF-8');
+                    $packId = mb_convert_encoding($packId, 'UTF-8', 'UTF-8');
                     $reshapedPacks[$packId] = [
                         'id'           => $packId,
-                        'description'  => trim((string) ($pack['ps'] ?? $packId)),
-                        'unit'         => trim((string) ($pack['pu'] ?? '')),
+                        'description'  => $desc,
+                        'unit'         => $unit,
                         'market_price' => isset($pack['op']) ? (float) $pack['op'] : null,
                     ];
                 }
@@ -97,7 +104,7 @@ class VendorProductController extends Controller
                 if (!isset($byProductId[$pid])) {
                     $byProductId[$pid] = [
                         'product_id'          => $pid,
-                        'name'                => $vp->product_name,
+                        'name'                => mb_convert_encoding(trim((string) $vp->product_name), 'UTF-8', 'UTF-8'),
                         'hsn_code'            => $vp->hsn_code,
                         'gst_percent'         => $vp->gst_percent,
                         'inventory_type'      => $vp->inventory_type,
@@ -131,7 +138,7 @@ class VendorProductController extends Controller
                     'limit'       => $limit,
                     'total_pages' => (int) ceil($total / max($limit, 1)),
                 ],
-            ]);
+            ], 200, [], JSON_UNESCAPED_UNICODE);
 
         } catch (\Exception $e) {
             Log::error('Vendor products list failed', [

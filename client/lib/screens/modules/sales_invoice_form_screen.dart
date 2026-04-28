@@ -985,6 +985,7 @@ class _ProductPickerField extends StatelessWidget {
                   : () async {
                       final selections = await showDialog<List<ProductSelection>>(
                         context: context,
+                        useRootNavigator: true,
                         builder: (ctx) => ProductSearchDialog(
                           title: 'Select Products',
                           searchFn: controller.searchProductsAsModels,

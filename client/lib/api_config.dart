@@ -6,7 +6,7 @@ class ApiConfig {
   ApiConfig._();
 
 //   static const String _localBaseUrl = 'http://192.168.1.4:8000';
-  static const String _localBaseUrl = 'http://10.112.146.228:8000';
+  static const String _localBaseUrl = 'http://10.0.2.2:8000';
   static const String _productionBaseUrl = 'https://loagmapms-hd5u.onrender.com';
 
   /// Pass --dart-define=USE_LOCAL=true to hit local server during dev.
