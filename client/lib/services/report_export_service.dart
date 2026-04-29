@@ -496,165 +496,181 @@ class ReportExportService {
     final pdf = pw.Document();
     final theme = await _pdfTheme();
     final docNo = '${c.docNoPrefix.value}${c.docNoNumber.value}'.trim();
+    final linkedSo = c.linkedSoNumbers.join(', ');
 
-    final rows = c.items.map((row) {
-      final qty = double.tryParse(row.quantity.value) ?? 0;
-      final rate = double.tryParse(row.unitPrice.value) ?? 0;
-      final taxable = double.tryParse(row.taxableAmount.value) ?? (qty * rate);
-      final sgst = double.tryParse(row.sgst.value) ?? 0;
-      final cgst = double.tryParse(row.cgst.value) ?? 0;
-      final igst = double.tryParse(row.igst.value) ?? 0;
-      final cess = double.tryParse(row.cess.value) ?? 0;
-      final roff = double.tryParse(row.roff.value) ?? 0;
-      final total = double.tryParse(row.value.value) ?? (taxable + sgst + cgst + igst + cess + roff);
+    // Per-line detailed rows
+    final itemRows = c.items.map((row) {
+      final qty    = double.tryParse(row.quantity.value)     ?? 0;
+      final rate   = double.tryParse(row.unitPrice.value)    ?? 0;
+      final taxable= double.tryParse(row.taxableAmount.value)?? (qty * rate);
+      final sgst   = double.tryParse(row.sgst.value)         ?? 0;
+      final cgst   = double.tryParse(row.cgst.value)         ?? 0;
+      final igst   = double.tryParse(row.igst.value)         ?? 0;
+      final cess   = double.tryParse(row.cess.value)         ?? 0;
+      final roff   = double.tryParse(row.roff.value)         ?? 0;
+      final total  = double.tryParse(row.value.value)        ?? (taxable + sgst + cgst + igst + cess + roff);
+
+      // Pack info
+      final packLabel = row.selectedPackLabel.value.trim();
+      final productDisplay = row.productName.value.trim().isEmpty ? '-' : row.productName.value.trim();
+      final packDisplay = packLabel.isNotEmpty ? packLabel : row.unitType.value;
+
+      // SO reference
+      final soRef = row.sourceSoNumber.value.trim().isEmpty ? '-' : row.sourceSoNumber.value.trim();
+
+      // Quantities
+      final ordQty   = double.tryParse(row.orderedQty.value) ?? 0;
+      final usedQty  = double.tryParse(row.usedQty.value)    ?? 0;
+      final leftQty  = double.tryParse(row.leftQty.value)    ?? 0;
+      final woQty    = double.tryParse(row.writeoffQty.value)?? 0;
+      final overQty  = double.tryParse(row.overrunQty.value) ?? 0;
+
       return <String>[
-        row.productName.value.trim().isEmpty ? '-' : row.productName.value.trim(),
+        productDisplay,
         row.hsnCode.value.trim().isEmpty ? '-' : row.hsnCode.value.trim(),
-        row.unitType.value,
+        packDisplay,
         qty.toStringAsFixed(2),
         rate.toStringAsFixed(2),
         taxable.toStringAsFixed(2),
-        sgst.toStringAsFixed(2),
-        cgst.toStringAsFixed(2),
-        igst.toStringAsFixed(2),
-        cess.toStringAsFixed(2),
-        roff.toStringAsFixed(2),
+        sgst > 0 ? '${(sgst*100/taxable).toStringAsFixed(1)}%\n${sgst.toStringAsFixed(2)}' : '-',
+        cgst > 0 ? '${(cgst*100/taxable).toStringAsFixed(1)}%\n${cgst.toStringAsFixed(2)}' : '-',
+        igst > 0 ? '${(igst*100/taxable).toStringAsFixed(1)}%\n${igst.toStringAsFixed(2)}' : '-',
+        cess > 0 ? cess.toStringAsFixed(2) : '-',
+        roff > 0 ? roff.toStringAsFixed(2) : '-',
         total.toStringAsFixed(2),
+        soRef,
+        ordQty > 0 ? ordQty.toStringAsFixed(1) : '-',
+        usedQty > 0 ? usedQty.toStringAsFixed(1) : '-',
+        leftQty > 0 ? leftQty.toStringAsFixed(1) : '-',
+        woQty  > 0 ? woQty.toStringAsFixed(1) : '-',
+        overQty> 0 ? overQty.toStringAsFixed(1): '-',
       ];
     }).toList();
 
-    // Tax summary totals
-    double totalSgst = 0, totalCgst = 0, totalIgst = 0, totalCess = 0, totalRoff = 0, grandTotal = 0;
+    // Totals
+    double totalTaxable=0, totalSgst=0, totalCgst=0, totalIgst=0, totalCess=0, totalRoff=0, netTotal=0;
     for (final row in c.items) {
-      totalSgst += double.tryParse(row.sgst.value) ?? 0;
-      totalCgst += double.tryParse(row.cgst.value) ?? 0;
-      totalIgst += double.tryParse(row.igst.value) ?? 0;
-      totalCess += double.tryParse(row.cess.value) ?? 0;
-      totalRoff += double.tryParse(row.roff.value) ?? 0;
-      grandTotal += double.tryParse(row.value.value) ?? 0;
+      totalTaxable += double.tryParse(row.taxableAmount.value) ?? 0;
+      totalSgst    += double.tryParse(row.sgst.value) ?? 0;
+      totalCgst    += double.tryParse(row.cgst.value) ?? 0;
+      totalIgst    += double.tryParse(row.igst.value) ?? 0;
+      totalCess    += double.tryParse(row.cess.value) ?? 0;
+      totalRoff    += double.tryParse(row.roff.value) ?? 0;
+      netTotal     += double.tryParse(row.value.value)?? 0;
     }
+    double chargesNet = 0;
     for (final ch in c.charges) {
       final amt = double.tryParse(ch.amount.value) ?? 0;
-      grandTotal += ch.name.value.toLowerCase().contains('discount') ? -amt : amt;
+      chargesNet += ch.name.value.toLowerCase().contains('discount') ? -amt : amt;
     }
-
-    final linkedSo = c.linkedSoNumbers.join(', ');
+    final grandTotal = netTotal + chargesNet;
 
     pdf.addPage(pw.MultiPage(
       theme: theme,
       pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.symmetric(horizontal: 28, vertical: 28),
+      margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       build: (ctx) => [
-        // Title row
+        // ── Header banner ──
         pw.Container(
-          decoration: const pw.BoxDecoration(
-            color: PdfColors.grey800,
-            borderRadius: pw.BorderRadius.all(pw.Radius.circular(4)),
-          ),
+          decoration: const pw.BoxDecoration(color: PdfColors.grey800, borderRadius: pw.BorderRadius.all(pw.Radius.circular(4))),
           padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text('TAX INVOICE',
-                  style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
-              pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-                pw.Text('No: ${docNo.isEmpty ? '-' : docNo}',
-                    style: pw.TextStyle(fontSize: 10, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
-                pw.Text('Date: ${_normalizeDate(c.docDate.value)}',
-                    style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey200)),
-                pw.Text('Status: ${c.status.value}',
-                    style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey200)),
-              ]),
-            ],
-          ),
+          child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              pw.Text('TAX INVOICE', style: pw.TextStyle(fontSize: 17, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+              pw.Text('Sales Invoice', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey300)),
+            ]),
+            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+              pw.Text(docNo.isEmpty ? '-' : docNo, style: pw.TextStyle(fontSize: 12, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
+              pw.Text(_normalizeDate(c.docDate.value), style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey200)),
+              pw.Text(c.status.value, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey200)),
+            ]),
+          ]),
         ),
         pw.SizedBox(height: 10),
 
-        // Billed To / Bill Details
+        // ── Billed To | Invoice Details ──
         pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-          pw.Expanded(
-            child: pw.Container(
-              padding: const pw.EdgeInsets.all(8),
-              decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400), borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3))),
-              child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                pw.Text('Billed To', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.grey600)),
-                pw.SizedBox(height: 3),
-                pw.Text(c.customerName.value.trim().isEmpty ? '-' : c.customerName.value.trim(),
-                    style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-                if (c.customerShopName.value.trim().isNotEmpty)
-                  pw.Text(c.customerShopName.value.trim(), style: const pw.TextStyle(fontSize: 9)),
-                if (c.customerPhone.value.trim().isNotEmpty)
-                  pw.Text('Ph: ${c.customerPhone.value.trim()}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
-              ]),
-            ),
-          ),
-          pw.SizedBox(width: 10),
-          pw.Expanded(
-            child: pw.Container(
-              padding: const pw.EdgeInsets.all(8),
-              decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400), borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3))),
-              child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                pw.Text('Invoice Details', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.grey600)),
-                pw.SizedBox(height: 3),
-                if (c.billNo.value.trim().isNotEmpty) _kv('Bill No', c.billNo.value.trim()),
-                if (c.billDate.value.trim().isNotEmpty) _kv('Bill Date', _normalizeDate(c.billDate.value)),
-                _kv('Sale Type', c.saleType.value.trim().isEmpty ? '-' : c.saleType.value.trim()),
-                if (linkedSo.isNotEmpty) _kv('Linked SO', linkedSo),
-              ]),
-            ),
-          ),
+          pw.Expanded(child: _infoBox('BILLED TO', [
+            pw.Text(c.customerName.value.trim().isEmpty ? '-' : c.customerName.value.trim(),
+                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+            if (c.customerShopName.value.trim().isNotEmpty)
+              pw.Text(c.customerShopName.value.trim(), style: const pw.TextStyle(fontSize: 9)),
+            if (c.customerPhone.value.trim().isNotEmpty)
+              pw.Text('Ph: ${c.customerPhone.value.trim()}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+          ])),
+          pw.SizedBox(width: 8),
+          pw.Expanded(child: _infoBox('INVOICE DETAILS', [
+            if (c.billNo.value.trim().isNotEmpty)    _kvSmall('Bill No',     c.billNo.value.trim()),
+            if (c.billDate.value.trim().isNotEmpty)  _kvSmall('Bill Date',   _normalizeDate(c.billDate.value)),
+                                                     _kvSmall('Sale Type',   c.saleType.value.trim().isEmpty ? '-' : c.saleType.value.trim()),
+            if (c.narration.value.trim().isNotEmpty) _kvSmall('Narration',   c.narration.value.trim()),
+            if (linkedSo.isNotEmpty)                 _kvSmall('Linked SO',   linkedSo),
+            if (c.doNotUpdateInventory.value)        _kvSmall('Inventory',   'Not Updated'),
+          ])),
         ]),
         pw.SizedBox(height: 10),
 
-        // Items table
-        pw.Text('Items', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+        // ── Items ──
+        _sectionTitle('ITEM DETAILS'),
         pw.SizedBox(height: 4),
         pw.TableHelper.fromTextArray(
-          headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7),
-          cellStyle: const pw.TextStyle(fontSize: 7),
+          headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6),
+          cellStyle: const pw.TextStyle(fontSize: 6),
           headerDecoration: const pw.BoxDecoration(color: PdfColors.grey200),
           cellAlignment: pw.Alignment.centerLeft,
           columnWidths: {
-            0: const pw.FlexColumnWidth(3),
-            1: const pw.FlexColumnWidth(1.2),
-            2: const pw.FlexColumnWidth(1),
-            3: const pw.FlexColumnWidth(1),
-            4: const pw.FlexColumnWidth(1.2),
-            5: const pw.FlexColumnWidth(1.5),
+            0: const pw.FlexColumnWidth(2.8),
+            1: const pw.FlexColumnWidth(1.1),
+            2: const pw.FlexColumnWidth(1.1),
+            3: const pw.FlexColumnWidth(0.9),
+            4: const pw.FlexColumnWidth(1.1),
+            5: const pw.FlexColumnWidth(1.3),
             6: const pw.FlexColumnWidth(1.2),
             7: const pw.FlexColumnWidth(1.2),
             8: const pw.FlexColumnWidth(1.2),
-            9: const pw.FlexColumnWidth(1),
-            10: const pw.FlexColumnWidth(1),
-            11: const pw.FlexColumnWidth(1.5),
+            9: const pw.FlexColumnWidth(0.8),
+            10: const pw.FlexColumnWidth(0.8),
+            11: const pw.FlexColumnWidth(1.3),
+            12: const pw.FlexColumnWidth(1.1),
+            13: const pw.FlexColumnWidth(0.9),
+            14: const pw.FlexColumnWidth(0.9),
+            15: const pw.FlexColumnWidth(0.9),
+            16: const pw.FlexColumnWidth(0.8),
+            17: const pw.FlexColumnWidth(0.8),
           },
-          headers: const ['Product', 'HSN', 'Unit', 'Qty', 'Rate', 'Taxable', 'SGST', 'CGST', 'IGST', 'CESS', 'ROFF', 'Total'],
-          data: rows,
+          headers: const [
+            'Product', 'HSN', 'Pack/Unit', 'Qty', 'Rate',
+            'Taxable', 'SGST', 'CGST', 'IGST', 'CESS', 'ROFF', 'Line Total',
+            'Ref SO', 'Ord Qty', 'Used', 'Left', 'W/O', 'Over',
+          ],
+          data: itemRows,
         ),
-        pw.SizedBox(height: 8),
+        pw.SizedBox(height: 10),
 
-        // Charges + Tax summary aligned right
+        // ── Charges + Tax summary ──
         pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
           pw.Expanded(
-            child: c.charges.isEmpty ? pw.SizedBox() : pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text('Charges', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 4),
-                ...c.charges.map((ch) {
-                  final amt = double.tryParse(ch.amount.value) ?? 0;
-                  final isDisc = ch.name.value.toLowerCase().contains('discount');
-                  return pw.Row(children: [
-                    pw.Expanded(child: pw.Text(ch.name.value, style: const pw.TextStyle(fontSize: 9))),
-                    pw.Text('${isDisc ? '-' : ''}${amt.toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 9)),
-                  ]);
-                }),
-              ],
-            ),
+            child: c.charges.isEmpty
+                ? pw.SizedBox()
+                : _infoBox('CHARGES', c.charges.map((ch) {
+                    final amt = double.tryParse(ch.amount.value) ?? 0;
+                    final isDisc = ch.name.value.toLowerCase().contains('discount');
+                    final rem = ch.remarks.value.trim();
+                    return pw.Padding(
+                      padding: const pw.EdgeInsets.only(bottom: 3),
+                      child: pw.Row(children: [
+                        pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                          pw.Text(ch.name.value, style: const pw.TextStyle(fontSize: 9)),
+                          if (rem.isNotEmpty) pw.Text(rem, style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600)),
+                        ])),
+                        pw.Text('${isDisc ? '-' : ''}${amt.toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 9)),
+                      ]),
+                    );
+                  }).toList()),
           ),
-          pw.SizedBox(width: 10),
+          pw.SizedBox(width: 8),
           pw.Container(
-            width: 200,
+            width: 210,
             padding: const pw.EdgeInsets.all(8),
             decoration: pw.BoxDecoration(
               color: PdfColors.grey100,
@@ -662,25 +678,21 @@ class ReportExportService {
               borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
             ),
             child: pw.Column(children: [
-              if (totalSgst > 0) _kvRight('SGST', totalSgst.toStringAsFixed(2)),
-              if (totalCgst > 0) _kvRight('CGST', totalCgst.toStringAsFixed(2)),
-              if (totalIgst > 0) _kvRight('IGST', totalIgst.toStringAsFixed(2)),
-              if (totalCess > 0) _kvRight('CESS', totalCess.toStringAsFixed(2)),
-              if (totalRoff > 0) _kvRight('ROFF', totalRoff.toStringAsFixed(2)),
+              _kvRight('Taxable Amount', totalTaxable.toStringAsFixed(2)),
+              if (totalSgst > 0) _kvRight('SGST',  totalSgst.toStringAsFixed(2)),
+              if (totalCgst > 0) _kvRight('CGST',  totalCgst.toStringAsFixed(2)),
+              if (totalIgst > 0) _kvRight('IGST',  totalIgst.toStringAsFixed(2)),
+              if (totalCess > 0) _kvRight('CESS',  totalCess.toStringAsFixed(2)),
+              if (totalRoff > 0) _kvRight('ROFF',  totalRoff.toStringAsFixed(2)),
+              if (chargesNet != 0) _kvRight('Charges / Disc', chargesNet.toStringAsFixed(2)),
               pw.Divider(color: PdfColors.grey400),
               pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-                pw.Text('Net Total', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                pw.Text(grandTotal.toStringAsFixed(2),
-                    style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                pw.Text('NET TOTAL', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                pw.Text(grandTotal.toStringAsFixed(2), style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
               ]),
             ]),
           ),
         ]),
-
-        if (c.narration.value.trim().isNotEmpty) ...[
-          pw.SizedBox(height: 8),
-          pw.Text('Narration: ${c.narration.value.trim()}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
-        ],
       ],
     ));
     return pdf.save();
@@ -710,100 +722,141 @@ class ReportExportService {
         ? (c.currentSoSeq.value?.toString() ?? '-')
         : c.currentSoNumber.value.trim();
 
-    final rows = c.items.map((row) {
-      final qty = double.tryParse(row.quantity.value) ?? 0;
-      final price = double.tryParse(row.price.value) ?? 0;
-      final disc = double.tryParse(row.discountPercent.value) ?? 0;
+    final itemRows = c.items.where((r) => r.productId.value != null).map((row) {
+      final qty      = double.tryParse(row.quantity.value) ?? 0;
+      final used     = double.tryParse(row.usedQty.value)  ?? 0;
+      final wo       = double.tryParse(row.writeoffQty.value) ?? 0;
+      final left     = double.tryParse(row.leftQty.value)  ?? 0;
+      final price    = double.tryParse(row.price.value)    ?? 0;
+      final disc     = double.tryParse(row.discountPercent.value) ?? 0;
+      final packLabel= row.selectedPackLabel.value.trim();
+      final unitDisp = packLabel.isNotEmpty ? packLabel : row.unit.value;
+
+      // Tax breakdown from taxFieldValues
+      final taxParts = row.taxFieldValues.entries
+          .where((e) => (double.tryParse(e.value) ?? 0) > 0)
+          .map((e) => '${e.key} ${e.value}%')
+          .join(', ');
+
       return <String>[
         row.productName.value.trim().isEmpty ? '-' : row.productName.value.trim(),
         row.hsnCode.value.trim().isEmpty ? '-' : row.hsnCode.value.trim(),
-        row.unit.value,
+        unitDisp,
         qty.toStringAsFixed(2),
+        used > 0 ? used.toStringAsFixed(1) : '-',
+        wo   > 0 ? wo.toStringAsFixed(1)   : '-',
+        left > 0 ? left.toStringAsFixed(1) : '-',
         price.toStringAsFixed(2),
         disc > 0 ? '${disc.toStringAsFixed(1)}%' : '-',
-        row.taxPercent.value.trim().isEmpty ? '-' : '${row.taxPercent.value}%',
+        taxParts.isEmpty ? (row.taxPercent.value.trim().isEmpty ? '-' : '${row.taxPercent.value}%') : taxParts,
+        row.priceInclTax.toStringAsFixed(2),
+        row.lineTotalExclTax.toStringAsFixed(2),
         row.lineTotal.toStringAsFixed(2),
+        row.description.value.trim().isEmpty ? '-' : row.description.value.trim(),
       ];
     }).toList();
 
     pdf.addPage(pw.MultiPage(
       theme: theme,
       pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.symmetric(horizontal: 28, vertical: 28),
+      margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       build: (ctx) => [
+        // ── Header banner ──
         pw.Container(
-          decoration: const pw.BoxDecoration(
-            color: PdfColors.grey800,
-            borderRadius: pw.BorderRadius.all(pw.Radius.circular(4)),
-          ),
+          decoration: const pw.BoxDecoration(color: PdfColors.grey800, borderRadius: pw.BorderRadius.all(pw.Radius.circular(4))),
           padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-            pw.Text('SALES ORDER',
-                style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              pw.Text('SALES ORDER', style: pw.TextStyle(fontSize: 17, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+              pw.Text('Order Confirmation', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey300)),
+            ]),
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-              pw.Text('No: $soNo',
-                  style: pw.TextStyle(fontSize: 10, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
-              pw.Text('Date: ${_normalizeDate(c.docDate.value)}',
-                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey200)),
-              pw.Text('Status: ${c.status.value}',
-                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey200)),
+              pw.Text(soNo, style: pw.TextStyle(fontSize: 12, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
+              pw.Text(_normalizeDate(c.docDate.value), style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey200)),
+              pw.Text(c.status.value, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey200)),
             ]),
           ]),
         ),
         pw.SizedBox(height: 10),
 
+        // ── Customer | Order Details ──
         pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-          pw.Expanded(
-            child: pw.Container(
-              padding: const pw.EdgeInsets.all(8),
-              decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400), borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3))),
-              child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                pw.Text('Customer', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.grey600)),
-                pw.SizedBox(height: 3),
-                pw.Text(c.customerName.value.trim().isEmpty ? '-' : c.customerName.value.trim(),
-                    style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-                if (c.customerShopName.value.trim().isNotEmpty)
-                  pw.Text(c.customerShopName.value.trim(), style: const pw.TextStyle(fontSize: 9)),
-                if (c.customerPhone.value.trim().isNotEmpty)
-                  pw.Text('Ph: ${c.customerPhone.value.trim()}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
-              ]),
-            ),
-          ),
-          pw.SizedBox(width: 10),
-          pw.Expanded(
-            child: pw.Container(
-              padding: const pw.EdgeInsets.all(8),
-              decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400), borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3))),
-              child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                pw.Text('Order Details', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.grey600)),
-                pw.SizedBox(height: 3),
-                _kv('Financial Year', c.financialYear.value),
-                if (c.expectedDate.value.trim().isNotEmpty)
-                  _kv('Expected Date', _normalizeDate(c.expectedDate.value)),
-                if (c.narration.value.trim().isNotEmpty)
-                  _kv('Narration', c.narration.value.trim()),
-              ]),
-            ),
-          ),
+          pw.Expanded(child: _infoBox('CUSTOMER', [
+            pw.Text(c.customerName.value.trim().isEmpty ? '-' : c.customerName.value.trim(),
+                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+            if (c.customerShopName.value.trim().isNotEmpty)
+              pw.Text(c.customerShopName.value.trim(), style: const pw.TextStyle(fontSize: 9)),
+            if (c.customerPhone.value.trim().isNotEmpty)
+              pw.Text('Ph: ${c.customerPhone.value.trim()}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+          ])),
+          pw.SizedBox(width: 8),
+          pw.Expanded(child: _infoBox('ORDER DETAILS', [
+                                                   _kvSmall('Financial Year', c.financialYear.value),
+            if (c.expectedDate.value.trim().isNotEmpty) _kvSmall('Expected Date', _normalizeDate(c.expectedDate.value)),
+            if (c.departmentId.value != null && c.departmentId.value!.trim().isNotEmpty)
+                                                   _kvSmall('Department',    c.departmentId.value!.trim()),
+            if (c.narration.value.trim().isNotEmpty) _kvSmall('Narration',    c.narration.value.trim()),
+          ])),
         ]),
         pw.SizedBox(height: 10),
 
-        pw.Text('Items', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+        // ── Items ──
+        _sectionTitle('ITEM DETAILS'),
         pw.SizedBox(height: 4),
         pw.TableHelper.fromTextArray(
-          headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8),
-          cellStyle: const pw.TextStyle(fontSize: 8),
+          headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6),
+          cellStyle: const pw.TextStyle(fontSize: 6),
           headerDecoration: const pw.BoxDecoration(color: PdfColors.grey200),
           cellAlignment: pw.Alignment.centerLeft,
-          headers: const ['Product', 'HSN', 'Unit', 'Qty', 'Rate', 'Disc%', 'Tax%', 'Total'],
-          data: rows,
+          columnWidths: {
+            0: const pw.FlexColumnWidth(2.8),
+            1: const pw.FlexColumnWidth(1.1),
+            2: const pw.FlexColumnWidth(1.1),
+            3: const pw.FlexColumnWidth(0.9),
+            4: const pw.FlexColumnWidth(0.9),
+            5: const pw.FlexColumnWidth(0.8),
+            6: const pw.FlexColumnWidth(0.9),
+            7: const pw.FlexColumnWidth(1.2),
+            8: const pw.FlexColumnWidth(0.9),
+            9: const pw.FlexColumnWidth(1.4),
+            10: const pw.FlexColumnWidth(1.1),
+            11: const pw.FlexColumnWidth(1.3),
+            12: const pw.FlexColumnWidth(1.3),
+            13: const pw.FlexColumnWidth(1.5),
+          },
+          headers: const [
+            'Product', 'HSN', 'Pack/Unit', 'Qty',
+            'Used', 'W/O', 'Left',
+            'Rate', 'Disc%', 'Tax Breakdown',
+            'Rate+Tax', 'Taxable Amt', 'Line Total', 'Description',
+          ],
+          data: itemRows,
         ),
-        pw.SizedBox(height: 8),
+        pw.SizedBox(height: 10),
 
-        pw.Row(children: [
-          pw.Spacer(),
+        // ── Charges + Summary ──
+        pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          pw.Expanded(
+            child: c.charges.isEmpty
+                ? pw.SizedBox()
+                : _infoBox('CHARGES', c.charges.map((ch) {
+                    final amt = double.tryParse(ch.amount.value) ?? 0;
+                    final rem = ch.remarks.value.trim();
+                    return pw.Padding(
+                      padding: const pw.EdgeInsets.only(bottom: 3),
+                      child: pw.Row(children: [
+                        pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                          pw.Text(ch.name.value, style: const pw.TextStyle(fontSize: 9)),
+                          if (rem.isNotEmpty) pw.Text(rem, style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600)),
+                        ])),
+                        pw.Text(amt.toStringAsFixed(2), style: const pw.TextStyle(fontSize: 9)),
+                      ]),
+                    );
+                  }).toList()),
+          ),
+          pw.SizedBox(width: 8),
           pw.Container(
-            width: 200,
+            width: 210,
             padding: const pw.EdgeInsets.all(8),
             decoration: pw.BoxDecoration(
               color: PdfColors.grey100,
@@ -811,19 +864,17 @@ class ReportExportService {
               borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
             ),
             child: pw.Column(children: [
-              if (c.charges.isNotEmpty) ...[
-                pw.Text('Charges', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 3),
-                ...c.charges.map((ch) {
-                  final amt = double.tryParse(ch.amount.value) ?? 0;
-                  return _kvRight(ch.name.value, amt.toStringAsFixed(2));
-                }),
-                pw.Divider(color: PdfColors.grey400),
-              ],
+              _kvRight('Subtotal (excl. tax)', c.itemsSubtotalExclTax.toStringAsFixed(2)),
+              if (c.sgstTotal > 0) _kvRight('SGST',  c.sgstTotal.toStringAsFixed(2)),
+              if (c.cgstTotal > 0) _kvRight('CGST',  c.cgstTotal.toStringAsFixed(2)),
+              if (c.igstTotal > 0) _kvRight('IGST',  c.igstTotal.toStringAsFixed(2)),
+              if (c.cessTotal > 0) _kvRight('CESS',  c.cessTotal.toStringAsFixed(2)),
+              if (c.roffTotal > 0) _kvRight('ROFF',  c.roffTotal.toStringAsFixed(2)),
+              if (c.addOnTotal != 0) _kvRight('Add-ons / Charges', c.addOnTotal.toStringAsFixed(2)),
+              pw.Divider(color: PdfColors.grey400),
               pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-                pw.Text('Grand Total', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                pw.Text(c.grandTotal.toStringAsFixed(2),
-                    style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                pw.Text('GRAND TOTAL', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                pw.Text(c.grandTotal.toStringAsFixed(2), style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
               ]),
             ]),
           ),
@@ -854,101 +905,128 @@ class ReportExportService {
     final theme = await _pdfTheme();
     final docNo = '${c.docNoPrefix.value}${c.docNoNumber.value}'.trim();
 
-    final rows = c.items
-        .where((row) => row.selected.value)
-        .map((row) {
-      final original = double.tryParse(row.originalQty.value) ?? 0;
-      final returned = double.tryParse(row.returnedQty.value) ?? 0;
-      final price = double.tryParse(row.unitPrice.value) ?? 0;
-      final total = returned * price;
+    final selectedItems = c.items.where((row) => row.selected.value).toList();
+    final allItems = selectedItems.isNotEmpty ? selectedItems : c.items.toList();
+
+    final itemRows = allItems.map((row) {
+      final original  = double.tryParse(row.originalQty.value)  ?? 0;
+      final available = double.tryParse(row.availableQty.value) ?? 0;
+      final returned  = double.tryParse(row.returnedQty.value)  ?? 0;
+      final price     = double.tryParse(row.unitPrice.value)    ?? 0;
+      final taxable   = returned * price;
+      final total     = taxable;
       return <String>[
         row.productName.value.trim().isEmpty ? '-' : row.productName.value.trim(),
         row.unitType.value,
         original.toStringAsFixed(2),
+        available > 0 ? available.toStringAsFixed(2) : '-',
         returned.toStringAsFixed(2),
         price.toStringAsFixed(2),
+        taxable.toStringAsFixed(2),
         total.toStringAsFixed(2),
         row.returnReason.value.trim().isEmpty ? '-' : row.returnReason.value.trim(),
+        row.remarks.value.trim().isEmpty ? '-' : row.remarks.value.trim(),
       ];
     }).toList();
+
+    // Net total
+    final netTotal = double.tryParse(c.totalReturnValue) ?? 0;
 
     pdf.addPage(pw.MultiPage(
       theme: theme,
       pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.symmetric(horizontal: 28, vertical: 28),
+      margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       build: (ctx) => [
+        // ── Header banner ──
         pw.Container(
-          decoration: const pw.BoxDecoration(
-            color: PdfColors.grey800,
-            borderRadius: pw.BorderRadius.all(pw.Radius.circular(4)),
-          ),
+          decoration: pw.BoxDecoration(color: PdfColors.grey800, borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4))),
           padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-            pw.Text('SALES RETURN',
-                style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              pw.Text('SALES RETURN', style: pw.TextStyle(fontSize: 17, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+              pw.Text('Return Document', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey300)),
+            ]),
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-              pw.Text('No: ${docNo.isEmpty ? '-' : docNo}',
-                  style: pw.TextStyle(fontSize: 10, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
-              pw.Text('Date: ${_normalizeDate(c.docDate.value)}',
-                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey200)),
-              pw.Text('Status: ${c.status.value}',
-                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey200)),
+              pw.Text(docNo.isEmpty ? '-' : docNo, style: pw.TextStyle(fontSize: 12, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
+              pw.Text(_normalizeDate(c.docDate.value), style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey200)),
+              pw.Text(c.status.value, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey200)),
             ]),
           ]),
         ),
         pw.SizedBox(height: 10),
 
+        // ── Customer | Return Details ──
         pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-          pw.Expanded(
-            child: pw.Container(
-              padding: const pw.EdgeInsets.all(8),
-              decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400), borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3))),
-              child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                pw.Text('Customer', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.grey600)),
-                pw.SizedBox(height: 3),
-                pw.Text(c.customerName.value.trim().isEmpty ? '-' : c.customerName.value.trim(),
-                    style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-                if (c.customerShopName.value.trim().isNotEmpty)
-                  pw.Text(c.customerShopName.value.trim(), style: const pw.TextStyle(fontSize: 9)),
-                if (c.customerPhone.value.trim().isNotEmpty)
-                  pw.Text('Ph: ${c.customerPhone.value.trim()}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
-              ]),
-            ),
-          ),
-          pw.SizedBox(width: 10),
-          pw.Expanded(
-            child: pw.Container(
-              padding: const pw.EdgeInsets.all(8),
-              decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400), borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3))),
-              child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                pw.Text('Return Details', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.grey600)),
-                pw.SizedBox(height: 3),
-                if (c.sourceSiNumber.value.trim().isNotEmpty)
-                  _kv('Source Invoice', c.sourceSiNumber.value.trim()),
-                if (c.reason.value.trim().isNotEmpty)
-                  _kv('Reason', c.reason.value.trim()),
-              ]),
-            ),
-          ),
+          pw.Expanded(child: _infoBox('CUSTOMER', [
+            pw.Text(c.customerName.value.trim().isEmpty ? '-' : c.customerName.value.trim(),
+                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+            if (c.customerShopName.value.trim().isNotEmpty)
+              pw.Text(c.customerShopName.value.trim(), style: const pw.TextStyle(fontSize: 9)),
+            if (c.customerPhone.value.trim().isNotEmpty)
+              pw.Text('Ph: ${c.customerPhone.value.trim()}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+          ])),
+          pw.SizedBox(width: 8),
+          pw.Expanded(child: _infoBox('RETURN DETAILS', [
+            if (c.sourceSiNumber.value.trim().isNotEmpty) _kvSmall('Source Invoice', c.sourceSiNumber.value.trim()),
+            if (c.reason.value.trim().isNotEmpty)         _kvSmall('Reason',         c.reason.value.trim()),
+          ])),
         ]),
         pw.SizedBox(height: 10),
 
-        pw.Text('Returned Items', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+        // ── Items ──
+        _sectionTitle('RETURNED ITEMS'),
         pw.SizedBox(height: 4),
         pw.TableHelper.fromTextArray(
-          headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8),
-          cellStyle: const pw.TextStyle(fontSize: 8),
+          headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7),
+          cellStyle: const pw.TextStyle(fontSize: 7),
           headerDecoration: const pw.BoxDecoration(color: PdfColors.grey200),
           cellAlignment: pw.Alignment.centerLeft,
-          headers: const ['Product', 'Unit', 'Orig Qty', 'Ret Qty', 'Rate', 'Total', 'Reason'],
-          data: rows,
+          columnWidths: {
+            0: const pw.FlexColumnWidth(2.5),
+            1: const pw.FlexColumnWidth(1.0),
+            2: const pw.FlexColumnWidth(1.0),
+            3: const pw.FlexColumnWidth(1.0),
+            4: const pw.FlexColumnWidth(1.0),
+            5: const pw.FlexColumnWidth(1.2),
+            6: const pw.FlexColumnWidth(1.2),
+            7: const pw.FlexColumnWidth(1.2),
+            8: const pw.FlexColumnWidth(1.8),
+            9: const pw.FlexColumnWidth(1.5),
+          },
+          headers: const [
+            'Product', 'Unit',
+            'Orig Qty', 'Avail Qty', 'Ret Qty',
+            'Unit Rate', 'Taxable', 'Line Total',
+            'Return Reason', 'Remarks',
+          ],
+          data: itemRows,
         ),
-        pw.SizedBox(height: 8),
+        pw.SizedBox(height: 10),
 
-        pw.Row(children: [
-          pw.Spacer(),
+        // ── Charges + Summary ──
+        pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          pw.Expanded(
+            child: c.charges.isEmpty
+                ? pw.SizedBox()
+                : _infoBox('CHARGES', c.charges.map((ch) {
+                    final amt    = double.tryParse(ch.amount.value) ?? 0;
+                    final isDisc = ch.name.value.toLowerCase().contains('discount');
+                    final rem    = ch.remarks.value.trim();
+                    return pw.Padding(
+                      padding: const pw.EdgeInsets.only(bottom: 3),
+                      child: pw.Row(children: [
+                        pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                          pw.Text(ch.name.value, style: const pw.TextStyle(fontSize: 9)),
+                          if (rem.isNotEmpty) pw.Text(rem, style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600)),
+                        ])),
+                        pw.Text('${isDisc ? '-' : ''}${amt.toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 9)),
+                      ]),
+                    );
+                  }).toList()),
+          ),
+          pw.SizedBox(width: 8),
           pw.Container(
-            width: 200,
+            width: 210,
             padding: const pw.EdgeInsets.all(8),
             decoration: pw.BoxDecoration(
               color: PdfColors.grey100,
@@ -956,19 +1034,10 @@ class ReportExportService {
               borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
             ),
             child: pw.Column(children: [
-              if (c.charges.isNotEmpty) ...[
-                pw.Text('Charges', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 3),
-                ...c.charges.map((ch) {
-                  final amt = double.tryParse(ch.amount.value) ?? 0;
-                  final isDisc = ch.name.value.toLowerCase().contains('discount');
-                  return _kvRight(ch.name.value, '${isDisc ? '-' : ''}${amt.toStringAsFixed(2)}');
-                }),
-                pw.Divider(color: PdfColors.grey400),
-              ],
+              pw.Divider(color: PdfColors.grey400),
               pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-                pw.Text('Net Total', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                pw.Text(c.totalReturnValue, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                pw.Text('NET TOTAL', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                pw.Text(netTotal.toStringAsFixed(2), style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
               ]),
             ]),
           ),
@@ -1011,6 +1080,47 @@ class ReportExportService {
           pw.Text(value, style: const pw.TextStyle(fontSize: 9)),
         ],
       ),
+    );
+  }
+
+  static pw.Widget _kvSmall(String key, String value) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 2),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.SizedBox(
+            width: 90,
+            child: pw.Text(key, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700)),
+          ),
+          pw.Expanded(
+            child: pw.Text(value, style: const pw.TextStyle(fontSize: 8)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _sectionTitle(String title) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.symmetric(vertical: 3, horizontal: 6),
+      decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+      child: pw.Text(title, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.grey800)),
+    );
+  }
+
+  static pw.Widget _infoBox(String title, List<pw.Widget> rows) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(8),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: PdfColors.grey400),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
+      ),
+      child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Text(title, style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: PdfColors.grey600)),
+        pw.SizedBox(height: 4),
+        ...rows,
+      ]),
     );
   }
 }
