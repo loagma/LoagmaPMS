@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.client"
+    namespace = "com.loagma.pms"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 

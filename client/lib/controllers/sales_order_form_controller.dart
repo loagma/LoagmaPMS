@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 
 import '../api_config.dart';
 import '../constants/charge_constants.dart';
+import '../controllers/auth_controller.dart';
 import '../models/party_result.dart';
 import '../models/product_model.dart';
 import '../models/sales_order_model.dart';
@@ -18,7 +19,6 @@ class SalesOrderFormController extends GetxController {
   final int? soId;
   final bool startInViewOnly;
 
-  final customers = <Map<String, dynamic>>[].obs;
   final departments = <Map<String, dynamic>>[].obs;
   final products = <Map<String, dynamic>>[].obs;
   final unitTypes = <String>[].obs;
@@ -41,6 +41,8 @@ class SalesOrderFormController extends GetxController {
 
   final items = <SOLineRow>[].obs;
 
+  int? _adminVendorId;
+
   final isLoading = false.obs;
   final isSaving = false.obs;
 
@@ -53,7 +55,7 @@ class SalesOrderFormController extends GetxController {
     super.onInit();
     viewOnly.value = startInViewOnly;
     _ensureDefaultCharges();
-    _loadCustomers();
+    _loadAdminVendorId();
     _loadDepartments();
     _loadUnitTypes();
     if (soId != null) {
@@ -65,14 +67,18 @@ class SalesOrderFormController extends GetxController {
     }
   }
 
+  Future<void> _loadAdminVendorId() async {
+    _adminVendorId = await AuthController.getAdminId();
+  }
+
   Future<List<Map<String, dynamic>>> _searchAllProducts(String query) async {
     try {
-      final uri = Uri.parse(ApiConfig.products).replace(
-        queryParameters: {
-          'limit': '50',
-          if (query.trim().isNotEmpty) 'search': query.trim(),
-        },
-      );
+      final params = <String, String>{
+        'limit': '50',
+        if (query.trim().isNotEmpty) 'search': query.trim(),
+        if (_adminVendorId != null) 'admin_vendor_id': _adminVendorId.toString(),
+      };
+      final uri = Uri.parse(ApiConfig.vendorProducts).replace(queryParameters: params);
       final response = await http
           .get(uri, headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: 15));
@@ -229,23 +235,6 @@ class SalesOrderFormController extends GetxController {
     final now = DateTime.now();
     docDate.value =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-  }
-
-  Future<void> _loadCustomers() async {
-    try {
-      final list = await CustomerApiService.fetchCustomers(limit: 500);
-      customers.value = list
-          .map((c) => {
-                'id': c.id,
-                'name': c.name,
-                'phone': c.contactNumber ?? '',
-                'shop_name': c.shopName ?? '',
-                'display_name': c.displayName,
-              })
-          .toList();
-    } catch (e) {
-      debugPrint('[SO FORM] Load customers error: $e');
-    }
   }
 
   String get customerDisplayTitle =>

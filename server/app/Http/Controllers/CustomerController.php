@@ -146,8 +146,8 @@ class CustomerController extends Controller
             return;
         }
 
-        $searchable = $this->existingColumns([
-            'userid',
+        // Columns that hold text — searched with LIKE %term%
+        $textCols = $this->existingColumns([
             'name',
             'shop_name',
             'phone',
@@ -156,13 +156,27 @@ class CustomerController extends Controller
             'email',
         ]);
 
-        if (empty($searchable)) {
-            return;
-        }
+        $like = '%' . addcslashes($search, '\\%_') . '%';
 
-        $query->where(function ($q) use ($search, $searchable) {
-            foreach ($searchable as $column) {
-                $q->orWhere($column, 'like', '%' . $search . '%');
+        $query->where(function ($q) use ($search, $textCols, $like) {
+            // Exact or prefix match on numeric customer ID
+            if (is_numeric($search)) {
+                $q->orWhere('userid', (int) $search);
+                // Also prefix-match so typing "10" finds ID 100, 101 etc.
+                $q->orWhereRaw('CAST(userid AS CHAR) LIKE ?', [$search . '%']);
+            }
+
+            // Phone number: also try prefix match (user may type first digits)
+            foreach ($textCols as $col) {
+                if (in_array($col, ['phone', 'mobile', 'contact_number'], true)) {
+                    // Prefix match for phone
+                    $q->orWhereRaw("LOWER(`$col`) LIKE ?", [strtolower($search) . '%']);
+                    // Full substring match
+                    $q->orWhereRaw("LOWER(`$col`) LIKE ?", [$like]);
+                } else {
+                    // Name / shop / email — substring match, case-insensitive
+                    $q->orWhereRaw("LOWER(`$col`) LIKE ?", ['%' . strtolower(addcslashes($search, '\\%_')) . '%']);
+                }
             }
         });
     }

@@ -22,10 +22,14 @@ use App\Http\Controllers\ProductPackageController;
 use App\Http\Controllers\MasterDataController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\SalesOrderController;
 use App\Http\Controllers\SalesInvoiceController;
 
 Route::get('/health', [HealthController::class, 'index']);
+
+// Deli-staff authentication
+Route::post('/auth/login', [AuthController::class, 'login']);
 Route::get('/products', [ProductController::class, 'index']);
 Route::post('/products', [ProductController::class, 'store']);
 Route::get('/products/{id}', [ProductController::class, 'show'])->where('id', '[0-9]+');
@@ -141,9 +145,11 @@ Route::post('/product-packages', [ProductPackageController::class, 'store']);
 Route::get('/product-packages/{id}', [ProductPackageController::class, 'show'])->where('id', '[0-9]+');
 Route::put('/product-packages/{id}', [ProductPackageController::class, 'update'])->where('id', '[0-9]+');
 
-// Sales Order routes (reads from legacy loagma_new.orders table)
+// Sales Order routes
 Route::get('/sales-orders', [SalesOrderController::class, 'index']);
+Route::post('/sales-orders', [SalesOrderController::class, 'store']);
 Route::get('/sales-orders/{id}', [SalesOrderController::class, 'show'])->where('id', '[0-9]+');
+Route::put('/sales-orders/{id}', [SalesOrderController::class, 'update'])->where('id', '[0-9]+');
 
 // Sales Invoice routes
 Route::get('/sales-invoices/series', [SalesInvoiceController::class, 'series']);

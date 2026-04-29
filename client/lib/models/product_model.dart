@@ -25,10 +25,11 @@ class ProductPack {
         json['pack_id_str'] ??
         '';
 
-    // Label: prefer description (actual DB field), fall back to pack_name/label/name
+    // Label: prefer description / ps (vendor pack size label), then fallbacks
     final label = (json['description']?.toString().trim().isNotEmpty == true
             ? json['description']
             : null) ??
+        (json['ps']?.toString().trim().isNotEmpty == true ? json['ps'] : null) ??
         json['pack_name'] ??
         json['label'] ??
         json['name'] ??

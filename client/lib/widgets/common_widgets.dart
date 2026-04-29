@@ -922,19 +922,10 @@ class _PackChip extends StatelessWidget {
 
   String get _label {
     if (pack == null) return fallbackLabel;
+    // Use the pack label (ps field from vendor_products) directly — it already
+    // contains the full human-readable size/price string e.g. "1 Kg x 106/-"
     final desc = pack!.label.trim();
-    // Build weight string if available
-    String? weightStr;
-    if (pack!.weight != null) {
-      final w = pack!.weight!;
-      final wStr = w % 1 == 0 ? w.toInt().toString() : w.toString();
-      final u = pack!.unit ?? 'Kg';
-      weightStr = '$wStr $u';
-    }
-    // If description looks like a real name (not just "1 Unit" style fallback), combine it with weight
-    if (desc.isNotEmpty && weightStr != null) return '$desc - $weightStr';
     if (desc.isNotEmpty) return desc;
-    if (weightStr != null) return weightStr;
     return fallbackLabel;
   }
 

@@ -77,6 +77,153 @@ class SalesOrderController extends Controller
         }
     }
 
+    public function store(Request $request): JsonResponse
+    {
+        try {
+            $customerId = (int) $request->input('customer_id', 0);
+            if ($customerId <= 0) {
+                return response()->json(['success' => false, 'message' => 'customer_id is required'], 422);
+            }
+
+            $items = $request->input('items', []);
+            if (empty($items)) {
+                return response()->json(['success' => false, 'message' => 'At least one item is required'], 422);
+            }
+
+            $status    = strtolower(trim((string) $request->input('status', 'pending')));
+            $docDate   = trim((string) $request->input('doc_date', date('Y-m-d')));
+            $discount  = (float) $request->input('discount', 0);
+            $delivery  = (float) $request->input('delivery_charge', 0);
+            $narration = trim((string) $request->input('narration', ''));
+
+            $lineTotal = 0.0;
+            foreach ($items as $item) {
+                $qty   = (float) ($item['quantity'] ?? 0);
+                $price = (float) ($item['price'] ?? 0);
+                $lineTotal += round($qty * $price, 2);
+            }
+            $orderTotal = round($lineTotal - $discount + $delivery, 2);
+
+            $orderId = DB::table(self::ORDERS_TABLE)->insertGetId([
+                'buyer_userid'    => $customerId,
+                'order_state'     => $status,
+                'order_total'     => $orderTotal,
+                'discount'        => $discount,
+                'delivery_charge' => $delivery,
+                'items_count'     => count($items),
+                'short_datetime'  => $docDate,
+                'txn_id'          => $narration ?: null,
+            ], 'order_id');
+
+            foreach ($items as $item) {
+                $productId = (int) ($item['product_id'] ?? 0);
+                $qty       = (float) ($item['quantity'] ?? 0);
+                $price     = (float) ($item['price'] ?? 0);
+
+                $pinfo = [];
+                if (!empty($item['hsn_code']))  $pinfo['hsn_code']  = $item['hsn_code'];
+                if (!empty($item['unit']))       $pinfo['unit']      = $item['unit'];
+                if (!empty($item['pack_id']))    $pinfo['selected_pack'] = ['id' => $item['pack_id'], 'unit' => $item['unit'] ?? 'Nos'];
+                if (!empty($item['description'])) $pinfo['description'] = $item['description'];
+
+                DB::table(self::ITEMS_TABLE)->insert([
+                    'order_id'    => $orderId,
+                    'product_id'  => $productId,
+                    'quantity'    => $qty,
+                    'item_price'  => $price,
+                    'item_total'  => round($qty * $price, 2),
+                    'pinfo'       => !empty($pinfo) ? json_encode($pinfo) : null,
+                    'qty_delivered' => 0,
+                    'qty_returned'  => 0,
+                ]);
+            }
+
+            $order = DB::table(self::ORDERS_TABLE)->where('order_id', $orderId)->first();
+            return response()->json([
+                'success' => true,
+                'message' => 'Sales order created successfully',
+                'data'    => $this->normalizeHeader($order),
+            ], 201);
+        } catch (\Throwable $e) {
+            Log::error('SalesOrder store error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to create sales order'], 500);
+        }
+    }
+
+    public function update(Request $request, int $id): JsonResponse
+    {
+        try {
+            $order = DB::table(self::ORDERS_TABLE)->where('order_id', $id)->first();
+            if (!$order) {
+                return response()->json(['success' => false, 'message' => 'Order not found'], 404);
+            }
+
+            $items = $request->input('items', []);
+            if (empty($items)) {
+                return response()->json(['success' => false, 'message' => 'At least one item is required'], 422);
+            }
+
+            $status   = strtolower(trim((string) $request->input('status', $order->order_state ?? 'pending')));
+            $docDate  = trim((string) $request->input('doc_date', $order->short_datetime ?? date('Y-m-d')));
+            $discount = (float) $request->input('discount', $order->discount ?? 0);
+            $delivery = (float) $request->input('delivery_charge', $order->delivery_charge ?? 0);
+            $narration = trim((string) $request->input('narration', ''));
+
+            $lineTotal = 0.0;
+            foreach ($items as $item) {
+                $qty   = (float) ($item['quantity'] ?? 0);
+                $price = (float) ($item['price'] ?? 0);
+                $lineTotal += round($qty * $price, 2);
+            }
+            $orderTotal = round($lineTotal - $discount + $delivery, 2);
+
+            DB::table(self::ORDERS_TABLE)->where('order_id', $id)->update([
+                'order_state'     => $status,
+                'order_total'     => $orderTotal,
+                'discount'        => $discount,
+                'delivery_charge' => $delivery,
+                'items_count'     => count($items),
+                'short_datetime'  => $docDate,
+                'txn_id'          => $narration ?: null,
+            ]);
+
+            DB::table(self::ITEMS_TABLE)->where('order_id', $id)->delete();
+
+            foreach ($items as $item) {
+                $productId = (int) ($item['product_id'] ?? 0);
+                $qty       = (float) ($item['quantity'] ?? 0);
+                $price     = (float) ($item['price'] ?? 0);
+
+                $pinfo = [];
+                if (!empty($item['hsn_code']))    $pinfo['hsn_code']  = $item['hsn_code'];
+                if (!empty($item['unit']))         $pinfo['unit']      = $item['unit'];
+                if (!empty($item['pack_id']))      $pinfo['selected_pack'] = ['id' => $item['pack_id'], 'unit' => $item['unit'] ?? 'Nos'];
+                if (!empty($item['description'])) $pinfo['description'] = $item['description'];
+
+                DB::table(self::ITEMS_TABLE)->insert([
+                    'order_id'      => $id,
+                    'product_id'    => $productId,
+                    'quantity'      => $qty,
+                    'item_price'    => $price,
+                    'item_total'    => round($qty * $price, 2),
+                    'pinfo'         => !empty($pinfo) ? json_encode($pinfo) : null,
+                    'qty_delivered' => 0,
+                    'qty_returned'  => 0,
+                ]);
+            }
+
+            $updated = DB::table(self::ORDERS_TABLE)->where('order_id', $id)->first();
+            return response()->json([
+                'success' => true,
+                'message' => 'Sales order updated successfully',
+                'data'    => $this->normalizeHeader($updated),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('SalesOrder update error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to update sales order'], 500);
+        }
+    }
+
     public function show(int $id): JsonResponse
     {
         try {

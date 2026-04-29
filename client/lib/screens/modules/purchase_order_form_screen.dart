@@ -107,6 +107,22 @@ class PurchaseOrderFormScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      floatingActionButton: Obx(() {
+        if (controller.isReadOnly) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 80),
+          child: FloatingActionButton(
+            heroTag: 'po_add_item_fab',
+            onPressed: controller.addItem,
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            tooltip: 'Add Product',
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: const Icon(Icons.add_rounded, size: 28),
+          ),
+        );
+      }),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       appBar: ModuleAppBar(
         title: controller.isEditMode ? 'Purchase Order' : 'Create Purchase Order',
         subtitle: 'Loagma',
@@ -849,23 +865,6 @@ class _ItemsCard extends StatelessWidget {
               ),
             if (!controller.isReadOnly) ...[
               const SizedBox(height: _sectionGap),
-              Align(
-                alignment: Alignment.topRight,
-                child: OutlinedButton.icon(
-                  onPressed: controller.addItem,
-                  icon: const Icon(Icons.add_rounded, size: 18),
-                  label: const Text('Add Product'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: const BorderSide(color: AppColors.primary, width: 1.2),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: _fieldVerticalGap),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                ),
-              ),
             ],
           ],
         );

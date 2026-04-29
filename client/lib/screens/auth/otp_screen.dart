@@ -51,13 +51,17 @@ class _OtpScreenState extends State<OtpScreen> {
       );
       return;
     }
-    if (auth.verifyOtp(_otp)) {
-      await AuthController.setLoggedIn(true);
+
+    auth.isLoading.value = true;
+    final error = await auth.verifyOtpViaApi(_otp);
+    auth.isLoading.value = false;
+
+    if (error == null) {
       Get.toNamed(AppRoutes.dashboard);
     } else {
       Get.snackbar(
-        'Wrong OTP',
-        'Please check and try again',
+        'Login Failed',
+        error,
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: AppColors.textDark,
         colorText: Colors.white,
@@ -159,13 +163,22 @@ class _OtpScreenState extends State<OtpScreen> {
                           }),
                         ),
                         const SizedBox(height: 32),
-                        SizedBox(
+                        Obx(() => SizedBox(
                           height: 52,
                           child: ElevatedButton(
-                            onPressed: () => _verify(auth),
-                            child: const Text('Verify'),
+                            onPressed: auth.isLoading.value ? null : () => _verify(auth),
+                            child: auth.isLoading.value
+                                ? const SizedBox(
+                                    height: 22,
+                                    width: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  )
+                                : const Text('Verify'),
                           ),
-                        ),
+                        )),
                         const SizedBox(height: 24),
                         TextButton(
                           onPressed: () => Get.back(),
