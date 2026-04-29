@@ -9,6 +9,7 @@ import '../../controllers/sales_invoice_controller.dart';
 import '../../models/party_result.dart';
 import '../../models/product_model.dart';
 import '../../models/sales_order_model.dart';
+import '../../services/report_export_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 import 'sales_return_form_screen.dart';
@@ -131,6 +132,22 @@ class SalesInvoiceFormScreen extends StatelessWidget {
               },
             );
           }),
+          Obx(() {
+            if (!controller.isReportMode) return const SizedBox.shrink();
+            return IconButton(
+              icon: const Icon(Icons.share_rounded, color: Colors.white),
+              tooltip: 'Share PDF',
+              onPressed: () => ReportExportService.shareSalesInvoice(controller),
+            );
+          }),
+          Obx(() {
+            if (!controller.isReportMode) return const SizedBox.shrink();
+            return IconButton(
+              icon: const Icon(Icons.print_rounded, color: Colors.white),
+              tooltip: 'Print Invoice',
+              onPressed: () => ReportExportService.printSalesInvoice(controller),
+            );
+          }),
           IconButton(
             icon: const Icon(Icons.help_outline_rounded, color: Colors.white),
             tooltip: 'Help',
@@ -184,6 +201,15 @@ class SalesInvoiceFormScreen extends StatelessWidget {
                   ActionButtonBar(
                     buttons: [
                       ActionButton(label: 'Back', onPressed: () => Get.back()),
+                      ActionButton(
+                        label: 'Share PDF',
+                        onPressed: () => ReportExportService.shareSalesInvoice(controller),
+                      ),
+                      ActionButton(
+                        label: 'Print',
+                        isPrimary: true,
+                        onPressed: () => ReportExportService.printSalesInvoice(controller),
+                      ),
                       if (controller.canEditFromReport)
                         ActionButton(
                           label: 'Edit Draft',

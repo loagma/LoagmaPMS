@@ -7,6 +7,7 @@ import '../../models/customer_model.dart';
 import '../../models/party_result.dart';
 import '../../models/product_model.dart';
 import '../../services/customer_api_service.dart';
+import '../../services/report_export_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 import 'sales_order_list_screen.dart';
@@ -110,6 +111,22 @@ class SalesOrderFormScreen extends StatelessWidget {
               onPressed: () => controller.viewOnly.value = false,
             );
           }),
+          Obx(() {
+            if (!controller.isReadOnly) return const SizedBox.shrink();
+            return IconButton(
+              icon: const Icon(Icons.share_rounded, color: Colors.white),
+              tooltip: 'Share PDF',
+              onPressed: () => ReportExportService.shareSalesOrder(controller),
+            );
+          }),
+          Obx(() {
+            if (!controller.isReadOnly) return const SizedBox.shrink();
+            return IconButton(
+              icon: const Icon(Icons.print_rounded, color: Colors.white),
+              tooltip: 'Print Order',
+              onPressed: () => ReportExportService.printSalesOrder(controller),
+            );
+          }),
           IconButton(
             icon: const Icon(Icons.list_alt_rounded, color: Colors.white),
             tooltip: 'View all sales orders',
@@ -161,6 +178,15 @@ class SalesOrderFormScreen extends StatelessWidget {
                   ActionButton(
                     label: 'Back',
                     onPressed: () => Get.back(),
+                  ),
+                  ActionButton(
+                    label: 'Share PDF',
+                    onPressed: () => ReportExportService.shareSalesOrder(controller),
+                  ),
+                  ActionButton(
+                    label: 'Print',
+                    isPrimary: true,
+                    onPressed: () => ReportExportService.printSalesOrder(controller),
                   ),
                   if (controller.status.value == 'DRAFT')
                     ActionButton(

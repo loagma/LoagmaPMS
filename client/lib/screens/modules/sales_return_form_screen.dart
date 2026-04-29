@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../../controllers/sales_return_form_controller.dart';
 import '../../models/party_result.dart';
+import '../../services/report_export_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 
@@ -117,6 +118,16 @@ class SalesReturnFormScreen extends StatelessWidget {
                   tooltip: 'Edit',
                   onPressed: controller.canEditFromView ? controller.enterEditMode : null,
                 ),
+                IconButton(
+                  icon: const Icon(Icons.share_rounded, color: Colors.white),
+                  tooltip: 'Share PDF',
+                  onPressed: () => ReportExportService.shareSalesReturn(controller),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.print_rounded, color: Colors.white),
+                  tooltip: 'Print Return',
+                  onPressed: () => ReportExportService.printSalesReturn(controller),
+                ),
               ],
             );
           }),
@@ -161,6 +172,15 @@ class SalesReturnFormScreen extends StatelessWidget {
               ActionButtonBar(
                 buttons: [
                   ActionButton(label: 'Back', onPressed: () => Get.back()),
+                  ActionButton(
+                    label: 'Share PDF',
+                    onPressed: () => ReportExportService.shareSalesReturn(controller),
+                  ),
+                  ActionButton(
+                    label: 'Print',
+                    isPrimary: true,
+                    onPressed: () => ReportExportService.printSalesReturn(controller),
+                  ),
                   if (controller.canEditFromView)
                     ActionButton(
                       label: 'Edit Draft',
