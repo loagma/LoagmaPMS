@@ -194,16 +194,20 @@ class _HeaderCard extends StatelessWidget {
                 )),
 
           // ── Order Date (read-only, formatted) ────────────────────────────
-          Obx(() => TextFormField(
-            key: ValueKey(controller.orderDate.value),
-            initialValue: _fmtDate(controller.orderDate.value).isEmpty
-                ? '-'
-                : _fmtDate(controller.orderDate.value),
-            readOnly: true,
-            decoration: _dec(label: 'Order Date'),
-            style: const TextStyle(color: AppColors.textMuted),
-          )),
-          const SizedBox(height: 10),
+          Obx(() => controller.orderDate.value.isEmpty
+              ? const SizedBox.shrink()
+              : Column(
+                  children: [
+                    TextFormField(
+                      key: ValueKey(controller.orderDate.value),
+                      initialValue: _fmtDate(controller.orderDate.value),
+                      readOnly: true,
+                      decoration: _dec(label: 'Order Date'),
+                      style: const TextStyle(color: AppColors.textMuted),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                )),
 
           // ── Invoice Date (date picker) ────────────────────────────────────
           Obx(() => InkWell(
@@ -236,7 +240,7 @@ class _HeaderCard extends StatelessWidget {
           )),
           const SizedBox(height: 10),
 
-          // ── Department (free text — same as SO form bill section) ─────────
+          // ── Department (free text) ─────────────────────────────────────────
           _EditableField(
             obs: controller.billDepartment,
             label: 'Department',
@@ -304,10 +308,6 @@ class _HeaderCard extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Order picker (bottom sheet search)
-// ─────────────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Customer picker (step 1)
@@ -380,7 +380,7 @@ class _CustomerPickerField extends StatelessWidget {
                     child: TextField(
                       autofocus: true,
                       decoration: InputDecoration(
-                        hintText: 'Search by name…',
+                        hintText: 'Search by name, mobile or customer ID…',
                         prefixIcon: const Icon(Icons.search),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -402,10 +402,14 @@ class _CustomerPickerField extends StatelessWidget {
                                   final id = int.tryParse(c['id']?.toString() ?? '') ?? 0;
                                   final name = c['name']?.toString() ?? '';
                                   final shop = c['shop_name']?.toString() ?? '';
+                                  final phone = c['phone']?.toString() ?? '';
+                                  final subtitle = [shop, phone]
+                                      .where((s) => s.isNotEmpty)
+                                      .join('  •  ');
                                   return ListTile(
                                     leading: const Icon(Icons.person_outline, color: AppColors.primary),
                                     title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                    subtitle: shop.isNotEmpty ? Text(shop) : null,
+                                    subtitle: subtitle.isNotEmpty ? Text(subtitle) : null,
                                     onTap: () {
                                       Navigator.pop(ctx);
                                       controller.selectCustomer(id, name);
@@ -440,13 +444,13 @@ class _OrderPickerField extends StatelessWidget {
       borderRadius: BorderRadius.circular(8),
       child: InputDecorator(
         decoration: _dec(
-          label: 'Source Order *',
-          hint: 'Tap to select order',
+          label: 'Source Order (optional)',
+          hint: 'Tap to link a sales order',
           suffix: const Icon(Icons.arrow_drop_down, color: AppColors.primary),
         ),
         child: Text(
           controller.sourceOrderNumber.value.isEmpty
-              ? 'Tap to select order'
+              ? 'Tap to link a sales order'
               : controller.sourceOrderNumber.value,
           style: TextStyle(
             fontSize: 14,
@@ -475,6 +479,9 @@ class _OrderPickerField extends StatelessWidget {
             setState(() => loading = false);
           }
 
+          // Auto-load orders on open
+          WidgetsBinding.instance.addPostFrameCallback((_) => doSearch(''));
+
           return DraggableScrollableSheet(
             expand: false,
             initialChildSize: 0.7,
@@ -493,16 +500,15 @@ class _OrderPickerField extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   const Text(
-                    'Select Order',
+                    'Select Pending Order',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: TextField(
-                      autofocus: true,
                       decoration: InputDecoration(
-                        hintText: 'Search by order number or customer…',
+                        hintText: 'Search by order number…',
                         prefixIcon: const Icon(Icons.search),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -517,7 +523,7 @@ class _OrderPickerField extends StatelessWidget {
                         : results.isEmpty
                             ? const Center(
                                 child: Text(
-                                  'Type to search orders',
+                                  'No pending orders found',
                                   style: TextStyle(color: Colors.grey),
                                 ),
                               )
@@ -583,23 +589,154 @@ class _ItemsCard extends StatelessWidget {
           const SizedBox(height: 12),
           Obx(() {
             if (controller.items.isEmpty) {
-              return const Center(
+              return Center(
                 child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Text(
-                    'No items — select a source order above.',
-                    style: TextStyle(color: AppColors.textMuted),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Column(
+                    children: [
+                      Text(
+                        controller.sourceOrderNumber.value.isEmpty
+                            ? 'No items — link a sales order or add items manually.'
+                            : 'No items — select a source order above.',
+                        style: const TextStyle(color: AppColors.textMuted),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
                 ),
               );
             }
             return Column(
               children: controller.items.asMap().entries.map((e) {
-                return _ItemRow(index: e.key, row: e.value, viewOnly: viewOnly);
+                return _ItemRow(
+                  index: e.key,
+                  row: e.value,
+                  viewOnly: viewOnly,
+                  onRemove: viewOnly ? null : () => controller.removeItem(e.key),
+                  onSelectProduct: viewOnly
+                      ? null
+                      : () => _showProductPicker(context, controller, e.value),
+                );
               }).toList(),
             );
           }),
+
+          // ── Add Item button (hidden in viewOnly) ──────────────────────────
+          if (!viewOnly)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: TextButton.icon(
+                onPressed: () {
+                  controller.addItem();
+                  // Auto-open product picker for the new row
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (controller.items.isNotEmpty) {
+                      _showProductPicker(context, controller, controller.items.last);
+                    }
+                  });
+                },
+                icon: const Icon(Icons.add_circle_outline, size: 18, color: AppColors.primary),
+                label: const Text('Add Item', style: TextStyle(color: AppColors.primary)),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                ),
+              ),
+            ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _showProductPicker(
+    BuildContext context,
+    SalesInvoiceFormController controller,
+    SILineRow row,
+  ) async {
+    List<Map<String, dynamic>> results = [];
+    bool loading = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) {
+          Future<void> doSearch(String q) async {
+            setState(() => loading = true);
+            results = await controller.searchProducts(q);
+            setState(() => loading = false);
+          }
+
+          return DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.65,
+            maxChildSize: 0.95,
+            builder: (_, scroll) => Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+              child: Column(
+                children: [
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 40, height: 4,
+                    decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Select Product', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: TextField(
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        hintText: 'Search by product name or code…',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      onChanged: (v) => doSearch(v),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: loading
+                        ? const Center(child: CircularProgressIndicator())
+                        : results.isEmpty
+                            ? const Center(child: Text('Type to search products', style: TextStyle(color: Colors.grey)))
+                            : ListView.builder(
+                                controller: scroll,
+                                itemCount: results.length,
+                                itemBuilder: (_, i) {
+                                  final p = results[i];
+                                  final id = p['id'] is int
+                                      ? p['id'] as int
+                                      : int.tryParse(p['id']?.toString() ?? '') ?? 0;
+                                  final name = p['product_name']?.toString() ?? p['name']?.toString() ?? '';
+                                  final code = p['product_code']?.toString() ?? '';
+                                  final unit = p['unit']?.toString() ?? 'Nos';
+                                  final price = double.tryParse(p['price']?.toString() ?? '') ?? 0.0;
+                                  return ListTile(
+                                    leading: const Icon(Icons.inventory_2_outlined, color: AppColors.primary),
+                                    title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                    subtitle: code.isNotEmpty ? Text(code) : null,
+                                    trailing: price > 0
+                                        ? Text('₹${price.toStringAsFixed(2)}',
+                                            style: const TextStyle(color: AppColors.primaryDark, fontWeight: FontWeight.w600))
+                                        : null,
+                                    onTap: () {
+                                      Navigator.pop(ctx);
+                                      controller.applyProduct(row, id, name, code, unit, price);
+                                    },
+                                  );
+                                },
+                              ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -609,8 +746,16 @@ class _ItemRow extends StatefulWidget {
   final int index;
   final SILineRow row;
   final bool viewOnly;
+  final VoidCallback? onRemove;
+  final VoidCallback? onSelectProduct;
 
-  const _ItemRow({required this.index, required this.row, required this.viewOnly});
+  const _ItemRow({
+    required this.index,
+    required this.row,
+    required this.viewOnly,
+    this.onRemove,
+    this.onSelectProduct,
+  });
 
   @override
   State<_ItemRow> createState() => _ItemRowState();
@@ -618,11 +763,13 @@ class _ItemRow extends StatefulWidget {
 
 class _ItemRowState extends State<_ItemRow> {
   late final TextEditingController _qtyCtrl;
+  late final TextEditingController _priceCtrl;
 
   @override
   void initState() {
     super.initState();
     _qtyCtrl = TextEditingController(text: widget.row.qtyDelivered.value);
+    _priceCtrl = TextEditingController(text: widget.row.price.value);
   }
 
   @override
@@ -632,11 +779,16 @@ class _ItemRowState extends State<_ItemRow> {
       _qtyCtrl.text = widget.row.qtyDelivered.value;
       _qtyCtrl.selection = TextSelection.collapsed(offset: _qtyCtrl.text.length);
     }
+    if (widget.row.price.value != _priceCtrl.text) {
+      _priceCtrl.text = widget.row.price.value;
+      _priceCtrl.selection = TextSelection.collapsed(offset: _priceCtrl.text.length);
+    }
   }
 
   @override
   void dispose() {
     _qtyCtrl.dispose();
+    _priceCtrl.dispose();
     super.dispose();
   }
 
@@ -657,7 +809,7 @@ class _ItemRowState extends State<_ItemRow> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Product name + unit
+            // Product name row + index badge + remove button
             Row(
               children: [
                 Container(
@@ -679,10 +831,21 @@ class _ItemRowState extends State<_ItemRow> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Obx(() => Text(
-                    row.productName.value.isNotEmpty ? row.productName.value : 'Product',
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                  )),
+                  child: Obx(() {
+                    final name = row.productName.value;
+                    final isEmpty = name.isEmpty;
+                    return GestureDetector(
+                      onTap: viewOnly ? null : widget.onSelectProduct,
+                      child: Text(
+                        isEmpty ? (viewOnly ? 'Product' : 'Tap to select product…') : name,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: isEmpty ? AppColors.textMuted : null,
+                        ),
+                      ),
+                    );
+                  }),
                 ),
                 Obx(() => Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -695,23 +858,34 @@ class _ItemRowState extends State<_ItemRow> {
                     style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600),
                   ),
                 )),
+                if (!viewOnly && widget.onRemove != null) ...[
+                  const SizedBox(width: 4),
+                  GestureDetector(
+                    onTap: widget.onRemove,
+                    child: const Icon(Icons.close, size: 18, color: Colors.redAccent),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 10),
 
-            // Ordered Qty | Qty Delivered
+            // Ordered Qty (read-only if from SO, hidden if 0) | Qty Delivered
             Row(
               children: [
-                Expanded(
-                  child: Obx(() => TextFormField(
-                    key: ValueKey('ordered_${row.orderedQty.value}'),
-                    initialValue: row.orderedQty.value,
-                    readOnly: true,
-                    decoration: _dec(label: 'Ordered Qty'),
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-                  )),
-                ),
-                const SizedBox(width: 8),
+                Obx(() => row.orderedQtyDouble > 0
+                    ? Expanded(
+                        child: TextFormField(
+                          key: ValueKey('ordered_${row.orderedQty.value}'),
+                          initialValue: row.orderedQty.value,
+                          readOnly: true,
+                          decoration: _dec(label: 'Ordered Qty'),
+                          style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                        ),
+                      )
+                    : const SizedBox.shrink()),
+                Obx(() => row.orderedQtyDouble > 0
+                    ? const SizedBox(width: 8)
+                    : const SizedBox.shrink()),
                 Expanded(
                   child: TextFormField(
                     controller: _qtyCtrl,
@@ -729,17 +903,31 @@ class _ItemRowState extends State<_ItemRow> {
             ),
             const SizedBox(height: 8),
 
-            // Unit Price | Line Total
+            // Unit Price (editable for manually added items) | Line Total
             Row(
               children: [
                 Expanded(
-                  child: Obx(() => TextFormField(
-                    key: ValueKey('price_${row.price.value}'),
-                    initialValue: '₹ ${row.price.value}',
-                    readOnly: true,
-                    decoration: _dec(label: 'Unit Price'),
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-                  )),
+                  child: Obx(() => row.orderedQtyDouble > 0
+                      // From SO: price is read-only
+                      ? TextFormField(
+                          key: ValueKey('price_${row.price.value}'),
+                          initialValue: '₹ ${row.price.value}',
+                          readOnly: true,
+                          decoration: _dec(label: 'Unit Price'),
+                          style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                        )
+                      // Manually added: price is editable
+                      : TextFormField(
+                          controller: _priceCtrl,
+                          readOnly: viewOnly,
+                          decoration: _dec(label: 'Unit Price *'),
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                          ],
+                          style: const TextStyle(fontSize: 13),
+                          onChanged: viewOnly ? null : (v) => row.price.value = v,
+                        )),
                 ),
                 const SizedBox(width: 8),
                 Expanded(

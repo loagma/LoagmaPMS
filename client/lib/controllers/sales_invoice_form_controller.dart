@@ -80,10 +80,14 @@ class SalesInvoiceFormController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    // Default invoice date to today
+    billDt.value = _today();
+    // Default doc year to current financial year
+    billDocYear.value = _currentFinancialYear();
+
     if (soId != null) {
       _loadOrder(soId!);
     } else {
-      // Fetch invoice number immediately for new invoices
       unawaited(_fetchNextInvoiceNumber());
     }
   }
@@ -154,12 +158,56 @@ class SalesInvoiceFormController extends GetxController {
       final List list = data['data'] ?? [];
       return list
           .whereType<Map<String, dynamic>>()
+          // Only show orders that can still be invoiced (not already billed)
           .where((o) => (o['status']?.toString().toLowerCase() ?? '') != 'billed')
           .toList();
     } catch (e) {
       debugPrint('[SI FORM] Search orders error: $e');
       return [];
     }
+  }
+
+  // ── Product search (for adding extra items) ─────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> searchProducts(String query) async {
+    try {
+      final uri = Uri.parse(ApiConfig.products).replace(queryParameters: {
+        'search': query,
+        'limit': '30',
+      });
+      final response = await http
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return [];
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) return [];
+      return (data['data'] as List? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .toList();
+    } catch (e) {
+      debugPrint('[SI FORM] Search products error: $e');
+      return [];
+    }
+  }
+
+  // ── Item management ──────────────────────────────────────────────────────────
+
+  void addItem() {
+    items.add(SILineRow(qtyDelivered: '1'));
+  }
+
+  void removeItem(int index) {
+    if (index >= 0 && index < items.length) items.removeAt(index);
+  }
+
+  void applyProduct(SILineRow row, int productId, String name, String? code, String? unit, double price) {
+    row.productId.value = productId;
+    row.productName.value = name;
+    row.productCode.value = code ?? '';
+    row.unit.value = unit?.isNotEmpty == true ? unit! : 'Nos';
+    row.price.value = price.toString();
+    row.orderedQty.value = '0';
+    row.qtyDelivered.value = '1';
   }
 
   // ── Load order ──────────────────────────────────────────────────────────────
@@ -203,13 +251,23 @@ class SalesInvoiceFormController extends GetxController {
     customerId.value = so.customerId;
     customerName.value = so.customerName ?? '';
     orderDate.value = so.docDate;
-    billDt.value = so.billDt ?? _today();
+
+    // Only override billDt if the SO already has an invoice date (viewing existing invoice)
+    if (so.billDt != null && so.billDt!.isNotEmpty) {
+      billDt.value = so.billDt!;
+    }
+    // else keep the today default set in onInit
+
     billDepartment.value = so.department ?? '';
     billNarration.value = so.billNarration ?? '';
     billVehicle.value = so.billVehicle ?? '';
     billStatement.value = so.billStatement ?? '';
     billRoff.value = so.billRoff?.toStringAsFixed(2) ?? '0';
-    billDocYear.value = so.docYear ?? '25-26';
+
+    // Only override docYear if the SO already has one
+    if (so.docYear != null && so.docYear!.isNotEmpty) {
+      billDocYear.value = so.docYear!;
+    }
 
     // Also sync customer picker to the order's customer
     if (selectedCustomerId.value == null) {
@@ -265,8 +323,8 @@ class SalesInvoiceFormController extends GetxController {
   // ── Validation & save ───────────────────────────────────────────────────────
 
   bool validate() {
-    if (sourceOrderId.value == null) {
-      _showError('Please select a source order');
+    if (selectedCustomerId.value == null) {
+      _showError('Please select a customer');
       return false;
     }
     if (billDt.value.trim().isEmpty) {
@@ -278,12 +336,17 @@ class SalesInvoiceFormController extends GetxController {
       return false;
     }
     for (final r in items) {
-      final qty = r.deliveredQtyDouble;
-      if (qty < 0) {
-        _showError('Delivered qty cannot be negative for ${r.productName.value}');
+      if (r.productId.value == null) {
+        _showError('Please select a product for all items');
         return false;
       }
-      if (qty > r.orderedQtyDouble) {
+      final qty = r.deliveredQtyDouble;
+      if (qty <= 0) {
+        _showError('Qty delivered must be greater than 0 for ${r.productName.value.isEmpty ? 'item' : r.productName.value}');
+        return false;
+      }
+      // Only enforce ordered qty limit if item came from a linked SO (orderedQty > 0)
+      if (r.orderedQtyDouble > 0 && qty > r.orderedQtyDouble) {
         _showError('Delivered qty cannot exceed ordered qty for ${r.productName.value}');
         return false;
       }
@@ -295,44 +358,10 @@ class SalesInvoiceFormController extends GetxController {
     if (!validate()) return;
     isSaving.value = true;
     try {
-      final orderId = sourceOrderId.value!;
-      final payload = {
-        'status': 'billed',
-        'bill_number': invoiceNumber.value.trim(),
-        'bill_dt': billDt.value.trim(),
-        if (billDepartment.value.trim().isNotEmpty) 'department': billDepartment.value.trim(),
-        if (billNarration.value.trim().isNotEmpty) 'bill_narration': billNarration.value.trim(),
-        if (billVehicle.value.trim().isNotEmpty) 'bill_vehicle': billVehicle.value.trim(),
-        if (billStatement.value.trim().isNotEmpty) 'bill_statement': billStatement.value.trim(),
-        'bill_roff': double.tryParse(billRoff.value) ?? 0,
-        if (billDocYear.value.trim().isNotEmpty) 'doc_year': billDocYear.value.trim(),
-        'items': items.map((r) => {
-          'product_id': r.productId.value,
-          'quantity': r.orderedQtyDouble,
-          'qty_delivered': r.deliveredQtyDouble,
-          'price': r.priceDouble,
-          if (r.unit.value.isNotEmpty) 'unit': r.unit.value,
-        }).toList(),
-      };
-
-      final response = await http.put(
-        Uri.parse('${ApiConfig.salesOrders}/$orderId'),
-        headers: {'Accept': 'application/json', 'Content-Type': 'application/json'},
-        body: jsonEncode(payload),
-      );
-
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (response.statusCode == 200 && data['success'] == true) {
-        Get.snackbar(
-          'Success',
-          'Invoice ${invoiceNumber.value} saved',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-        );
-        Get.back(result: true);
+      if (sourceOrderId.value != null) {
+        await _putExistingOrder(sourceOrderId.value!);
       } else {
-        _showError(data['message']?.toString() ?? 'Failed to save invoice');
+        await _createNewOrderAsBilled();
       }
     } catch (e) {
       debugPrint('[SI FORM] Save error: $e');
@@ -342,9 +371,104 @@ class SalesInvoiceFormController extends GetxController {
     }
   }
 
+  Future<void> _putExistingOrder(int orderId) async {
+    final payload = {
+      'status': 'billed',
+      'bill_number': invoiceNumber.value.trim(),
+      'bill_dt': billDt.value.trim(),
+      if (billDepartment.value.trim().isNotEmpty) 'department': billDepartment.value.trim(),
+      if (billNarration.value.trim().isNotEmpty) 'bill_narration': billNarration.value.trim(),
+      if (billVehicle.value.trim().isNotEmpty) 'bill_vehicle': billVehicle.value.trim(),
+      if (billStatement.value.trim().isNotEmpty) 'bill_statement': billStatement.value.trim(),
+      'bill_roff': double.tryParse(billRoff.value) ?? 0,
+      if (billDocYear.value.trim().isNotEmpty) 'doc_year': billDocYear.value.trim(),
+      'items': items.map((r) => {
+        'product_id': r.productId.value,
+        'quantity': r.orderedQtyDouble > 0 ? r.orderedQtyDouble : r.deliveredQtyDouble,
+        'qty_delivered': r.deliveredQtyDouble,
+        'price': r.priceDouble,
+        if (r.unit.value.isNotEmpty) 'unit': r.unit.value,
+      }).toList(),
+    };
+
+    final response = await http.put(
+      Uri.parse('${ApiConfig.salesOrders}/$orderId'),
+      headers: {'Accept': 'application/json', 'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    );
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode == 200 && data['success'] == true) {
+      Get.snackbar(
+        'Success',
+        'Invoice ${invoiceNumber.value} saved',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+      Get.back(result: true);
+    } else {
+      _showError(data['message']?.toString() ?? 'Failed to save invoice');
+    }
+  }
+
+  Future<void> _createNewOrderAsBilled() async {
+    final payload = {
+      'customer_id': selectedCustomerId.value,
+      'status': 'billed',
+      'bill_number': invoiceNumber.value.trim(),
+      'bill_dt': billDt.value.trim(),
+      'doc_date': billDt.value.trim(),
+      if (billDepartment.value.trim().isNotEmpty) 'department': billDepartment.value.trim(),
+      if (billNarration.value.trim().isNotEmpty) 'bill_narration': billNarration.value.trim(),
+      if (billVehicle.value.trim().isNotEmpty) 'bill_vehicle': billVehicle.value.trim(),
+      if (billStatement.value.trim().isNotEmpty) 'bill_statement': billStatement.value.trim(),
+      'bill_roff': double.tryParse(billRoff.value) ?? 0,
+      if (billDocYear.value.trim().isNotEmpty) 'doc_year': billDocYear.value.trim(),
+      'items': items.map((r) => {
+        'product_id': r.productId.value,
+        'quantity': r.orderedQtyDouble > 0 ? r.orderedQtyDouble : r.deliveredQtyDouble,
+        'qty_delivered': r.deliveredQtyDouble,
+        'price': r.priceDouble,
+        if (r.unit.value.isNotEmpty) 'unit': r.unit.value,
+      }).toList(),
+    };
+
+    final response = await http.post(
+      Uri.parse(ApiConfig.salesOrders),
+      headers: {'Accept': 'application/json', 'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    );
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    if ((response.statusCode == 200 || response.statusCode == 201) && data['success'] == true) {
+      Get.snackbar(
+        'Success',
+        'Invoice ${invoiceNumber.value} created',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+      Get.back(result: true);
+    } else {
+      _showError(data['message']?.toString() ?? 'Failed to create invoice');
+    }
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+
   String _today() {
     final now = DateTime.now();
     return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  String _currentFinancialYear() {
+    final now = DateTime.now();
+    // Indian FY: April 1 to March 31
+    final startYear = now.month >= 4 ? now.year : now.year - 1;
+    final s = startYear.toString().substring(2);
+    final e = (startYear + 1).toString().substring(2);
+    return '$s-$e';
   }
 
   void _showError(String msg) {

@@ -151,6 +151,7 @@ Route::get('/sales-orders', [SalesOrderController::class, 'index']);
 Route::post('/sales-orders', [SalesOrderController::class, 'store']);
 Route::get('/sales-orders/{id}', [SalesOrderController::class, 'show'])->where('id', '[0-9]+');
 Route::put('/sales-orders/{id}', [SalesOrderController::class, 'update'])->where('id', '[0-9]+');
+Route::delete('/sales-orders/{id}', [SalesOrderController::class, 'destroy'])->where('id', '[0-9]+');
 
 // Sales Return routes (series must be before /{id})
 Route::get('/sales-returns/series', [SalesReturnController::class, 'series']);

@@ -307,6 +307,28 @@ class SalesOrderController extends Controller
         }
     }
 
+    public function destroy(int $id): JsonResponse
+    {
+        try {
+            $order = DB::table(self::ORDERS_TABLE)->where('order_id', $id)->first();
+            if (!$order) {
+                return response()->json(['success' => false, 'message' => 'Order not found'], 404);
+            }
+            if (!empty($order->bill_number)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot delete order: invoice ' . $order->bill_number . ' is linked. Delete the invoice first.',
+                ], 422);
+            }
+            DB::table(self::ITEMS_TABLE)->where('order_id', $id)->delete();
+            DB::table(self::ORDERS_TABLE)->where('order_id', $id)->delete();
+            return response()->json(['success' => true, 'message' => 'Order deleted']);
+        } catch (\Throwable $e) {
+            Log::error('SalesOrder destroy error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to delete order'], 500);
+        }
+    }
+
     public function show(int $id): JsonResponse
     {
         try {
