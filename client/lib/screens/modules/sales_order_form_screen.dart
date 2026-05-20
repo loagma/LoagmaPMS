@@ -275,7 +275,16 @@ class _SalesOrderReportView extends StatelessWidget {
                 _metaRow('Document Date', _normalizeDate(controller.docDate.value)),
                 _metaRow('Expected Date', _normalizeDate(controller.expectedDate.value)),
                 _metaRow('Financial Year', controller.financialYear.value.trim().isEmpty ? '-' : controller.financialYear.value.trim()),
-                _metaRow('Narration', controller.narration.value.trim().isEmpty ? '-' : controller.narration.value.trim(), isLast: true),
+                _metaRow('Narration', controller.narration.value.trim().isEmpty ? '-' : controller.narration.value.trim(), isLast: !controller.isBillMode),
+                if (controller.isBillMode) ...[
+                  _metaRow('Bill Date', controller.billDt.value.isEmpty ? '-' : _normalizeDate(controller.billDt.value)),
+                  _metaRow('Department', controller.billDepartment.value.isEmpty ? '-' : controller.billDepartment.value),
+                  _metaRow('Bill Narration', controller.billNarration.value.isEmpty ? '-' : controller.billNarration.value),
+                  _metaRow('Vehicle', controller.billVehicle.value.isEmpty ? '-' : controller.billVehicle.value),
+                  _metaRow('Bill Statement', controller.billStatement.value.isEmpty ? '-' : controller.billStatement.value),
+                  _metaRow('Round Off', controller.billRoff.value.isEmpty ? '0' : controller.billRoff.value),
+                  _metaRow('Doc Year', controller.billDocYear.value.isEmpty ? '-' : controller.billDocYear.value, isLast: true),
+                ],
               ],
             ),
           ),
@@ -965,6 +974,7 @@ class _HeaderCard extends StatelessWidget {
                   items: const [
                     DropdownMenuItem(value: 'DRAFT', child: Text('Draft')),
                     DropdownMenuItem(value: 'CONFIRMED', child: Text('Confirmed')),
+                    DropdownMenuItem(value: 'BILLED', child: Text('Billed')),
                     DropdownMenuItem(value: 'PARTIALLY_INVOICED', child: Text('Partially invoiced')),
                     DropdownMenuItem(value: 'CLOSED', child: Text('Closed')),
                     DropdownMenuItem(value: 'CANCELLED', child: Text('Cancelled')),
@@ -987,6 +997,102 @@ class _HeaderCard extends StatelessWidget {
                 maxLines: 1,
                 onChanged: controller.setNarration,
               )),
+          // Bill / Invoice fields — shown only when status is BILLED
+          Obx(() {
+            if (!controller.isBillMode) return const SizedBox.shrink();
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: _sectionGap),
+                const Divider(),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Text(
+                    'Bill / Invoice Details',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: _sectionGap),
+                // Bill Date
+                Obx(() => InkWell(
+                      onTap: controller.isReadOnly
+                          ? null
+                          : () => _pickSoDate(
+                                context,
+                                currentValue: controller.billDt.value,
+                                onPicked: controller.setBillDt,
+                              ),
+                      child: InputDecorator(
+                        decoration: _soInputDecoration(labelText: 'Bill Date'),
+                        child: Text(
+                          controller.billDt.value.isEmpty
+                              ? 'Select date'
+                              : controller.billDt.value,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: controller.billDt.value.isEmpty
+                                ? Colors.grey
+                                : null,
+                          ),
+                        ),
+                      ),
+                    )),
+                const SizedBox(height: _sectionGap),
+                // Department
+                Obx(() => TextFormField(
+                      enabled: !controller.isReadOnly,
+                      initialValue: controller.billDepartment.value,
+                      decoration: _soInputDecoration(labelText: 'Department'),
+                      onChanged: controller.setBillDepartment,
+                    )),
+                const SizedBox(height: _sectionGap),
+                // Bill Narration
+                Obx(() => TextFormField(
+                      enabled: !controller.isReadOnly,
+                      initialValue: controller.billNarration.value,
+                      decoration: _soInputDecoration(labelText: 'Bill Narration'),
+                      onChanged: controller.setBillNarration,
+                    )),
+                const SizedBox(height: _sectionGap),
+                // Bill Vehicle
+                Obx(() => TextFormField(
+                      enabled: !controller.isReadOnly,
+                      initialValue: controller.billVehicle.value,
+                      decoration: _soInputDecoration(labelText: 'Vehicle'),
+                      onChanged: controller.setBillVehicle,
+                    )),
+                const SizedBox(height: _sectionGap),
+                // Bill Statement
+                Obx(() => TextFormField(
+                      enabled: !controller.isReadOnly,
+                      initialValue: controller.billStatement.value,
+                      decoration: _soInputDecoration(labelText: 'Bill Statement'),
+                      onChanged: controller.setBillStatement,
+                    )),
+                const SizedBox(height: _sectionGap),
+                // Round-off
+                Obx(() => TextFormField(
+                      enabled: !controller.isReadOnly,
+                      initialValue: controller.billRoff.value,
+                      decoration: _soInputDecoration(labelText: 'Round Off'),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                      onChanged: controller.setBillRoff,
+                    )),
+                const SizedBox(height: _sectionGap),
+                // Doc Year
+                Obx(() => TextFormField(
+                      enabled: !controller.isReadOnly,
+                      initialValue: controller.billDocYear.value,
+                      decoration: _soInputDecoration(labelText: 'Doc Year (e.g. 25-26)'),
+                      onChanged: controller.setBillDocYear,
+                    )),
+              ],
+            );
+          }),
         ],
       ),
     );
@@ -1203,6 +1309,20 @@ class _ItemRow extends StatelessWidget {
               ),
             ],
           ),
+          // Qty Delivered — only visible when billing
+          Obx(() {
+            if (!controller.isBillMode) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: TextFormField(
+                initialValue: row.qtyDelivered.value,
+                decoration: _soInputDecoration(labelText: 'Qty Delivered'),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,3}'))],
+                onChanged: (v) => row.qtyDelivered.value = v,
+              ),
+            );
+          }),
           Obx(() {
             if (row.productId.value == null || row.availableTaxKeys.isEmpty) {
               return const SizedBox.shrink();

@@ -40,6 +40,7 @@ import '../screens/modules/sales_home_screen.dart';
 import '../screens/modules/sales_module_reports_screen.dart';
 import '../screens/modules/sales_order_form_screen.dart';
 import '../screens/modules/sales_order_list_screen.dart';
+
 import '../screens/modules/sales_invoice_form_screen.dart';
 import '../screens/modules/sales_invoice_list_screen.dart';
 import '../screens/modules/sales_return_form_screen.dart';
@@ -89,10 +90,10 @@ abstract class AppRoutes {
   static const String customers = '/customers';
   static const String customerForm = '/customer-form';
   static const String sales = '/sales';
-  static const String salesOrders = '/sales-orders';
+  static const String salesOrderList = '/sales-orders';
   static const String salesOrderForm = '/sales-order-form';
   static const String salesInvoiceList = '/sales-invoices';
-  static const String salesInvoice = '/sales-invoice';
+  static const String salesInvoiceForm = '/sales-invoice-form';
   static const String salesReturnList = '/sales-returns';
   static const String salesReturnForm = '/sales-return';
   static const String salesModuleReports = '/reports/sales-module';
@@ -231,8 +232,8 @@ final List<GetPage<dynamic>> appPages = [
   ),
   GetPage(name: AppRoutes.sales, page: () => const SalesHomeScreen()),
   GetPage(
-    name: AppRoutes.salesOrders,
-    page: () => const SalesOrderFormScreen(),
+    name: AppRoutes.salesOrderList,
+    page: () => const SalesOrderListScreen(),
   ),
   GetPage(
     name: AppRoutes.salesOrderForm,
@@ -243,9 +244,9 @@ final List<GetPage<dynamic>> appPages = [
     page: () => const SalesInvoiceListScreen(),
   ),
   GetPage(
-    name: AppRoutes.salesInvoice,
+    name: AppRoutes.salesInvoiceForm,
     page: () => SalesInvoiceFormScreen(
-      invoiceId: Get.arguments is int ? Get.arguments as int? : null,
+      soId: Get.arguments is int ? Get.arguments as int? : null,
     ),
   ),
   GetPage(

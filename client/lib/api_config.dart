@@ -116,6 +116,9 @@ class ApiConfig {
   /// GET/POST ${ApiConfig.apiBaseUrl}/sales-orders
   static String get salesOrders => '$apiBaseUrl/sales-orders';
 
+  /// GET ${ApiConfig.apiBaseUrl}/sales-orders/invoice-series
+  static String get salesInvoiceSeries => '$apiBaseUrl/sales-orders/invoice-series';
+
 
   /// GET/POST ${ApiConfig.apiBaseUrl}/sales-returns
   static String get salesReturns => '$apiBaseUrl/sales-returns';

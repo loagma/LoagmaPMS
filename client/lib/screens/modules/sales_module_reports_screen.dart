@@ -19,12 +19,6 @@ class SalesModuleReportsScreen extends StatelessWidget {
         onTap: () => Get.to(() => const SalesOrderListScreen()),
       ),
       _SalesReportTile(
-        title: 'Sales Invoices',
-        subtitle: 'View all sales invoices',
-        icon: Icons.description_outlined,
-        onTap: () => Get.toNamed(AppRoutes.salesInvoiceList),
-      ),
-      _SalesReportTile(
         title: 'Sales Returns',
         subtitle: 'View return and credit note documents',
         icon: Icons.assignment_return_outlined,

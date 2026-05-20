@@ -24,7 +24,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\SalesOrderController;
-use App\Http\Controllers\SalesInvoiceController;
+use App\Http\Controllers\SalesReturnController;
 
 Route::get('/health', [HealthController::class, 'index']);
 
@@ -145,18 +145,20 @@ Route::post('/product-packages', [ProductPackageController::class, 'store']);
 Route::get('/product-packages/{id}', [ProductPackageController::class, 'show'])->where('id', '[0-9]+');
 Route::put('/product-packages/{id}', [ProductPackageController::class, 'update'])->where('id', '[0-9]+');
 
-// Sales Order routes
+// Sales Order routes (invoice-series must be before /{id})
+Route::get('/sales-orders/invoice-series', [SalesOrderController::class, 'series']);
 Route::get('/sales-orders', [SalesOrderController::class, 'index']);
 Route::post('/sales-orders', [SalesOrderController::class, 'store']);
 Route::get('/sales-orders/{id}', [SalesOrderController::class, 'show'])->where('id', '[0-9]+');
 Route::put('/sales-orders/{id}', [SalesOrderController::class, 'update'])->where('id', '[0-9]+');
 
-// Sales Invoice routes
-Route::get('/sales-invoices/series', [SalesInvoiceController::class, 'series']);
-Route::get('/sales-invoices', [SalesInvoiceController::class, 'index']);
-Route::post('/sales-invoices', [SalesInvoiceController::class, 'store']);
-Route::get('/sales-invoices/{id}', [SalesInvoiceController::class, 'show'])->where('id', '[0-9]+');
-Route::put('/sales-invoices/{id}', [SalesInvoiceController::class, 'update'])->where('id', '[0-9]+');
+// Sales Return routes (series must be before /{id})
+Route::get('/sales-returns/series', [SalesReturnController::class, 'series']);
+Route::get('/sales-returns', [SalesReturnController::class, 'index']);
+Route::post('/sales-returns', [SalesReturnController::class, 'store']);
+Route::get('/sales-returns/{id}', [SalesReturnController::class, 'show'])->where('id', '[0-9]+');
+Route::put('/sales-returns/{id}', [SalesReturnController::class, 'update'])->where('id', '[0-9]+');
+Route::delete('/sales-returns/{id}', [SalesReturnController::class, 'destroy'])->where('id', '[0-9]+');
 
 // Category routes (parent_cat_id=0: category, parent_cat_id>0: subcategory)
 Route::get('/categories', [CategoryController::class, 'index']);

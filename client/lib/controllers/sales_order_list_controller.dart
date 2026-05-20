@@ -125,17 +125,22 @@ class SalesOrderListController extends GetxController {
   }
 
   Color statusColor(String status) {
-    switch (status.toUpperCase()) {
-      case 'DRAFT':
-        return Colors.blue;
-      case 'CONFIRMED':
-        return Colors.green;
-      case 'PARTIALLY_INVOICED':
+    switch (status.toLowerCase()) {
+      case 'pending':
         return Colors.orange;
-      case 'CLOSED':
-        return AppColors.textMuted;
-      case 'CANCELLED':
+      case 'registered':
+        return Colors.blue;
+      case 'dispatched':
+        return Colors.indigo;
+      case 'delivered':
+        return Colors.teal;
+      case 'billed':
+        return Colors.green;
+      case 'cancelled':
+      case 'rejected':
         return Colors.redAccent;
+      case 'returned':
+        return Colors.purple;
       default:
         return AppColors.textMuted;
     }

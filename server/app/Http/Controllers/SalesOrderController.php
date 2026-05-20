@@ -14,6 +14,24 @@ class SalesOrderController extends Controller
 
     private static array $CLOSED_STATES = ['cancelled', 'rejected', 'returned'];
 
+    // GET /sales-orders/invoice-series
+    public function series(): JsonResponse
+    {
+        try {
+            $count   = DB::table(self::ORDERS_TABLE)->whereNotNull('bill_number')->count();
+            $nextNum = str_pad((string) ($count + 1), 3, '0', STR_PAD_LEFT);
+            return response()->json([
+                'success'     => true,
+                'prefix'      => 'INV/25-26/',
+                'next_number' => $nextNum,
+                'full_number' => 'INV/25-26/' . $nextNum,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('SalesOrder series error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to get invoice series'], 500);
+        }
+    }
+
     public function index(Request $request): JsonResponse
     {
         try {
@@ -56,6 +74,17 @@ class SalesOrderController extends Controller
                     'o.discount',
                     'o.delivery_charge',
                     'o.items_count',
+                    'o.buyer_name',
+                    'o.bill_number',
+                    'o.Bill_Dt',
+                    'o.Department',
+                    'o.Bill_Narration',
+                    'o.Bill_Vehicle',
+                    'o.Bill_Statement',
+                    'o.bill_roff',
+                    'o.Doc_Year',
+                    'o.Sales_Return_VoucherNo',
+                    'o.Sales_Return_Dt',
                 ])
                 ->offset(($page - 1) * $limit)
                 ->limit($limit)
@@ -96,6 +125,23 @@ class SalesOrderController extends Controller
             $delivery  = (float) $request->input('delivery_charge', 0);
             $narration = trim((string) $request->input('narration', ''));
 
+            // Bill fields (populated when status = 'billed')
+            $billDt        = $request->input('bill_dt') ?: null;
+            $department    = trim((string) $request->input('department', '')) ?: null;
+            $billNarration = trim((string) $request->input('bill_narration', '')) ?: null;
+            $billVehicle   = trim((string) $request->input('bill_vehicle', '')) ?: null;
+            $billStatement = trim((string) $request->input('bill_statement', '')) ?: null;
+            $billRoff      = (float) $request->input('bill_roff', 0);
+            $docYear       = trim((string) $request->input('doc_year', '')) ?: null;
+
+            // Return fields
+            $salesReturnVoucherNo = trim((string) $request->input('sales_return_voucher_no', '')) ?: null;
+            $salesReturnDt        = $request->input('sales_return_dt') ?: null;
+
+            if ($status === 'billed' && empty($billDt)) {
+                return response()->json(['success' => false, 'message' => 'bill_dt is required when status is billed'], 422);
+            }
+
             $lineTotal = 0.0;
             foreach ($items as $item) {
                 $qty   = (float) ($item['quantity'] ?? 0);
@@ -113,6 +159,15 @@ class SalesOrderController extends Controller
                 'items_count'     => count($items),
                 'short_datetime'  => $docDate,
                 'txn_id'          => $narration ?: null,
+                'Bill_Dt'         => $billDt,
+                'Department'      => $department,
+                'Bill_Narration'  => $billNarration,
+                'Bill_Vehicle'    => $billVehicle,
+                'Bill_Statement'  => $billStatement,
+                'bill_roff'               => $billRoff,
+                'Doc_Year'                => $docYear,
+                'Sales_Return_VoucherNo'  => $salesReturnVoucherNo,
+                'Sales_Return_Dt'         => $salesReturnDt,
             ], 'order_id');
 
             foreach ($items as $item) {
@@ -169,6 +224,24 @@ class SalesOrderController extends Controller
             $delivery = (float) $request->input('delivery_charge', $order->delivery_charge ?? 0);
             $narration = trim((string) $request->input('narration', ''));
 
+            // Bill fields
+            $billNumber    = trim((string) $request->input('bill_number', '')) ?: ($order->bill_number ?? null);
+            $billDt        = $request->input('bill_dt') ?: null;
+            $department    = trim((string) $request->input('department', '')) ?: null;
+            $billNarration = trim((string) $request->input('bill_narration', '')) ?: null;
+            $billVehicle   = trim((string) $request->input('bill_vehicle', '')) ?: null;
+            $billStatement = trim((string) $request->input('bill_statement', '')) ?: null;
+            $billRoff      = (float) $request->input('bill_roff', 0);
+            $docYear       = trim((string) $request->input('doc_year', '')) ?: null;
+
+            // Return fields
+            $salesReturnVoucherNo = trim((string) $request->input('sales_return_voucher_no', '')) ?: null;
+            $salesReturnDt        = $request->input('sales_return_dt') ?: null;
+
+            if ($status === 'billed' && empty($billDt)) {
+                return response()->json(['success' => false, 'message' => 'bill_dt is required when status is billed'], 422);
+            }
+
             $lineTotal = 0.0;
             foreach ($items as $item) {
                 $qty   = (float) ($item['quantity'] ?? 0);
@@ -185,6 +258,16 @@ class SalesOrderController extends Controller
                 'items_count'     => count($items),
                 'short_datetime'  => $docDate,
                 'txn_id'          => $narration ?: null,
+                'bill_number'             => $billNumber,
+                'Bill_Dt'                 => $billDt,
+                'Department'              => $department,
+                'Bill_Narration'          => $billNarration,
+                'Bill_Vehicle'            => $billVehicle,
+                'Bill_Statement'          => $billStatement,
+                'bill_roff'               => $billRoff,
+                'Doc_Year'                => $docYear,
+                'Sales_Return_VoucherNo'  => $salesReturnVoucherNo,
+                'Sales_Return_Dt'         => $salesReturnDt,
             ]);
 
             DB::table(self::ITEMS_TABLE)->where('order_id', $id)->delete();
@@ -207,7 +290,7 @@ class SalesOrderController extends Controller
                     'item_price'    => $price,
                     'item_total'    => round($qty * $price, 2),
                     'pinfo'         => !empty($pinfo) ? json_encode($pinfo) : null,
-                    'qty_delivered' => 0,
+                    'qty_delivered' => (float) ($item['qty_delivered'] ?? 0),
                     'qty_returned'  => 0,
                 ]);
             }
@@ -239,6 +322,16 @@ class SalesOrderController extends Controller
                     'o.discount',
                     'o.delivery_charge',
                     'o.items_count',
+                    'o.bill_number',
+                    'o.Bill_Dt',
+                    'o.Department',
+                    'o.Bill_Narration',
+                    'o.Bill_Vehicle',
+                    'o.Bill_Statement',
+                    'o.bill_roff',
+                    'o.Doc_Year',
+                    'o.Sales_Return_VoucherNo',
+                    'o.Sales_Return_Dt',
                 ])
                 ->first();
 
@@ -307,9 +400,10 @@ class SalesOrderController extends Controller
         $state = strtolower(trim((string) ($data['order_state'] ?? 'pending')));
 
         return [
-            'id'           => $orderId,
-            'so_number'    => 'ORD-' . $orderId,
-            'customer_id'  => (int) ($data['buyer_userid'] ?? 0),
+            'id'            => $orderId,
+            'so_number'     => 'ORD-' . $orderId,
+            'customer_id'   => (int) ($data['buyer_userid'] ?? 0),
+            'customer_name' => $data['buyer_name'] ?? null,
             'doc_date'     => $docDate,
             'status'       => strtoupper($state),
             'total_amount' => $total,
@@ -318,6 +412,16 @@ class SalesOrderController extends Controller
             'total_with_charges' => $total,
             'narration'    => null,
             'txn_id'       => $data['txn_id'] ?? null,
+            'bill_number'    => $data['bill_number'] ?? null,
+            'bill_dt'        => $data['Bill_Dt'] ?? null,
+            'department'     => $data['Department'] ?? null,
+            'bill_narration' => $data['Bill_Narration'] ?? null,
+            'bill_vehicle'   => $data['Bill_Vehicle'] ?? null,
+            'bill_statement' => $data['Bill_Statement'] ?? null,
+            'bill_roff'               => (float) ($data['bill_roff'] ?? 0),
+            'doc_year'                => $data['Doc_Year'] ?? null,
+            'sales_return_voucher_no' => $data['Sales_Return_VoucherNo'] ?? null,
+            'sales_return_dt'         => $data['Sales_Return_Dt'] ?? null,
         ];
     }
 
@@ -396,9 +500,11 @@ class SalesOrderController extends Controller
         $qty          = (float) ($data['quantity'] ?? 0);
         $qtyDelivered = (float) ($data['qty_delivered'] ?? 0);
         $qtyReturned  = (float) ($data['qty_returned'] ?? 0);
-        $usedQty      = $qtyDelivered;
-        $writeoffQty  = $qtyReturned;
-        $leftQty      = max(0, $qty - $usedQty - $writeoffQty);
+
+        // left_qty = still undelivered (not yet given to customer)
+        $leftQty = max(0, $qty - $qtyDelivered);
+        // available_to_return = of what was delivered, how much can still be returned
+        $availableToReturn = max(0, $qtyDelivered - $qtyReturned);
 
         // item_price is the unit price in orders_item
         // item_total is qty * unit_price (line total)
@@ -408,21 +514,23 @@ class SalesOrderController extends Controller
         $price = $itemPrice > 0 ? $itemPrice : ($qty > 0 ? round($itemTotal / $qty, 4) : 0);
 
         return [
-            'id'             => (int) ($data['item_id'] ?? 0),
-            'sales_order_id' => (int) ($data['order_id'] ?? 0),
-            'product_id'     => $productId,
-            'product_name'   => $productName ?: ('Product ' . $productId),
-            'product_code'   => $productCode,
-            'unit'           => $unit,
-            'pack_id'        => $packId,
-            'pack_label'     => $packLabel,
-            'quantity'       => $qty,
-            'price'          => $price,
-            'used_qty'       => $usedQty,
-            'writeoff_qty'   => $writeoffQty,
-            'left_qty'       => $leftQty,
-            'line_total'     => $itemTotal > 0 ? $itemTotal : round($qty * $price, 2),
-            'hsn_code'       => $hsnCode,
+            'id'                 => (int) ($data['item_id'] ?? 0),
+            'sales_order_id'     => (int) ($data['order_id'] ?? 0),
+            'product_id'         => $productId,
+            'product_name'       => $productName ?: ('Product ' . $productId),
+            'product_code'       => $productCode,
+            'unit'               => $unit,
+            'pack_id'            => $packId,
+            'pack_label'         => $packLabel,
+            'quantity'           => $qty,
+            'price'              => $price,
+            'used_qty'           => $qtyDelivered,
+            'writeoff_qty'       => 0,
+            'returned_qty'       => $qtyReturned,
+            'left_qty'           => $leftQty,
+            'available_quantity' => $availableToReturn,
+            'line_total'         => $itemTotal > 0 ? $itemTotal : round($qty * $price, 2),
+            'hsn_code'           => $hsnCode,
         ];
     }
 

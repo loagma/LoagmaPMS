@@ -14,6 +14,18 @@ class SalesOrder {
   final double? totalWithCharges;
   final List<SalesOrderCharge> chargesJson;
   final List<SalesOrderItem> items;
+  // Bill / Invoice fields
+  final String? billNumber;
+  final String? billDt;
+  final String? department;
+  final String? billNarration;
+  final String? billVehicle;
+  final String? billStatement;
+  final double? billRoff;
+  final String? docYear;
+  // Return fields
+  final String? salesReturnVoucherNo;
+  final String? salesReturnDt;
 
   SalesOrder({
     this.id,
@@ -31,6 +43,16 @@ class SalesOrder {
     this.totalWithCharges,
     this.chargesJson = const [],
     this.items = const [],
+    this.billNumber,
+    this.billDt,
+    this.department,
+    this.billNarration,
+    this.billVehicle,
+    this.billStatement,
+    this.billRoff,
+    this.docYear,
+    this.salesReturnVoucherNo,
+    this.salesReturnDt,
   });
 
   factory SalesOrder.fromJson(Map<String, dynamic> json) {
@@ -86,6 +108,16 @@ class SalesOrder {
           .whereType<Map<String, dynamic>>()
           .map(SalesOrderItem.fromJson)
           .toList(),
+      billNumber: json['bill_number']?.toString(),
+      billDt: json['bill_dt']?.toString(),
+      department: json['department']?.toString(),
+      billNarration: json['bill_narration']?.toString(),
+      billVehicle: json['bill_vehicle']?.toString(),
+      billStatement: json['bill_statement']?.toString(),
+      billRoff: parseDouble(json['bill_roff']),
+      docYear: json['doc_year']?.toString(),
+      salesReturnVoucherNo: json['sales_return_voucher_no']?.toString(),
+      salesReturnDt: json['sales_return_dt']?.toString(),
     );
   }
 
@@ -106,6 +138,16 @@ class SalesOrder {
       if (chargesJson.isNotEmpty)
         'charges_json': chargesJson.map((e) => e.toJson()).toList(),
       if (items.isNotEmpty) 'items': items.map((e) => e.toJson()).toList(),
+      if (billNumber != null) 'bill_number': billNumber,
+      if (billDt != null) 'bill_dt': billDt,
+      if (department != null) 'department': department,
+      if (billNarration != null) 'bill_narration': billNarration,
+      if (billVehicle != null) 'bill_vehicle': billVehicle,
+      if (billStatement != null) 'bill_statement': billStatement,
+      if (billRoff != null) 'bill_roff': billRoff,
+      if (docYear != null) 'doc_year': docYear,
+      if (salesReturnVoucherNo != null) 'sales_return_voucher_no': salesReturnVoucherNo,
+      if (salesReturnDt != null) 'sales_return_dt': salesReturnDt,
     };
   }
 }

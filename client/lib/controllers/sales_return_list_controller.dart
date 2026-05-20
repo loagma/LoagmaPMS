@@ -47,7 +47,7 @@ class SalesReturnListController extends GetxController {
       }
 
       final queryParams = <String, String>{
-        'per_page': limit.toString(),
+        'limit': limit.toString(),
         'page': currentPage.value.toString(),
         if (searchQuery.value.isNotEmpty) 'search': searchQuery.value,
         if (customerId != null && customerId.isNotEmpty) 'customer_id': customerId,

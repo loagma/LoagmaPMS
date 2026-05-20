@@ -5,52 +5,22 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 
 import '../api_config.dart';
-
-class SalesInvoiceSummary {
-  final int id;
-  final String docNo;
-  final String customerName;
-  final String docDate;
-  final String billNo;
-  final String status;
-  final bool hasWriteoff;
-  final double? netTotal;
-
-  SalesInvoiceSummary({
-    required this.id,
-    required this.docNo,
-    required this.customerName,
-    required this.docDate,
-    required this.billNo,
-    required this.status,
-    required this.hasWriteoff,
-    this.netTotal,
-  });
-}
+import '../models/sales_invoice_model.dart';
 
 class SalesInvoiceListController extends GetxController {
   final invoices = <SalesInvoiceSummary>[].obs;
   final isLoading = false.obs;
-  final loadError = RxnString();
-
   final searchQuery = ''.obs;
-  final searchController = TextEditingController();
-  final fromDate = ''.obs;
-  final toDate = ''.obs;
-  final statusFilter = ''.obs;
   final currentPage = 1.obs;
   final hasMore = true.obs;
   final limit = 20;
 
-  final _lastRefreshTime = Rxn<DateTime>();
+  final searchController = TextEditingController();
 
   @override
   void onInit() {
     super.onInit();
     fetchInvoices();
-    ever<DateTime?>(_lastRefreshTime, (ts) {
-      if (ts != null) fetchInvoices();
-    });
   }
 
   @override
@@ -59,13 +29,16 @@ class SalesInvoiceListController extends GetxController {
     super.onClose();
   }
 
-  void markForRefresh() => _lastRefreshTime.value = DateTime.now();
-
-  Future<void> fetchInvoices({bool loadMore = false}) async {
+  Future<void> fetchInvoices({
+    bool loadMore = false,
+    String? customerId,
+    String? fromDate,
+    String? toDate,
+  }) async {
     if (isLoading.value) return;
+
     try {
       isLoading.value = true;
-      loadError.value = null;
 
       if (!loadMore) {
         currentPage.value = 1;
@@ -75,13 +48,14 @@ class SalesInvoiceListController extends GetxController {
       final queryParams = <String, String>{
         'limit': limit.toString(),
         'page': currentPage.value.toString(),
+        'status': 'billed',
         if (searchQuery.value.isNotEmpty) 'search': searchQuery.value,
-        if (fromDate.value.isNotEmpty) 'from_date': fromDate.value,
-        if (toDate.value.isNotEmpty) 'to_date': toDate.value,
-        if (statusFilter.value.isNotEmpty) 'status': statusFilter.value,
+        if (customerId != null && customerId.isNotEmpty) 'customer_id': customerId,
+        if (fromDate != null && fromDate.isNotEmpty) 'from_date': fromDate,
+        if (toDate != null && toDate.isNotEmpty) 'to_date': toDate,
       };
 
-      final uri = Uri.parse(ApiConfig.salesInvoices).replace(queryParameters: queryParams);
+      final uri = Uri.parse(ApiConfig.salesOrders).replace(queryParameters: queryParams);
       final response = await http
           .get(uri, headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: 30));
@@ -89,29 +63,11 @@ class SalesInvoiceListController extends GetxController {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         if (data['success'] == true) {
-          final List invoicesData = data['data'] ?? [];
-          final list = invoicesData.map((item) {
-            final prefix = item['doc_no_prefix']?.toString() ?? '';
-            final num = item['doc_no_number']?.toString() ?? '';
-            final docNo = prefix.isNotEmpty && num.isNotEmpty
-                ? '$prefix$num'
-                : (item['doc_no']?.toString() ?? '');
-            final rawTotal = item['net_total'];
-            double? netTotal;
-            if (rawTotal is int) netTotal = rawTotal.toDouble();
-            if (rawTotal is double) netTotal = rawTotal;
-            if (rawTotal is String) netTotal = double.tryParse(rawTotal);
-            return SalesInvoiceSummary(
-              id: item['id'] ?? 0,
-              docNo: docNo,
-              customerName: item['customer_name']?.toString() ?? '',
-              docDate: _formatDate(item['doc_date']?.toString() ?? item['created_at']?.toString() ?? ''),
-              billNo: item['bill_no']?.toString() ?? '',
-              status: item['status']?.toString() ?? 'DRAFT',
-              hasWriteoff: item['has_writeoff'] == true,
-              netTotal: netTotal,
-            );
-          }).toList();
+          final List items = data['data'] ?? [];
+          final list = items
+              .whereType<Map<String, dynamic>>()
+              .map(SalesInvoiceSummary.fromJson)
+              .toList();
 
           if (loadMore) {
             invoices.addAll(list);
@@ -128,28 +84,20 @@ class SalesInvoiceListController extends GetxController {
           }
           if (hasMore.value) currentPage.value++;
         } else {
-          invoices.value = [];
-          final message = data['message']?.toString() ?? 'Could not load sales invoices.';
-          loadError.value = message;
-          _showLoadError(message);
+          throw Exception(data['message'] ?? 'Failed to load invoices');
         }
       } else {
-        String message = 'Server returned ${response.statusCode}.';
-        try {
-          final body = jsonDecode(response.body) as Map<String, dynamic>;
-          final m = body['message']?.toString();
-          if (m != null && m.isNotEmpty) message = m;
-        } catch (_) {}
-        invoices.value = [];
-        loadError.value = message;
-        _showLoadError(message);
+        throw Exception('Server error: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('[SALES_INVOICE_LIST] Failed: $e');
-      invoices.value = [];
-      const message = 'Could not load sales invoices. Check backend/API URL.';
-      loadError.value = message;
-      _showLoadError(message);
+      debugPrint('[INV LIST] Fetch failed: $e');
+      Get.snackbar(
+        'Error',
+        'Failed to load invoices: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
     } finally {
       isLoading.value = false;
     }
@@ -157,68 +105,21 @@ class SalesInvoiceListController extends GetxController {
 
   void onSearch(String query) {
     searchQuery.value = query.trim();
+    currentPage.value = 1;
     fetchInvoices();
   }
 
   void clearSearch() {
     searchController.clear();
     searchQuery.value = '';
+    currentPage.value = 1;
     fetchInvoices();
   }
 
+  @override
   Future<void> refresh() async {
     currentPage.value = 1;
     hasMore.value = true;
     await fetchInvoices();
-  }
-
-  void applyFilters({String? from, String? to, String? status}) {
-    fromDate.value = from ?? '';
-    toDate.value = to ?? '';
-    statusFilter.value = status ?? '';
-    fetchInvoices();
-  }
-
-  void clearFilters() {
-    fromDate.value = '';
-    toDate.value = '';
-    statusFilter.value = '';
-    searchController.clear();
-    searchQuery.value = '';
-    fetchInvoices();
-  }
-
-  Color statusColor(String status) {
-    switch (status.toUpperCase()) {
-      case 'DRAFT':
-        return Colors.blue;
-      case 'POSTED':
-        return Colors.green;
-      case 'CANCELLED':
-        return Colors.redAccent;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  void _showLoadError(String message) {
-    Get.snackbar(
-      'Sales Invoices',
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.redAccent,
-      colorText: Colors.white,
-      duration: const Duration(seconds: 4),
-    );
-  }
-
-  String _formatDate(String dateStr) {
-    if (dateStr.isEmpty) return '';
-    try {
-      final date = DateTime.parse(dateStr.split(' ').first);
-      return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-    } catch (_) {
-      return dateStr;
-    }
   }
 }

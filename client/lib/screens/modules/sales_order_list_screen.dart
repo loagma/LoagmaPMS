@@ -24,19 +24,21 @@ class _SalesOrderListScreenState extends State<SalesOrderListScreen> {
 
   static const _statusOptions = [
     '',
-    'DRAFT',
-    'CONFIRMED',
-    'PARTIALLY_INVOICED',
-    'CLOSED',
-    'CANCELLED',
+    'pending',
+    'registered',
+    'dispatched',
+    'delivered',
+    'billed',
+    'cancelled',
   ];
   static const _statusLabels = {
     '': 'All',
-    'DRAFT': 'Draft',
-    'CONFIRMED': 'Confirmed',
-    'PARTIALLY_INVOICED': 'Partially Invoiced',
-    'CLOSED': 'Closed',
-    'CANCELLED': 'Cancelled',
+    'pending': 'Pending',
+    'registered': 'Registered',
+    'dispatched': 'Dispatched',
+    'delivered': 'Delivered',
+    'billed': 'Billed',
+    'cancelled': 'Cancelled',
   };
 
   @override

@@ -37,6 +37,14 @@ class SalesOrderFormController extends GetxController {
   final expectedDate = ''.obs;
   final status = 'DRAFT'.obs;
   final narration = ''.obs;
+  // Bill / Invoice fields
+  final billDt = ''.obs;
+  final billDepartment = ''.obs;
+  final billNarration = ''.obs;
+  final billVehicle = ''.obs;
+  final billStatement = ''.obs;
+  final billRoff = '0'.obs;
+  final billDocYear = ''.obs;
   final charges = <SOChargeRow>[].obs;
 
   final items = <SOLineRow>[].obs;
@@ -390,6 +398,13 @@ class SalesOrderFormController extends GetxController {
         currentSoSeq.value = int.tryParse(match.group(1)!);
       }
     }
+    billDt.value = so.billDt ?? '';
+    billDepartment.value = so.department ?? '';
+    billNarration.value = so.billNarration ?? '';
+    billVehicle.value = so.billVehicle ?? '';
+    billStatement.value = so.billStatement ?? '';
+    billRoff.value = so.billRoff?.toStringAsFixed(2) ?? '0';
+    billDocYear.value = so.docYear ?? '';
     _loadChargesFromModel(so.chargesJson);
     unawaited(_hydrateCustomerDetails(so.customerId));
     items.clear();
@@ -399,6 +414,7 @@ class SalesOrderFormController extends GetxController {
         productName: item.productName,
         hsnCode: item.hsnCode,
         quantity: item.quantity.toString(),
+        qtyDelivered: item.usedQty.toString(),
         usedQty: item.usedQty.toString(),
         writeoffQty: item.writeoffQty.toString(),
         leftQty: item.leftQty.toString(),
@@ -431,6 +447,13 @@ class SalesOrderFormController extends GetxController {
     expectedDate.value = '';
     status.value = 'DRAFT';
     narration.value = '';
+    billDt.value = '';
+    billDepartment.value = '';
+    billNarration.value = '';
+    billVehicle.value = '';
+    billStatement.value = '';
+    billRoff.value = '0';
+    billDocYear.value = '';
     currentSoNumber.value = '';
     _ensureDefaultCharges(reset: true);
     items.clear();
@@ -516,6 +539,13 @@ class SalesOrderFormController extends GetxController {
           status.value = so.status;
           narration.value = so.narration ?? '';
           currentSoNumber.value = so.soNumber;
+          billDt.value = so.billDt ?? '';
+          billDepartment.value = so.department ?? '';
+          billNarration.value = so.billNarration ?? '';
+          billVehicle.value = so.billVehicle ?? '';
+          billStatement.value = so.billStatement ?? '';
+          billRoff.value = so.billRoff?.toStringAsFixed(2) ?? '0';
+          billDocYear.value = so.docYear ?? '';
           _loadChargesFromModel(so.chargesJson);
           items.clear();
           for (final item in so.items) {
@@ -524,6 +554,7 @@ class SalesOrderFormController extends GetxController {
               productName: item.productName,
               hsnCode: item.hsnCode,
               quantity: item.quantity.toString(),
+              qtyDelivered: item.usedQty.toString(),
               usedQty: item.usedQty.toString(),
               writeoffQty: item.writeoffQty.toString(),
               leftQty: item.leftQty.toString(),
@@ -576,6 +607,16 @@ class SalesOrderFormController extends GetxController {
   void setExpectedDate(String v) => expectedDate.value = v;
   void setStatus(String v) => status.value = v;
   void setNarration(String v) => narration.value = v;
+
+  bool get isBillMode => status.value == 'BILLED';
+
+  void setBillDt(String v) => billDt.value = v;
+  void setBillDepartment(String v) => billDepartment.value = v;
+  void setBillNarration(String v) => billNarration.value = v;
+  void setBillVehicle(String v) => billVehicle.value = v;
+  void setBillStatement(String v) => billStatement.value = v;
+  void setBillRoff(String v) => billRoff.value = v;
+  void setBillDocYear(String v) => billDocYear.value = v;
 
   void addItem() {
     final row = SOLineRow();
@@ -678,6 +719,13 @@ class SalesOrderFormController extends GetxController {
         if (expectedDate.value.trim().isNotEmpty) 'expected_date': expectedDate.value.trim(),
         'status': status.value,
         if (narration.value.trim().isNotEmpty) 'narration': narration.value.trim(),
+        if (billDt.value.trim().isNotEmpty) 'bill_dt': billDt.value.trim(),
+        if (billDepartment.value.trim().isNotEmpty) 'department': billDepartment.value.trim(),
+        if (billNarration.value.trim().isNotEmpty) 'bill_narration': billNarration.value.trim(),
+        if (billVehicle.value.trim().isNotEmpty) 'bill_vehicle': billVehicle.value.trim(),
+        if (billStatement.value.trim().isNotEmpty) 'bill_statement': billStatement.value.trim(),
+        'bill_roff': double.tryParse(billRoff.value) ?? 0,
+        if (billDocYear.value.trim().isNotEmpty) 'doc_year': billDocYear.value.trim(),
         'charges': charges
             .map((row) => {
                   'name': row.name.value,
@@ -707,6 +755,7 @@ class SalesOrderFormController extends GetxController {
             if (r.unit.value.trim().isNotEmpty) 'unit': r.unit.value.trim(),
             if (r.selectedPackId.value.trim().isNotEmpty) 'pack_id': r.selectedPackId.value.trim(),
             'quantity': qty,
+            'qty_delivered': double.tryParse(r.qtyDelivered.value) ?? 0,
             'price': price,
             if (discount != null && discount > 0) 'discount_percent': discount,
             if (tax != null && tax > 0) 'tax_percent': tax,
@@ -813,6 +862,7 @@ class SOLineRow {
   final productName = ''.obs;
   final hsnCode = ''.obs;
   final quantity = '1'.obs;
+  final qtyDelivered = '0'.obs;
   final usedQty = '0'.obs;
   final writeoffQty = '0'.obs;
   final leftQty = '0'.obs;
@@ -838,6 +888,7 @@ class SOLineRow {
     String? productName,
     String? hsnCode,
     String? quantity,
+    String? qtyDelivered,
     String? usedQty,
     String? writeoffQty,
     String? leftQty,
@@ -851,6 +902,7 @@ class SOLineRow {
     if (productName != null) this.productName.value = productName;
     if (hsnCode != null) this.hsnCode.value = hsnCode;
     if (quantity != null) this.quantity.value = quantity;
+    if (qtyDelivered != null) this.qtyDelivered.value = qtyDelivered;
     if (usedQty != null) this.usedQty.value = usedQty;
     if (writeoffQty != null) this.writeoffQty.value = writeoffQty;
     if (leftQty != null) this.leftQty.value = leftQty;

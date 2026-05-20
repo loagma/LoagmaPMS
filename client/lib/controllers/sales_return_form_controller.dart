@@ -242,7 +242,7 @@ class SalesReturnFormController extends GetxController {
   Future<List<Map<String, dynamic>>> searchSalesInvoices(String query, {int? customerIdFilter}) async {
     try {
       isSearchingInvoices.value = true;
-      final uri = Uri.parse(ApiConfig.salesInvoices).replace(
+      final uri = Uri.parse(ApiConfig.salesOrders).replace(
         queryParameters: {
           'limit': '20',
           if (query.trim().isNotEmpty) 'search': query.trim(),
@@ -278,7 +278,7 @@ class SalesReturnFormController extends GetxController {
       sourceSiIdSelected.value = siId;
 
       final response = await http
-          .get(Uri.parse('${ApiConfig.salesInvoices}/$siId'), headers: {'Accept': 'application/json'})
+          .get(Uri.parse('${ApiConfig.salesOrders}/$siId'), headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {

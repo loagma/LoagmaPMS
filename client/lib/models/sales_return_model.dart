@@ -38,15 +38,27 @@ class SalesReturnHeader {
   });
 
   factory SalesReturnHeader.fromJson(Map<String, dynamic> json) {
+    // Backend now sends: voucher_no, return_dt, source_order_id (sales_returns table)
+    // Fallback to legacy field names for backward compatibility
+    final voucherNo = json['voucher_no']?.toString()
+        ?? json['doc_no_number']?.toString()
+        ?? json['doc_number']?.toString()
+        ?? '';
+    final docDate = json['return_dt']?.toString()
+        ?? json['doc_date']?.toString()
+        ?? '';
     return SalesReturnHeader(
       id: _srIntOrNull(json['id']),
-      docNoPrefix: json['doc_no_prefix']?.toString() ?? '25-26/',
-      docNoNumber: json['doc_no_number']?.toString() ?? '',
-      sourceSalesInvoiceId: _srIntOrNull(json['source_sales_invoice_id']),
-      sourceSiNumber: json['source_si_number']?.toString(),
+      docNoPrefix: json['doc_no_prefix']?.toString() ?? 'SR/25-26/',
+      docNoNumber: voucherNo,
+      sourceSalesInvoiceId: _srIntOrNull(
+        json['source_order_id'] ?? json['source_sales_invoice_id'],
+      ),
+      sourceSiNumber: json['source_si_number']?.toString()
+          ?? json['so_number']?.toString(),
       customerId: _srIntOrNull(json['customer_id']),
       customerName: json['customer_name']?.toString(),
-      docDate: json['doc_date']?.toString() ?? '',
+      docDate: docDate,
       reason: json['reason']?.toString(),
       isPartialReturn: json['is_partial_return'] != false,
       status: json['status']?.toString() ?? 'DRAFT',
@@ -128,7 +140,11 @@ class SalesReturnItemRow {
       json['available_quantity'] ?? json['remaining_returnable_qty'],
       originalQty,
     );
-    final returnedQty = d(json['returned_quantity'] ?? json['return_qty'], 0);
+    // Backend sends both 'returned_quantity' (create payload) and 'returned_qty' (show response)
+    final returnedQty = d(
+      json['returned_qty'] ?? json['returned_quantity'] ?? json['return_qty'],
+      0,
+    );
     final unitPrice = d(json['unit_price'], 0);
     final taxable = d(json['taxable_amount'], returnedQty * unitPrice);
     final sgst = d(json['sgst']);
@@ -139,7 +155,9 @@ class SalesReturnItemRow {
     final value = d(json['value'], taxable + sgst + cgst + igst + cess + roff);
 
     return SalesReturnItemRow(
-      sourceSalesInvoiceItemId: _srIntOrNull(json['source_sales_invoice_item_id']),
+      sourceSalesInvoiceItemId: _srIntOrNull(
+        json['source_sales_invoice_item_id'] ?? json['order_item_id'],
+      ),
       sourceSalesOrderItemId: _srIntOrNull(json['source_sales_order_item_id']),
       productId: _srIntOrNull(json['product_id']),
       productName: json['product_name']?.toString(),
@@ -313,11 +331,18 @@ class SalesReturnSummary {
   factory SalesReturnSummary.fromJson(Map<String, dynamic> json) {
     return SalesReturnSummary(
       id: _srIntOrNull(json['id']) ?? 0,
-      docNumber: json['doc_no']?.toString() ?? json['doc_no_number'] ?? '',
+      docNumber: json['voucher_no']?.toString()
+          ?? json['doc_number']?.toString()
+          ?? json['doc_no_number']?.toString()
+          ?? '',
       customerName: json['customer_name']?.toString(),
-      docDate: json['doc_date']?.toString() ?? '',
+      docDate: json['return_dt']?.toString()
+          ?? json['doc_date']?.toString()
+          ?? '',
       status: json['status']?.toString() ?? 'DRAFT',
-      totalValue: _srDoubleOrNull(json['net_total']) ?? _srDoubleOrNull(json['total_value']) ?? 0,
+      totalValue: _srDoubleOrNull(json['total_value'])
+          ?? _srDoubleOrNull(json['net_total'])
+          ?? 0,
     );
   }
 }
