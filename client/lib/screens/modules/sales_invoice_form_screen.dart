@@ -477,8 +477,10 @@ class _OrderField extends StatelessWidget {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) {
           Future<void> doSearch(String q) async {
+            if (!ctx.mounted) return;
             setState(() => loading = true);
             results = await controller.searchOrders(q);
+            if (!ctx.mounted) return;
             setState(() => loading = false);
           }
 
@@ -1057,8 +1059,10 @@ Future<void> _showProductPicker(
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setState) {
         Future<void> doSearch(String q) async {
+          if (!ctx.mounted) return;
           setState(() => loading = true);
           results = await controller.searchProducts(q);
+          if (!ctx.mounted) return;
           setState(() => loading = false);
         }
 
