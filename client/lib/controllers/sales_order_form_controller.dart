@@ -20,6 +20,7 @@ class SalesOrderFormController extends GetxController {
   final bool startInViewOnly;
 
   final departments = <Map<String, dynamic>>[].obs;
+  final salesmen = <Map<String, dynamic>>[].obs;
   final products = <Map<String, dynamic>>[].obs;
   final unitTypes = <String>[].obs;
   final viewOnly = false.obs;
@@ -33,6 +34,7 @@ class SalesOrderFormController extends GetxController {
   final customerPhone = ''.obs;
   final customerShopName = ''.obs;
   final departmentId = Rxn<String>();
+  final salesmanId = Rxn<String>();
   final docDate = ''.obs;
   final expectedDate = ''.obs;
   final status = 'DRAFT'.obs;
@@ -50,6 +52,8 @@ class SalesOrderFormController extends GetxController {
   final items = <SOLineRow>[].obs;
 
   int? _adminVendorId;
+  String _companyState = '';
+  String _customerState = '';
 
   final isLoading = false.obs;
   final isSaving = false.obs;
@@ -65,12 +69,15 @@ class SalesOrderFormController extends GetxController {
     _ensureDefaultCharges();
     _loadAdminVendorId();
     _loadDepartments();
+    _loadSalesmen();
     _loadUnitTypes();
+    AuthController.getCompanyState().then((s) => _companyState = s);
     if (soId != null) {
       _loadSalesOrder();
     } else {
       _setDefaultDocDate();
       _loadNextSoNumberForNew();
+      billDepartment.value = 'Sales';
       addItem();
     }
   }
@@ -197,6 +204,27 @@ class SalesOrderFormController extends GetxController {
     }
 
     if (applied) {
+      // State-based GST filtering
+      final sameState = _isSameState();
+      if (sameState) {
+        // Intra-state: keep SGST + CGST, remove IGST
+        fixedKeys.remove('IGST');
+        row.igst.value = '';
+        row.taxFieldValues.remove('IGST');
+      } else {
+        // Inter-state: keep IGST, remove SGST + CGST
+        fixedKeys.remove('SGST');
+        fixedKeys.remove('CGST');
+        row.sgst.value = '';
+        row.cgst.value = '';
+        row.taxFieldValues.remove('SGST');
+        row.taxFieldValues.remove('CGST');
+      }
+      // Recalculate total from remaining taxes
+      totalPercent = row.taxFieldValues.values
+          .map((v) => double.tryParse(v) ?? 0)
+          .fold(0.0, (a, b) => a + b);
+
       final ordered = ['SGST', 'CGST', 'IGST', 'CESS', 'ROFF']
           .where(fixedKeys.contains)
           .toList();
@@ -205,6 +233,13 @@ class SalesOrderFormController extends GetxController {
       row.taxPercent.value = totalPercent.toStringAsFixed(2);
     }
     return applied;
+  }
+
+  bool _isSameState() {
+    final company = _companyState.trim().toLowerCase();
+    final customer = _customerState.trim().toLowerCase();
+    if (company.isEmpty || customer.isEmpty) return true;
+    return company == customer;
   }
 
   Future<List<Map<String, dynamic>>> _fetchProductTaxRows(int productId) async {
@@ -289,6 +324,32 @@ class SalesOrderFormController extends GetxController {
       }
     } catch (e) {
       debugPrint('[SO FORM] Load departments error: $e');
+    }
+  }
+
+  Future<void> _loadSalesmen() async {
+    try {
+      Future<List<Map<String, dynamic>>> fetch(Uri uri) async {
+        final response = await http.get(uri, headers: {'Accept': 'application/json'});
+        if (response.statusCode != 200) return [];
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        if (data['success'] != true) return [];
+        return (data['data'] as List)
+            .whereType<Map<String, dynamic>>()
+            .map((e) => {'id': e['id']?.toString(), 'name': e['name']?.toString() ?? ''})
+            .where((e) => (e['id'] ?? '').isNotEmpty)
+            .toList();
+      }
+
+      final filteredUri = Uri.parse(ApiConfig.users)
+          .replace(queryParameters: {'role': 'Salesman', 'limit': '500'});
+      var list = await fetch(filteredUri);
+      if (list.isEmpty) {
+        list = await fetch(Uri.parse(ApiConfig.users).replace(queryParameters: {'limit': '500'}));
+      }
+      salesmen.value = list;
+    } catch (e) {
+      debugPrint('[SO FORM] Load salesmen error: $e');
     }
   }
 
@@ -387,6 +448,7 @@ class SalesOrderFormController extends GetxController {
     customerPhone.value = '';
     customerShopName.value = '';
     departmentId.value = so.departmentId;
+    salesmanId.value = so.salesmanId;
     docDate.value = so.docDate;
     expectedDate.value = so.expectedDate ?? '';
     status.value = so.status;
@@ -442,13 +504,15 @@ class SalesOrderFormController extends GetxController {
     customerName.value = '';
     customerPhone.value = '';
     customerShopName.value = '';
+    _customerState = '';
     departmentId.value = null;
+    salesmanId.value = null;
     docDate.value = '';
     expectedDate.value = '';
     status.value = 'DRAFT';
     narration.value = '';
     billDt.value = '';
-    billDepartment.value = '';
+    billDepartment.value = 'Sales';
     billNarration.value = '';
     billVehicle.value = '';
     billStatement.value = '';
@@ -534,6 +598,7 @@ class SalesOrderFormController extends GetxController {
           financialYear.value = so.financialYear ?? '25-26';
           customerId.value = so.customerId;
           departmentId.value = so.departmentId;
+          salesmanId.value = so.salesmanId;
           docDate.value = so.docDate;
           expectedDate.value = so.expectedDate ?? '';
           status.value = so.status;
@@ -601,8 +666,17 @@ class SalesOrderFormController extends GetxController {
     customerName.value = customer.name;
     customerPhone.value = customer.contactNumber ?? '';
     customerShopName.value = customer.shopName ?? '';
+    _customerState = customer.state?.trim() ?? '';
+    // Re-apply taxes on all loaded items since state may have changed
+    for (final item in items) {
+      final pid = item.productId.value;
+      if (pid != null && pid > 0) {
+        unawaited(applyProductTaxesToRow(item, pid));
+      }
+    }
   }
   void setDepartmentId(String? v) => departmentId.value = v;
+  void setSalesmanId(String? v) => salesmanId.value = v;
   void setDocDate(String v) => docDate.value = v;
   void setExpectedDate(String v) => expectedDate.value = v;
   void setStatus(String v) => status.value = v;
@@ -715,6 +789,8 @@ class SalesOrderFormController extends GetxController {
         'customer_id': customerId.value,
         if (departmentId.value != null && departmentId.value!.trim().isNotEmpty)
           'department_id': departmentId.value,
+        if (salesmanId.value != null && salesmanId.value!.trim().isNotEmpty)
+          'salesman_id': salesmanId.value,
         'doc_date': docDate.value,
         if (expectedDate.value.trim().isNotEmpty) 'expected_date': expectedDate.value.trim(),
         'status': status.value,

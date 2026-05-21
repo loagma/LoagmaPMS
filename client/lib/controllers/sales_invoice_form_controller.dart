@@ -84,6 +84,7 @@ class SalesInvoiceFormController extends GetxController {
     billDt.value = _today();
     // Default doc year to current financial year
     billDocYear.value = _currentFinancialYear();
+    billDepartment.value = 'Sales';
 
     if (soId != null) {
       _loadOrder(soId!);
@@ -258,7 +259,7 @@ class SalesInvoiceFormController extends GetxController {
     }
     // else keep the today default set in onInit
 
-    billDepartment.value = so.department ?? '';
+    if (so.department != null && so.department!.isNotEmpty) billDepartment.value = so.department!;
     billNarration.value = so.billNarration ?? '';
     billVehicle.value = so.billVehicle ?? '';
     billStatement.value = so.billStatement ?? '';

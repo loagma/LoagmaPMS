@@ -20,6 +20,7 @@ class AuthController extends GetxController {
   static const _keyRole     = 'deli_staff_role';
   static const _keyName     = 'deli_staff_name';
   static const _keyMobile   = 'deli_staff_mobile';
+  static const _keyState    = 'deli_staff_state';
 
   // ── Persistence helpers ──────────────────────────────────────────────────
 
@@ -39,6 +40,7 @@ class AuthController extends GetxController {
     required String role,
     required String name,
     required String mobile,
+    required String state,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_keyDeliId, deliId);
@@ -46,6 +48,7 @@ class AuthController extends GetxController {
     await prefs.setString(_keyRole, role);
     await prefs.setString(_keyName, name);
     await prefs.setString(_keyMobile, mobile);
+    await prefs.setString(_keyState, state);
     await prefs.setBool(_keyLoggedIn, true);
   }
 
@@ -57,6 +60,7 @@ class AuthController extends GetxController {
     await prefs.remove(_keyRole);
     await prefs.remove(_keyName);
     await prefs.remove(_keyMobile);
+    await prefs.remove(_keyState);
   }
 
   // ── Stored session getters ────────────────────────────────────────────────
@@ -84,6 +88,11 @@ class AuthController extends GetxController {
   static Future<String?> getStoredMobile() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_keyMobile);
+  }
+
+  static Future<String> getCompanyState() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyState) ?? '';
   }
 
   // ── Controller methods ────────────────────────────────────────────────────
@@ -114,6 +123,7 @@ class AuthController extends GetxController {
           role:    data['role']?.toString()   ?? '',
           name:    data['name']?.toString()   ?? '',
           mobile:  data['mobile']?.toString() ?? mobile.value,
+          state:   data['state']?.toString()  ?? '',
         );
         return null; // success
       }

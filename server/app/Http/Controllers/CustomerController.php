@@ -150,6 +150,7 @@ class CustomerController extends Controller
         $textCols = $this->existingColumns([
             'name',
             'shop_name',
+            'contactno',
             'phone',
             'mobile',
             'contact_number',
@@ -168,7 +169,7 @@ class CustomerController extends Controller
 
             // Phone number: also try prefix match (user may type first digits)
             foreach ($textCols as $col) {
-                if (in_array($col, ['phone', 'mobile', 'contact_number'], true)) {
+                if (in_array($col, ['contactno', 'phone', 'mobile', 'contact_number'], true)) {
                     // Prefix match for phone
                     $q->orWhereRaw("LOWER(`$col`) LIKE ?", [strtolower($search) . '%']);
                     // Full substring match
@@ -301,7 +302,7 @@ class CustomerController extends Controller
 
         $data['name'] = trim((string) ($data['name'] ?? $data['shop_name'] ?? ''));
         $data['shop_name'] = trim((string) ($data['shop_name'] ?? ''));
-        $data['phone'] = trim((string) ($data['phone'] ?? $data['mobile'] ?? $data['contact_number'] ?? ''));
+        $data['phone'] = trim((string) ($data['phone'] ?? $data['contactno'] ?? $data['mobile'] ?? $data['contact_number'] ?? ''));
         $data['email'] = trim((string) ($data['email'] ?? ''));
         $data['alternate_phone'] = trim((string) ($data['alternate_phone'] ?? ''));
         $data['gst_no'] = trim((string) ($data['gst_no'] ?? ''));

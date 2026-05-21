@@ -23,6 +23,7 @@ class SalesOrder {
   final String? billStatement;
   final double? billRoff;
   final String? docYear;
+  final String? salesmanId;
   // Return fields
   final String? salesReturnVoucherNo;
   final String? salesReturnDt;
@@ -51,6 +52,7 @@ class SalesOrder {
     this.billStatement,
     this.billRoff,
     this.docYear,
+    this.salesmanId,
     this.salesReturnVoucherNo,
     this.salesReturnDt,
   });
@@ -116,6 +118,7 @@ class SalesOrder {
       billStatement: json['bill_statement']?.toString(),
       billRoff: parseDouble(json['bill_roff']),
       docYear: json['doc_year']?.toString(),
+      salesmanId: json['salesman_id']?.toString(),
       salesReturnVoucherNo: json['sales_return_voucher_no']?.toString(),
       salesReturnDt: json['sales_return_dt']?.toString(),
     );
@@ -146,6 +149,7 @@ class SalesOrder {
       if (billStatement != null) 'bill_statement': billStatement,
       if (billRoff != null) 'bill_roff': billRoff,
       if (docYear != null) 'doc_year': docYear,
+      if (salesmanId != null) 'salesman_id': salesmanId,
       if (salesReturnVoucherNo != null) 'sales_return_voucher_no': salesReturnVoucherNo,
       if (salesReturnDt != null) 'sales_return_dt': salesReturnDt,
     };

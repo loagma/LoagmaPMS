@@ -922,6 +922,29 @@ class _HeaderCard extends StatelessWidget {
             );
           }),
           const SizedBox(height: _sectionGap),
+          Obx(() {
+            final list = controller.salesmen;
+            final current = controller.salesmanId.value;
+            final hasValue = list.any((s) => s['id']?.toString() == current?.toString());
+            final value = hasValue ? current : null;
+            return DropdownButtonFormField<String>(
+              value: value,
+              decoration: _soInputDecoration(labelText: 'Salesman'),
+              items: list
+                  .map((s) => DropdownMenuItem<String>(
+                        value: s['id']?.toString(),
+                        child: Text(
+                          s['name']?.toString() ?? 'Salesman',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ))
+                  .toList(),
+              onChanged: controller.isReadOnly
+                  ? null
+                  : (v) => controller.setSalesmanId(v),
+            );
+          }),
+          const SizedBox(height: _sectionGap),
           Row(
             children: [
               Expanded(
@@ -1253,16 +1276,16 @@ class _ItemRow extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: _fieldVerticalGap),
                   child: Obx(() {
-                    final units = controller.unitTypes.isEmpty
+                    final base = controller.unitTypes.isEmpty
                         ? ['KG', 'PCS', 'LTR', 'MTR', 'GM', 'ML']
                         : controller.unitTypes;
-                    final current = row.unit.value;
-                    final value = units.contains(current) ? current : units.first;
-                    if (value != current && !controller.isReadOnly) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        row.unit.value = value;
-                      });
-                    }
+                    final current = row.unit.value.trim();
+                    // Always include the product's own unit so it's never lost
+                    final units = <String>{
+                      if (current.isNotEmpty) current,
+                      ...base,
+                    }.toList();
+                    final value = current.isNotEmpty ? current : units.first;
                     return DropdownButtonFormField<String>(
                       value: value,
                       decoration: _soInputDecoration(labelText: 'Unit').copyWith(

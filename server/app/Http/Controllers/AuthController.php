@@ -48,6 +48,7 @@ class AuthController extends Controller
                     'name',
                     'mobile',
                     'is_locked',
+                    'state',
                 ]);
 
             if (!$staff) {
@@ -76,6 +77,7 @@ class AuthController extends Controller
                     'role'     => $staff->role,
                     'name'     => $staff->name,
                     'mobile'   => $staff->mobile,
+                    'state'    => $staff->state ?? '',
                 ],
             ]);
         } catch (\Exception $e) {
