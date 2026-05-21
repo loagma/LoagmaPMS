@@ -91,7 +91,7 @@ List<_SalesTile> get _salesTiles => [
     title: 'Sales Order',
     subtitle: 'View and manage sales orders',
     icon: Icons.receipt_long_outlined,
-    onTap: () => Get.toNamed(AppRoutes.salesOrderList),
+    onTap: () => Get.toNamed(AppRoutes.salesOrderForm),
   ),
   _SalesTile(
     title: 'Sales Invoice',

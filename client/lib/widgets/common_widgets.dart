@@ -336,6 +336,11 @@ class ActionButton extends StatelessWidget {
 /// ```
 class ProductSearchDialog extends StatefulWidget {
   final Future<List<Product>> Function(String query) searchFn;
+
+  /// When [showSupplierToggle] is true, this is the search function used when
+  /// the user toggles to "Show all products".
+  final Future<List<Product>> Function(String query)? allProductsSearchFn;
+
   final String title;
   final Set<int> excludeIds;
 
@@ -351,6 +356,7 @@ class ProductSearchDialog extends StatefulWidget {
   const ProductSearchDialog({
     super.key,
     required this.searchFn,
+    this.allProductsSearchFn,
     this.title = 'Search Product',
     this.excludeIds = const {},
     this.showSupplierToggle = false,
@@ -368,6 +374,7 @@ class _ProductSearchDialogState extends State<ProductSearchDialog> {
   List<Product> _results = [];
   bool _loading = false;
   Timer? _debounce;
+  late bool _showAllProducts;
 
   // multi-select state: "productId_packId" → ProductSelection
   // For products with no packs, key is "productId_"
@@ -375,9 +382,15 @@ class _ProductSearchDialogState extends State<ProductSearchDialog> {
 
   String _selKey(int productId, String packId) => '${productId}_$packId';
 
+  Future<List<Product>> Function(String) get _activeFn =>
+      (_showAllProducts && widget.allProductsSearchFn != null)
+          ? widget.allProductsSearchFn!
+          : widget.searchFn;
+
   @override
   void initState() {
     super.initState();
+    _showAllProducts = widget.supplierToggleValue;
     _runSearch('');
   }
 
@@ -398,7 +411,7 @@ class _ProductSearchDialogState extends State<ProductSearchDialog> {
   Future<void> _runSearch(String query) async {
     if (!mounted) return;
     setState(() => _loading = true);
-    final list = await widget.searchFn(query.trim());
+    final list = await _activeFn(query.trim());
     if (!mounted) return;
     setState(() {
       _results = list.where((p) => !widget.excludeIds.contains(p.id)).toList();
@@ -665,19 +678,19 @@ class _ProductSearchDialogState extends State<ProductSearchDialog> {
         width: double.infinity,
         child: OutlinedButton.icon(
           onPressed: () {
-            widget.onSupplierToggle?.call(!widget.supplierToggleValue);
+            final next = !_showAllProducts;
+            setState(() => _showAllProducts = next);
+            widget.onSupplierToggle?.call(next);
             _runSearch(_searchController.text);
           },
           icon: Icon(
-            widget.supplierToggleValue
-                ? Icons.filter_alt_off_outlined
-                : Icons.filter_alt_outlined,
+            _showAllProducts
+                ? Icons.filter_alt_outlined
+                : Icons.filter_alt_off_outlined,
             size: 18,
           ),
           label: Text(
-            widget.supplierToggleValue
-                ? 'Show supplier products only'
-                : 'Show all products',
+            _showAllProducts ? 'Show supplier products only' : 'Show all products',
             style: const TextStyle(fontSize: 13),
           ),
           style: OutlinedButton.styleFrom(

@@ -923,25 +923,44 @@ class _HeaderCard extends StatelessWidget {
           }),
           const SizedBox(height: _sectionGap),
           Obx(() {
-            final list = controller.suppliers;
-            final current = controller.supplierId.value;
-            final hasValue = list.any((s) => s['id']?.toString() == current?.toString());
-            final value = hasValue ? current : null;
-            return DropdownButtonFormField<String>(
-              value: value,
-              decoration: _soInputDecoration(labelText: 'Supplier'),
-              items: list
-                  .map((s) => DropdownMenuItem<String>(
-                        value: s['id']?.toString(),
-                        child: Text(
-                          s['name']?.toString() ?? 'Supplier',
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ))
-                  .toList(),
-              onChanged: controller.isReadOnly
+            final name = controller.supplierName.value.trim();
+            return InkWell(
+              onTap: controller.isReadOnly
                   ? null
-                  : (v) => controller.setSupplierId(v),
+                  : () async {
+                      final party = await showDialog<PartyResult>(
+                        context: context,
+                        builder: (_) => PartySearchDialog(
+                          title: 'Select Supplier',
+                          hint: 'Search by name...',
+                          headerIcon: Icons.local_shipping_outlined,
+                          searchFn: controller.searchSuppliers,
+                        ),
+                      );
+                      if (party != null) {
+                        controller.setSupplier(party.id.toString(), party.name);
+                      }
+                    },
+              child: InputDecorator(
+                decoration: _soInputDecoration(labelText: 'Supplier').copyWith(
+                  suffixIcon: controller.isReadOnly
+                      ? null
+                      : name.isEmpty
+                          ? const Icon(Icons.search, size: 18, color: Colors.grey)
+                          : IconButton(
+                              icon: const Icon(Icons.clear, size: 18, color: Colors.grey),
+                              onPressed: () => controller.setSupplier(null, ''),
+                            ),
+                ),
+                child: Text(
+                  name.isEmpty ? 'Tap to select...' : name,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: name.isEmpty ? Colors.grey : null,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             );
           }),
           const SizedBox(height: _sectionGap),
@@ -1067,6 +1086,7 @@ class _HeaderCard extends StatelessWidget {
                 const SizedBox(height: _sectionGap),
                 // Department
                 Obx(() => TextFormField(
+                      key: ValueKey('dept-${controller.billDepartment.value}'),
                       enabled: !controller.isReadOnly,
                       initialValue: controller.billDepartment.value,
                       decoration: _soInputDecoration(labelText: 'Department'),
@@ -1536,7 +1556,7 @@ class _AddonCard extends StatelessWidget {
   }
 }
 
-class _ProductPicker extends StatelessWidget {
+class _ProductPicker extends StatefulWidget {
   final SalesOrderFormController controller;
   final SOLineRow row;
   final bool readOnly;
@@ -1548,7 +1568,21 @@ class _ProductPicker extends StatelessWidget {
   });
 
   @override
+  State<_ProductPicker> createState() => _ProductPickerState();
+}
+
+class _ProductPickerState extends State<_ProductPicker> {
+  bool _showAllProducts = false;
+
+  @override
   Widget build(BuildContext context) {
+    final controller = widget.controller;
+    final row = widget.row;
+    final readOnly = widget.readOnly;
+
+    final hasSupplierFilter = controller.supplierId.value != null &&
+        controller.supplierId.value!.isNotEmpty;
+
     return FormField<int>(
       initialValue: row.productId.value,
       validator: (v) => v == null ? 'Please select product' : null,
@@ -1566,7 +1600,13 @@ class _ProductPicker extends StatelessWidget {
                         builder: (ctx) => ProductSearchDialog(
                           title: 'Select Products',
                           searchFn: controller.searchProductsAsModels,
+                          allProductsSearchFn: hasSupplierFilter
+                              ? controller.searchAllProductsUnfiltered
+                              : null,
                           allowMultiSelect: true,
+                          showSupplierToggle: hasSupplierFilter,
+                          supplierToggleValue: _showAllProducts,
+                          onSupplierToggle: (v) => setState(() => _showAllProducts = v),
                         ),
                       );
                       if (selections == null || selections.isEmpty) return;

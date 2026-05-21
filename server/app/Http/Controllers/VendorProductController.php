@@ -24,6 +24,7 @@ class VendorProductController extends Controller
             $page  = (int) $request->query('page', 1);
             $search        = trim((string) $request->query('search', ''));
             $adminVendorId = trim((string) $request->query('admin_vendor_id', ''));
+            $supplierId    = trim((string) $request->query('supplier_id', ''));
 
             if ($limit < 1 || $limit > 100) {
                 $limit = 10;
@@ -51,6 +52,15 @@ class VendorProductController extends Controller
             // Filter by vendor when admin_vendor_id is supplied
             if ($adminVendorId !== '') {
                 $query->where('vp.admin_vendor_id', (int) $adminVendorId);
+            }
+
+            // Filter by supplier: restrict to products linked to this supplier
+            if ($supplierId !== '') {
+                $supplierProductIds = DB::table('supplier_products')
+                    ->where('supplier_id', (int) $supplierId)
+                    ->where('is_active', true)
+                    ->pluck('product_id');
+                $query->whereIn('vp.product_id', $supplierProductIds);
             }
 
             // Multi-word AND search across product name, keywords, and product_id

@@ -35,6 +35,7 @@ class SalesOrderFormController extends GetxController {
   final customerShopName = ''.obs;
   final departmentId = Rxn<String>();
   final supplierId = Rxn<String>();
+  final supplierName = ''.obs;
   final docDate = ''.obs;
   final expectedDate = ''.obs;
   final status = 'DRAFT'.obs;
@@ -92,6 +93,8 @@ class SalesOrderFormController extends GetxController {
         'limit': '50',
         if (query.trim().isNotEmpty) 'search': query.trim(),
         if (_adminVendorId != null) 'admin_vendor_id': _adminVendorId.toString(),
+        if (supplierId.value != null && supplierId.value!.isNotEmpty)
+          'supplier_id': supplierId.value!,
       };
       final uri = Uri.parse(ApiConfig.vendorProducts).replace(queryParameters: params);
       final response = await http
@@ -125,20 +128,56 @@ class SalesOrderFormController extends GetxController {
         .toList();
   }
 
-  Future<void> applyProductTaxesToRow(SOLineRow row, int productId) async {
-    row.isTaxLoading.value = true;
-    _clearTaxBreakdown(row);
+  // Searches without supplier filter — used by the "Show all products" toggle.
+  Future<List<Product>> searchAllProductsUnfiltered(String query) async {
     try {
-      final productTaxes = await _fetchProductTaxRows(productId);
-      final applied = _applyTaxRowsToRow(row, productTaxes);
-      if (!applied) {
-        row.taxPercent.value = '';
-      }
+      final params = <String, String>{
+        'limit': '50',
+        if (query.trim().isNotEmpty) 'search': query.trim(),
+        if (_adminVendorId != null) 'admin_vendor_id': _adminVendorId.toString(),
+      };
+      final uri = Uri.parse(ApiConfig.vendorProducts).replace(queryParameters: params);
+      final response = await http
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return [];
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) return [];
+      final List list = data['data'] ?? [];
+      return list
+          .whereType<Map<String, dynamic>>()
+          .map((e) {
+            try { return Product.fromJson(e); } catch (_) { return null; }
+          })
+          .whereType<Product>()
+          .toList();
     } catch (e) {
-      debugPrint('[SO FORM] Resolve taxes error: $e');
-      row.taxPercent.value = '';
-    } finally {
-      row.isTaxLoading.value = false;
+      debugPrint('[SO FORM] Search all products error: $e');
+      return [];
+    }
+  }
+
+  Future<void> applyProductTaxesToRow(SOLineRow row, int productId) async {
+    _clearTaxBreakdown(row);
+    _applyFixedGst(row);
+  }
+
+  // SGST = 2.5%, CGST = 2.5%, IGST = 5% — fixed for all products.
+  // State-based filtering then keeps only SGST+CGST or only IGST.
+  void _applyFixedGst(SOLineRow row) {
+    final sameState = _isSameState();
+    if (sameState) {
+      row.sgst.value = '2.50';
+      row.cgst.value = '2.50';
+      row.taxFieldValues['SGST'] = '2.50';
+      row.taxFieldValues['CGST'] = '2.50';
+      row.availableTaxKeys.assignAll(['SGST', 'CGST']);
+      row.taxPercent.value = '5.00';
+    } else {
+      row.igst.value = '5.00';
+      row.taxFieldValues['IGST'] = '5.00';
+      row.availableTaxKeys.assignAll(['IGST']);
+      row.taxPercent.value = '5.00';
     }
   }
 
@@ -152,126 +191,11 @@ class SalesOrderFormController extends GetxController {
     row.availableTaxKeys.clear();
   }
 
-  bool _applyTaxRowsToRow(SOLineRow row, List<Map<String, dynamic>> rows) {
-    if (rows.isEmpty) return false;
-    var applied = false;
-    var totalPercent = 0.0;
-    final fixedKeys = <String>{};
-    final customKeys = <String>[];
-
-    for (final map in rows) {
-      final tax = map['tax'] as Map<String, dynamic>?;
-      final rawName = (tax?['tax_name'] ?? map['tax_name'] ?? '').toString().trim();
-      final rawSub = (tax?['tax_sub_category'] ?? map['tax_sub_category'] ?? '').toString().trim();
-      final taxName = rawName.toUpperCase();
-      final taxSub = rawSub.toUpperCase();
-      final percent = (map['tax_percent'] ?? 0) is num
-          ? (map['tax_percent'] as num).toDouble()
-          : double.tryParse(map['tax_percent']?.toString() ?? '') ?? 0;
-
-      if (percent <= 0) continue;
-      totalPercent += percent;
-      final canonical = _canonicalTaxKey(taxName, taxSub);
-      final label = canonical ?? (rawName.isNotEmpty ? rawName : (rawSub.isNotEmpty ? rawSub : 'Tax'));
-      row.taxFieldValues[label] = percent.toStringAsFixed(2);
-      if (canonical == null && !customKeys.contains(label)) {
-        customKeys.add(label);
-      }
-
-      if (canonical == 'SGST') {
-        row.sgst.value = percent.toStringAsFixed(2);
-        fixedKeys.add('SGST');
-        applied = true;
-      } else if (canonical == 'CGST') {
-        row.cgst.value = percent.toStringAsFixed(2);
-        fixedKeys.add('CGST');
-        applied = true;
-      } else if (canonical == 'IGST') {
-        row.igst.value = percent.toStringAsFixed(2);
-        fixedKeys.add('IGST');
-        applied = true;
-      } else if (canonical == 'CESS') {
-        row.cess.value = percent.toStringAsFixed(2);
-        fixedKeys.add('CESS');
-        applied = true;
-      } else if (canonical == 'ROFF') {
-        row.roff.value = percent.toStringAsFixed(2);
-        fixedKeys.add('ROFF');
-        applied = true;
-      } else {
-        applied = true;
-      }
-    }
-
-    if (applied) {
-      // State-based GST filtering
-      final sameState = _isSameState();
-      if (sameState) {
-        // Intra-state: keep SGST + CGST, remove IGST
-        fixedKeys.remove('IGST');
-        row.igst.value = '';
-        row.taxFieldValues.remove('IGST');
-      } else {
-        // Inter-state: keep IGST, remove SGST + CGST
-        fixedKeys.remove('SGST');
-        fixedKeys.remove('CGST');
-        row.sgst.value = '';
-        row.cgst.value = '';
-        row.taxFieldValues.remove('SGST');
-        row.taxFieldValues.remove('CGST');
-      }
-      // Recalculate total from remaining taxes
-      totalPercent = row.taxFieldValues.values
-          .map((v) => double.tryParse(v) ?? 0)
-          .fold(0.0, (a, b) => a + b);
-
-      final ordered = ['SGST', 'CGST', 'IGST', 'CESS', 'ROFF']
-          .where(fixedKeys.contains)
-          .toList();
-      ordered.addAll(customKeys);
-      row.availableTaxKeys.assignAll(ordered);
-      row.taxPercent.value = totalPercent.toStringAsFixed(2);
-    }
-    return applied;
-  }
-
   bool _isSameState() {
     final company = _companyState.trim().toLowerCase();
     final customer = _customerState.trim().toLowerCase();
     if (company.isEmpty || customer.isEmpty) return true;
     return company == customer;
-  }
-
-  Future<List<Map<String, dynamic>>> _fetchProductTaxRows(int productId) async {
-    final uri = Uri.parse(ApiConfig.productTaxes).replace(
-      queryParameters: {'product_id': productId.toString(), 'limit': '100'},
-    );
-    final response = await http
-        .get(uri, headers: {'Accept': 'application/json'})
-        .timeout(const Duration(seconds: 10));
-    if (response.statusCode != 200) return [];
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    if (data['success'] != true) return [];
-    final List list = data['data'] ?? [];
-    return list
-        .whereType<Map<dynamic, dynamic>>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
-  }
-
-  bool _matchesTax(String taxName, String taxSub, String key) {
-    return taxName.contains(key) || taxSub.contains(key);
-  }
-
-  String? _canonicalTaxKey(String taxName, String taxSub) {
-    if (_matchesTax(taxName, taxSub, 'SGST')) return 'SGST';
-    if (_matchesTax(taxName, taxSub, 'CGST')) return 'CGST';
-    if (_matchesTax(taxName, taxSub, 'IGST')) return 'IGST';
-    if (_matchesTax(taxName, taxSub, 'CESS')) return 'CESS';
-    if (_matchesTax(taxName, taxSub, 'ROFF') || taxName.contains('ROUND')) {
-      return 'ROFF';
-    }
-    return null;
   }
 
   void _setDefaultDocDate() {
@@ -320,6 +244,15 @@ class SalesOrderFormController extends GetxController {
                   })
               .where((e) => (e['id'] ?? '').toString().isNotEmpty)
               .toList();
+          // Auto-select 'Sales' department if none is set yet
+          if (departmentId.value == null) {
+            final sales = departments.firstWhereOrNull(
+              (d) => (d['name'] ?? '').toString().toLowerCase() == 'sales',
+            );
+            if (sales != null) {
+              departmentId.value = sales['id']?.toString();
+            }
+          }
         }
       }
     } catch (e) {
@@ -338,7 +271,10 @@ class SalesOrderFormController extends GetxController {
       if (data['success'] != true) return;
       suppliers.value = (data['data'] as List)
           .whereType<Map<String, dynamic>>()
-          .map((e) => {'id': e['id']?.toString(), 'name': e['name']?.toString() ?? ''})
+          .map((e) => {
+                'id': e['id']?.toString(),
+                'name': (e['supplier_name'] ?? e['name'] ?? '').toString(),
+              })
           .where((e) => (e['id'] ?? '').isNotEmpty)
           .toList();
     } catch (e) {
@@ -360,7 +296,7 @@ class SalesOrderFormController extends GetxController {
         }
       }
     } catch (e) {
-      unitTypes.value = ['KG', 'PCS', 'LTR', 'MTR', 'GM', 'ML'];
+      unitTypes.value = ['1 Kg', 'Nos', '5 Kg', 'grams', '1 Ltr'];
     }
   }
 
@@ -442,6 +378,12 @@ class SalesOrderFormController extends GetxController {
     customerShopName.value = '';
     departmentId.value = so.departmentId;
     supplierId.value = so.supplierId;
+    if (so.supplierId != null) {
+      final match = suppliers.firstWhereOrNull((s) => s['id'] == so.supplierId);
+      supplierName.value = match?['name']?.toString() ?? '';
+    } else {
+      supplierName.value = '';
+    }
     docDate.value = so.docDate;
     expectedDate.value = so.expectedDate ?? '';
     status.value = so.status;
@@ -500,6 +442,7 @@ class SalesOrderFormController extends GetxController {
     _customerState = '';
     departmentId.value = null;
     supplierId.value = null;
+    supplierName.value = '';
     docDate.value = '';
     expectedDate.value = '';
     status.value = 'DRAFT';
@@ -592,6 +535,12 @@ class SalesOrderFormController extends GetxController {
           customerId.value = so.customerId;
           departmentId.value = so.departmentId;
           supplierId.value = so.supplierId;
+          if (so.supplierId != null) {
+            final sm = suppliers.firstWhereOrNull((s) => s['id'] == so.supplierId);
+            supplierName.value = sm?['name']?.toString() ?? '';
+          } else {
+            supplierName.value = '';
+          }
           docDate.value = so.docDate;
           expectedDate.value = so.expectedDate ?? '';
           status.value = so.status;
@@ -669,7 +618,41 @@ class SalesOrderFormController extends GetxController {
     }
   }
   void setDepartmentId(String? v) => departmentId.value = v;
-  void setSupplierId(String? v) => supplierId.value = v;
+
+  void setSupplier(String? id, String name) {
+    supplierId.value = id;
+    supplierName.value = name;
+  }
+
+  void setSupplierId(String? v) {
+    supplierId.value = v;
+    if (v == null || v.isEmpty) {
+      supplierName.value = '';
+    } else {
+      final match = suppliers.firstWhereOrNull((s) => s['id'] == v);
+      supplierName.value = match?['name']?.toString() ?? '';
+    }
+  }
+
+  Future<List<PartyResult>> searchSuppliers(String query) async {
+    final q = query.trim().toLowerCase();
+    final filtered = q.isEmpty
+        ? suppliers
+        : suppliers.where((s) {
+            final name = (s['name'] ?? '').toString().toLowerCase();
+            return name.contains(q);
+          }).toList();
+    return filtered
+        .map((s) => PartyResult(
+              id: int.tryParse(s['id']?.toString() ?? '0') ?? 0,
+              name: s['name']?.toString() ?? '',
+              phone: null,
+              shopName: null,
+              code: s['id']?.toString(),
+              state: null,
+            ))
+        .toList();
+  }
   void setDocDate(String v) => docDate.value = v;
   void setExpectedDate(String v) => expectedDate.value = v;
   void setStatus(String v) => status.value = v;

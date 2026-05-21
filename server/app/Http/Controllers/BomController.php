@@ -323,25 +323,23 @@ class BomController extends Controller
     public function getUnitTypes(): JsonResponse
     {
         try {
-            // Get distinct unit types from product table
-            $unitTypes = DB::table('product')
-                ->select('inventory_unit_type')
-                ->whereNotNull('inventory_unit_type')
-                ->where('inventory_unit_type', '!=', '')
-                ->distinct()
-                ->pluck('inventory_unit_type')
+            $units = DB::table('loagma_new.units_master')
+                ->whereNotNull('unit_name')
+                ->where('unit_name', '!=', '')
+                ->orderBy('serial_no')
+                ->orderBy('unit_name')
+                ->pluck('unit_name')
                 ->filter()
                 ->values();
 
-            // Add common unit types if not present
-            $commonUnits = ['KG', 'PCS', 'LTR', 'MTR', 'GM', 'ML'];
-            $allUnits = $unitTypes->merge($commonUnits)->unique()->sort()->values();
+            if ($units->isEmpty()) {
+                $units = collect(['GM', 'KG', 'LTR', 'ML', 'MTR', 'NOS', 'PCS']);
+            }
 
             return response()->json([
                 'success' => true,
-                'data' => $allUnits
+                'data' => $units,
             ]);
-
         } catch (\Exception $e) {
             Log::error('Unit types fetch failed', ['error' => $e->getMessage()]);
 
