@@ -133,7 +133,7 @@ class SalesOrderController extends Controller
             $billStatement = trim((string) $request->input('bill_statement', '')) ?: null;
             $billRoff      = (float) $request->input('bill_roff', 0);
             $docYear       = trim((string) $request->input('doc_year', '')) ?: null;
-            $salesmanId    = trim((string) $request->input('salesman_id', '')) ?: null;
+            $salesmanId    = trim((string) $request->input('supplier_id', '')) ?: null;
 
             // Return fields
             $salesReturnVoucherNo = trim((string) $request->input('sales_return_voucher_no', '')) ?: null;
@@ -167,7 +167,7 @@ class SalesOrderController extends Controller
                 'Bill_Statement'  => $billStatement,
                 'bill_roff'               => $billRoff,
                 'Doc_Year'                => $docYear,
-                'salesman_id'             => $salesmanId,
+                'supplier_id'             => $salesmanId,
                 'Sales_Return_VoucherNo'  => $salesReturnVoucherNo,
                 'Sales_Return_Dt'         => $salesReturnDt,
             ], 'order_id');
@@ -235,7 +235,7 @@ class SalesOrderController extends Controller
             $billStatement = trim((string) $request->input('bill_statement', '')) ?: null;
             $billRoff      = (float) $request->input('bill_roff', 0);
             $docYear       = trim((string) $request->input('doc_year', '')) ?: null;
-            $salesmanId    = trim((string) $request->input('salesman_id', '')) ?: null;
+            $salesmanId    = trim((string) $request->input('supplier_id', '')) ?: null;
 
             // Return fields
             $salesReturnVoucherNo = trim((string) $request->input('sales_return_voucher_no', '')) ?: null;
@@ -269,7 +269,7 @@ class SalesOrderController extends Controller
                 'Bill_Statement'          => $billStatement,
                 'bill_roff'               => $billRoff,
                 'Doc_Year'                => $docYear,
-                'salesman_id'             => $salesmanId,
+                'supplier_id'             => $salesmanId,
                 'Sales_Return_VoucherNo'  => $salesReturnVoucherNo,
                 'Sales_Return_Dt'         => $salesReturnDt,
             ]);
@@ -446,7 +446,7 @@ class SalesOrderController extends Controller
             'bill_statement' => $data['Bill_Statement'] ?? null,
             'bill_roff'               => (float) ($data['bill_roff'] ?? 0),
             'doc_year'                => $data['Doc_Year'] ?? null,
-            'salesman_id'             => $data['salesman_id'] ?? null,
+            'supplier_id'             => $data['supplier_id'] ?? null,
             'sales_return_voucher_no' => $data['Sales_Return_VoucherNo'] ?? null,
             'sales_return_dt'         => $data['Sales_Return_Dt'] ?? null,
         ];

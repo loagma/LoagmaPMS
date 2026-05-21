@@ -20,7 +20,7 @@ class SalesOrderFormController extends GetxController {
   final bool startInViewOnly;
 
   final departments = <Map<String, dynamic>>[].obs;
-  final salesmen = <Map<String, dynamic>>[].obs;
+  final suppliers = <Map<String, dynamic>>[].obs;
   final products = <Map<String, dynamic>>[].obs;
   final unitTypes = <String>[].obs;
   final viewOnly = false.obs;
@@ -34,7 +34,7 @@ class SalesOrderFormController extends GetxController {
   final customerPhone = ''.obs;
   final customerShopName = ''.obs;
   final departmentId = Rxn<String>();
-  final salesmanId = Rxn<String>();
+  final supplierId = Rxn<String>();
   final docDate = ''.obs;
   final expectedDate = ''.obs;
   final status = 'DRAFT'.obs;
@@ -69,7 +69,7 @@ class SalesOrderFormController extends GetxController {
     _ensureDefaultCharges();
     _loadAdminVendorId();
     _loadDepartments();
-    _loadSalesmen();
+    _loadSuppliers();
     _loadUnitTypes();
     AuthController.getCompanyState().then((s) => _companyState = s);
     if (soId != null) {
@@ -327,29 +327,22 @@ class SalesOrderFormController extends GetxController {
     }
   }
 
-  Future<void> _loadSalesmen() async {
+  Future<void> _loadSuppliers() async {
     try {
-      Future<List<Map<String, dynamic>>> fetch(Uri uri) async {
-        final response = await http.get(uri, headers: {'Accept': 'application/json'});
-        if (response.statusCode != 200) return [];
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        if (data['success'] != true) return [];
-        return (data['data'] as List)
-            .whereType<Map<String, dynamic>>()
-            .map((e) => {'id': e['id']?.toString(), 'name': e['name']?.toString() ?? ''})
-            .where((e) => (e['id'] ?? '').isNotEmpty)
-            .toList();
-      }
-
-      final filteredUri = Uri.parse(ApiConfig.users)
-          .replace(queryParameters: {'role': 'Salesman', 'limit': '500'});
-      var list = await fetch(filteredUri);
-      if (list.isEmpty) {
-        list = await fetch(Uri.parse(ApiConfig.users).replace(queryParameters: {'limit': '500'}));
-      }
-      salesmen.value = list;
+      final response = await http.get(
+        Uri.parse(ApiConfig.suppliers).replace(queryParameters: {'limit': '500'}),
+        headers: {'Accept': 'application/json'},
+      );
+      if (response.statusCode != 200) return;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) return;
+      suppliers.value = (data['data'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map((e) => {'id': e['id']?.toString(), 'name': e['name']?.toString() ?? ''})
+          .where((e) => (e['id'] ?? '').isNotEmpty)
+          .toList();
     } catch (e) {
-      debugPrint('[SO FORM] Load salesmen error: $e');
+      debugPrint('[SO FORM] Load suppliers error: $e');
     }
   }
 
@@ -448,7 +441,7 @@ class SalesOrderFormController extends GetxController {
     customerPhone.value = '';
     customerShopName.value = '';
     departmentId.value = so.departmentId;
-    salesmanId.value = so.salesmanId;
+    supplierId.value = so.supplierId;
     docDate.value = so.docDate;
     expectedDate.value = so.expectedDate ?? '';
     status.value = so.status;
@@ -506,7 +499,7 @@ class SalesOrderFormController extends GetxController {
     customerShopName.value = '';
     _customerState = '';
     departmentId.value = null;
-    salesmanId.value = null;
+    supplierId.value = null;
     docDate.value = '';
     expectedDate.value = '';
     status.value = 'DRAFT';
@@ -598,7 +591,7 @@ class SalesOrderFormController extends GetxController {
           financialYear.value = so.financialYear ?? '25-26';
           customerId.value = so.customerId;
           departmentId.value = so.departmentId;
-          salesmanId.value = so.salesmanId;
+          supplierId.value = so.supplierId;
           docDate.value = so.docDate;
           expectedDate.value = so.expectedDate ?? '';
           status.value = so.status;
@@ -676,7 +669,7 @@ class SalesOrderFormController extends GetxController {
     }
   }
   void setDepartmentId(String? v) => departmentId.value = v;
-  void setSalesmanId(String? v) => salesmanId.value = v;
+  void setSupplierId(String? v) => supplierId.value = v;
   void setDocDate(String v) => docDate.value = v;
   void setExpectedDate(String v) => expectedDate.value = v;
   void setStatus(String v) => status.value = v;
@@ -789,8 +782,8 @@ class SalesOrderFormController extends GetxController {
         'customer_id': customerId.value,
         if (departmentId.value != null && departmentId.value!.trim().isNotEmpty)
           'department_id': departmentId.value,
-        if (salesmanId.value != null && salesmanId.value!.trim().isNotEmpty)
-          'salesman_id': salesmanId.value,
+        if (supplierId.value != null && supplierId.value!.trim().isNotEmpty)
+          'supplier_id': supplierId.value,
         'doc_date': docDate.value,
         if (expectedDate.value.trim().isNotEmpty) 'expected_date': expectedDate.value.trim(),
         'status': status.value,

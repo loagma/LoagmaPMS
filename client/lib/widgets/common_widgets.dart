@@ -1299,6 +1299,13 @@ class _PartyCard extends StatelessWidget {
                           label: result.phone!,
                         ),
                       ],
+                      if (result.state != null && result.state!.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        _InfoBadge(
+                          icon: Icons.location_on_outlined,
+                          label: result.state!,
+                        ),
+                      ],
                     ],
                   ),
                 ],

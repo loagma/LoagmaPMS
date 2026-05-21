@@ -11,7 +11,7 @@ class ApiConfig {
 
   /// Pass --dart-define=USE_LOCAL=true to hit local server during dev.
   /// Default is production.
-  static const bool _useLocal = bool.fromEnvironment('USE_LOCAL', defaultValue: true);
+  static const bool _useLocal = bool.fromEnvironment('USE_LOCAL', defaultValue: false);
   static const String _envOverride = String.fromEnvironment('API_BASE_URL');
 
   static String get baseUrl =>

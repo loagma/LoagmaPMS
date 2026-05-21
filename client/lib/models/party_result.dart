@@ -4,6 +4,7 @@ class PartyResult {
   final String? phone;
   final String? shopName;
   final String? code;
+  final String? state;
 
   const PartyResult({
     required this.id,
@@ -11,6 +12,7 @@ class PartyResult {
     this.phone,
     this.shopName,
     this.code,
+    this.state,
   });
 
   String get displayLabel {

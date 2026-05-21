@@ -113,6 +113,7 @@ class CustomerApiService {
               phone: customer.contactNumber,
               shopName: customer.shopName,
               code: customer.id.toString(),
+              state: customer.state,
             );
           })
           .toList();

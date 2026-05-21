@@ -923,25 +923,25 @@ class _HeaderCard extends StatelessWidget {
           }),
           const SizedBox(height: _sectionGap),
           Obx(() {
-            final list = controller.salesmen;
-            final current = controller.salesmanId.value;
+            final list = controller.suppliers;
+            final current = controller.supplierId.value;
             final hasValue = list.any((s) => s['id']?.toString() == current?.toString());
             final value = hasValue ? current : null;
             return DropdownButtonFormField<String>(
               value: value,
-              decoration: _soInputDecoration(labelText: 'Salesman'),
+              decoration: _soInputDecoration(labelText: 'Supplier'),
               items: list
                   .map((s) => DropdownMenuItem<String>(
                         value: s['id']?.toString(),
                         child: Text(
-                          s['name']?.toString() ?? 'Salesman',
+                          s['name']?.toString() ?? 'Supplier',
                           overflow: TextOverflow.ellipsis,
                         ),
                       ))
                   .toList(),
               onChanged: controller.isReadOnly
                   ? null
-                  : (v) => controller.setSalesmanId(v),
+                  : (v) => controller.setSupplierId(v),
             );
           }),
           const SizedBox(height: _sectionGap),
