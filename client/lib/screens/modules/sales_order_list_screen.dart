@@ -6,6 +6,7 @@ import '../../controllers/sales_order_list_controller.dart';
 import '../../models/sales_order_model.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
+import 'sales_order_detail_screen.dart';
 import 'sales_order_form_screen.dart';
 
 class SalesOrderListScreen extends StatefulWidget {
@@ -344,10 +345,7 @@ class _SalesOrderListScreenState extends State<SalesOrderListScreen> {
                         onTap: () {
                           if (so.id != null) {
                             Get.to(
-                              () => SalesOrderFormScreen(
-                                soId: so.id,
-                                startInViewOnly: true,
-                              ),
+                              () => SalesOrderDetailScreen(soId: so.id!),
                             )?.then((_) => controller.refresh());
                           }
                         },

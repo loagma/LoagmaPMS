@@ -25,6 +25,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\SalesOrderController;
 use App\Http\Controllers\SalesReturnController;
+use App\Http\Controllers\AdminInfoController;
 
 Route::get('/health', [HealthController::class, 'index']);
 
@@ -89,6 +90,7 @@ Route::get('/customers/{id}', [CustomerController::class, 'show'])->where('id', 
 Route::post('/customers', [CustomerController::class, 'store']);
 Route::put('/customers/{id}', [CustomerController::class, 'update'])->where('id', '[0-9]+');
 Route::get('/users', [UserController::class, 'index']);
+Route::get('/admin-info', [AdminInfoController::class, 'show']);
 
 // Supplier Product routes (specific 'bulk' must be before {id})
 Route::get('/supplier-products', [SupplierProductController::class, 'index']);

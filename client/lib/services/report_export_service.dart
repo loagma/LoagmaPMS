@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../controllers/auth_controller.dart';
 import '../controllers/purchase_order_form_controller.dart';
 import '../controllers/purchase_return_form_controller.dart';
 import '../controllers/purchase_voucher_controller.dart';
@@ -499,6 +500,16 @@ class ReportExportService {
         ? (c.currentSoSeq.value?.toString() ?? '-')
         : c.currentSoNumber.value.trim();
 
+    final adminInfo = await AuthController.getAdminInfo();
+    final orgName    = adminInfo?['org_name']?.toString()       ?? '';
+    final orgAddress = adminInfo?['org_address']?.toString()    ?? '';
+    final orgGst     = adminInfo?['org_gst']?.toString()        ?? '';
+    final fssaiNo    = adminInfo?['fssai_no']?.toString()       ?? '';
+    final bankName   = adminInfo?['bank_name']?.toString()      ?? '';
+    final bankBranch = adminInfo?['bank_branch']?.toString()    ?? '';
+    final accountNo  = adminInfo?['account_number']?.toString() ?? '';
+    final ifscCode   = adminInfo?['ifsc_code']?.toString()      ?? '';
+
     final itemRows = c.items.where((r) => r.productId.value != null).map((row) {
       final qty      = double.tryParse(row.quantity.value) ?? 0;
       final used     = double.tryParse(row.usedQty.value)  ?? 0;
@@ -538,19 +549,28 @@ class ReportExportService {
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       build: (ctx) => [
-        // ── Header banner ──
+        // ── Company + Order header ──
         pw.Container(
           decoration: const pw.BoxDecoration(color: PdfColors.grey800, borderRadius: pw.BorderRadius.all(pw.Radius.circular(4))),
           padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+          child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            // Left: company info
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              pw.Text('SALES ORDER', style: pw.TextStyle(fontSize: 17, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
-              pw.Text('Order Confirmation', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey300)),
+              if (orgName.isNotEmpty)
+                pw.Text(orgName, style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+              if (orgAddress.isNotEmpty)
+                pw.Text(orgAddress, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey300)),
+              if (orgGst.isNotEmpty)
+                pw.Text('GST: $orgGst', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey300)),
+              if (fssaiNo.isNotEmpty)
+                pw.Text('FSSAI: $fssaiNo', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey300)),
             ]),
+            // Right: document info
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-              pw.Text(soNo, style: pw.TextStyle(fontSize: 12, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
-              pw.Text(_normalizeDate(c.docDate.value), style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey200)),
-              pw.Text(c.status.value, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey200)),
+              pw.Text('SALES ORDER', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+              pw.Text(soNo, style: pw.TextStyle(fontSize: 11, color: PdfColors.grey200, fontWeight: pw.FontWeight.bold)),
+              pw.Text(_normalizeDate(c.docDate.value), style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey300)),
+              pw.Text(c.status.value, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey300)),
             ]),
           ]),
         ),
@@ -656,6 +676,28 @@ class ReportExportService {
             ]),
           ),
         ]),
+
+        // ── Bank Details ──
+        if (bankName.isNotEmpty || accountNo.isNotEmpty) ...[
+          pw.SizedBox(height: 10),
+          _sectionTitle('BANK DETAILS'),
+          pw.SizedBox(height: 4),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(8),
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColors.grey300),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
+            ),
+            child: pw.Row(children: [
+              pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                if (bankName.isNotEmpty)   _kvSmall('Bank',       bankName),
+                if (bankBranch.isNotEmpty) _kvSmall('Branch',     bankBranch),
+                if (accountNo.isNotEmpty)  _kvSmall('Account No', accountNo),
+                if (ifscCode.isNotEmpty)   _kvSmall('IFSC Code',  ifscCode),
+              ])),
+            ]),
+          ),
+        ],
       ],
     ));
     return pdf.save();

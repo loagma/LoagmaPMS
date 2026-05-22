@@ -923,7 +923,7 @@ class _HeaderCard extends StatelessWidget {
           }),
           const SizedBox(height: _sectionGap),
           Obx(() {
-            final name = controller.supplierName.value.trim();
+            final name = controller.salesmanName.value.trim();
             return InkWell(
               onTap: controller.isReadOnly
                   ? null
@@ -931,25 +931,25 @@ class _HeaderCard extends StatelessWidget {
                       final party = await showDialog<PartyResult>(
                         context: context,
                         builder: (_) => PartySearchDialog(
-                          title: 'Select Supplier',
+                          title: 'Select Salesman',
                           hint: 'Search by name...',
-                          headerIcon: Icons.local_shipping_outlined,
-                          searchFn: controller.searchSuppliers,
+                          headerIcon: Icons.person_outlined,
+                          searchFn: controller.searchSalesmen,
                         ),
                       );
                       if (party != null) {
-                        controller.setSupplier(party.id.toString(), party.name);
+                        controller.setSalesman(party.id.toString(), party.name);
                       }
                     },
               child: InputDecorator(
-                decoration: _soInputDecoration(labelText: 'Supplier').copyWith(
+                decoration: _soInputDecoration(labelText: 'Salesman').copyWith(
                   suffixIcon: controller.isReadOnly
                       ? null
                       : name.isEmpty
                           ? const Icon(Icons.search, size: 18, color: Colors.grey)
                           : IconButton(
                               icon: const Icon(Icons.clear, size: 18, color: Colors.grey),
-                              onPressed: () => controller.setSupplier(null, ''),
+                              onPressed: () => controller.setSalesman(null, ''),
                             ),
                 ),
                 child: Text(
@@ -1580,8 +1580,8 @@ class _ProductPickerState extends State<_ProductPicker> {
     final row = widget.row;
     final readOnly = widget.readOnly;
 
-    final hasSupplierFilter = controller.supplierId.value != null &&
-        controller.supplierId.value!.isNotEmpty;
+    final hasSupplierFilter = controller.salesmanId.value != null &&
+        controller.salesmanId.value!.isNotEmpty;
 
     return FormField<int>(
       initialValue: row.productId.value,

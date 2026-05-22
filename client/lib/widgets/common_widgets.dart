@@ -375,6 +375,7 @@ class _ProductSearchDialogState extends State<ProductSearchDialog> {
   bool _loading = false;
   Timer? _debounce;
   late bool _showAllProducts;
+  int _searchGeneration = 0;
 
   // multi-select state: "productId_packId" → ProductSelection
   // For products with no packs, key is "productId_"
@@ -410,9 +411,13 @@ class _ProductSearchDialogState extends State<ProductSearchDialog> {
 
   Future<void> _runSearch(String query) async {
     if (!mounted) return;
-    setState(() => _loading = true);
+    final generation = ++_searchGeneration;
+    setState(() {
+      _loading = true;
+      _results = [];
+    });
     final list = await _activeFn(query.trim());
-    if (!mounted) return;
+    if (!mounted || generation != _searchGeneration) return;
     setState(() {
       _results = list.where((p) => !widget.excludeIds.contains(p.id)).toList();
       _loading = false;

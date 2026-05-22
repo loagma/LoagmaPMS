@@ -6,14 +6,14 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 
 class UserController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = DB::table('users')->select(
+            $table = DB::getSchemaBuilder()->hasTable('users') ? 'users' : 'LoginUser_crm';
+            $query = DB::table($table)->select(
                 'id',
                 'name',
                 'email',
@@ -21,12 +21,15 @@ class UserController extends Controller
                 'contactNumber'
             );
 
-            if ($request->filled('role') && Schema::hasTable('roles') && Schema::hasColumn('users', 'roleId')) {
-                $role = trim((string) $request->input('role'));
+            if ($request->filled('role')) {
+                $role = strtolower(trim((string) $request->input('role')));
                 if ($role !== '') {
-                    $query
-                        ->join('roles', 'roles.id', '=', 'users.roleId')
-                        ->whereRaw('LOWER(roles.name) = ?', [strtolower($role)]);
+                    $query->where(function ($q) use ($role, $table) {
+                        // roleId stores the role name directly (e.g. "salesman")
+                        $q->whereRaw('LOWER(`' . $table . '`.`roleId`) = ?', [$role]);
+                        // Also check JSON roles array column (e.g. ["salesman"])
+                        $q->orWhereRaw('JSON_CONTAINS(LOWER(`' . $table . '`.`roles`), ?)', [json_encode($role)]);
+                    });
                 }
             }
 

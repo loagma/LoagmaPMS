@@ -20,7 +20,7 @@ class SalesOrderFormController extends GetxController {
   final bool startInViewOnly;
 
   final departments = <Map<String, dynamic>>[].obs;
-  final suppliers = <Map<String, dynamic>>[].obs;
+  final salesmen = <Map<String, dynamic>>[].obs;
   final products = <Map<String, dynamic>>[].obs;
   final unitTypes = <String>[].obs;
   final viewOnly = false.obs;
@@ -34,8 +34,8 @@ class SalesOrderFormController extends GetxController {
   final customerPhone = ''.obs;
   final customerShopName = ''.obs;
   final departmentId = Rxn<String>();
-  final supplierId = Rxn<String>();
-  final supplierName = ''.obs;
+  final salesmanId = Rxn<String>();
+  final salesmanName = ''.obs;
   final docDate = ''.obs;
   final expectedDate = ''.obs;
   final status = 'DRAFT'.obs;
@@ -70,7 +70,7 @@ class SalesOrderFormController extends GetxController {
     _ensureDefaultCharges();
     _loadAdminVendorId();
     _loadDepartments();
-    _loadSuppliers();
+    _loadSalesmen();
     _loadUnitTypes();
     AuthController.getCompanyState().then((s) => _companyState = s);
     if (soId != null) {
@@ -93,8 +93,8 @@ class SalesOrderFormController extends GetxController {
         'limit': '50',
         if (query.trim().isNotEmpty) 'search': query.trim(),
         if (_adminVendorId != null) 'admin_vendor_id': _adminVendorId.toString(),
-        if (supplierId.value != null && supplierId.value!.isNotEmpty)
-          'supplier_id': supplierId.value!,
+        if (salesmanId.value != null && salesmanId.value!.isNotEmpty)
+          'supplier_id': salesmanId.value!,
       };
       final uri = Uri.parse(ApiConfig.vendorProducts).replace(queryParameters: params);
       final response = await http
@@ -260,25 +260,25 @@ class SalesOrderFormController extends GetxController {
     }
   }
 
-  Future<void> _loadSuppliers() async {
+  Future<void> _loadSalesmen() async {
     try {
       final response = await http.get(
-        Uri.parse(ApiConfig.suppliers).replace(queryParameters: {'limit': '500'}),
+        Uri.parse(ApiConfig.salesmen).replace(queryParameters: {'role': 'salesman', 'limit': '500'}),
         headers: {'Accept': 'application/json'},
       );
       if (response.statusCode != 200) return;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       if (data['success'] != true) return;
-      suppliers.value = (data['data'] as List)
+      salesmen.value = (data['data'] as List)
           .whereType<Map<String, dynamic>>()
           .map((e) => {
                 'id': e['id']?.toString(),
-                'name': (e['supplier_name'] ?? e['name'] ?? '').toString(),
+                'name': (e['name'] ?? '').toString(),
               })
           .where((e) => (e['id'] ?? '').isNotEmpty)
           .toList();
     } catch (e) {
-      debugPrint('[SO FORM] Load suppliers error: $e');
+      debugPrint('[SO FORM] Load salesmen error: $e');
     }
   }
 
@@ -377,12 +377,12 @@ class SalesOrderFormController extends GetxController {
     customerPhone.value = '';
     customerShopName.value = '';
     departmentId.value = so.departmentId;
-    supplierId.value = so.supplierId;
-    if (so.supplierId != null) {
-      final match = suppliers.firstWhereOrNull((s) => s['id'] == so.supplierId);
-      supplierName.value = match?['name']?.toString() ?? '';
+    salesmanId.value = so.salesmanId;
+    if (so.salesmanId != null) {
+      final match = salesmen.firstWhereOrNull((s) => s['id'] == so.salesmanId);
+      salesmanName.value = match?['name']?.toString() ?? '';
     } else {
-      supplierName.value = '';
+      salesmanName.value = '';
     }
     docDate.value = so.docDate;
     expectedDate.value = so.expectedDate ?? '';
@@ -441,8 +441,8 @@ class SalesOrderFormController extends GetxController {
     customerShopName.value = '';
     _customerState = '';
     departmentId.value = null;
-    supplierId.value = null;
-    supplierName.value = '';
+    salesmanId.value = null;
+    salesmanName.value = '';
     docDate.value = '';
     expectedDate.value = '';
     status.value = 'DRAFT';
@@ -534,12 +534,12 @@ class SalesOrderFormController extends GetxController {
           financialYear.value = so.financialYear ?? '25-26';
           customerId.value = so.customerId;
           departmentId.value = so.departmentId;
-          supplierId.value = so.supplierId;
-          if (so.supplierId != null) {
-            final sm = suppliers.firstWhereOrNull((s) => s['id'] == so.supplierId);
-            supplierName.value = sm?['name']?.toString() ?? '';
+          salesmanId.value = so.salesmanId;
+          if (so.salesmanId != null) {
+            final sm = salesmen.firstWhereOrNull((s) => s['id'] == so.salesmanId);
+            salesmanName.value = sm?['name']?.toString() ?? '';
           } else {
-            supplierName.value = '';
+            salesmanName.value = '';
           }
           docDate.value = so.docDate;
           expectedDate.value = so.expectedDate ?? '';
@@ -619,26 +619,26 @@ class SalesOrderFormController extends GetxController {
   }
   void setDepartmentId(String? v) => departmentId.value = v;
 
-  void setSupplier(String? id, String name) {
-    supplierId.value = id;
-    supplierName.value = name;
+  void setSalesman(String? id, String name) {
+    salesmanId.value = id;
+    salesmanName.value = name;
   }
 
-  void setSupplierId(String? v) {
-    supplierId.value = v;
+  void setSalesmanId(String? v) {
+    salesmanId.value = v;
     if (v == null || v.isEmpty) {
-      supplierName.value = '';
+      salesmanName.value = '';
     } else {
-      final match = suppliers.firstWhereOrNull((s) => s['id'] == v);
-      supplierName.value = match?['name']?.toString() ?? '';
+      final match = salesmen.firstWhereOrNull((s) => s['id'] == v);
+      salesmanName.value = match?['name']?.toString() ?? '';
     }
   }
 
-  Future<List<PartyResult>> searchSuppliers(String query) async {
+  Future<List<PartyResult>> searchSalesmen(String query) async {
     final q = query.trim().toLowerCase();
     final filtered = q.isEmpty
-        ? suppliers
-        : suppliers.where((s) {
+        ? salesmen
+        : salesmen.where((s) {
             final name = (s['name'] ?? '').toString().toLowerCase();
             return name.contains(q);
           }).toList();
@@ -765,8 +765,8 @@ class SalesOrderFormController extends GetxController {
         'customer_id': customerId.value,
         if (departmentId.value != null && departmentId.value!.trim().isNotEmpty)
           'department_id': departmentId.value,
-        if (supplierId.value != null && supplierId.value!.trim().isNotEmpty)
-          'supplier_id': supplierId.value,
+        if (salesmanId.value != null && salesmanId.value!.trim().isNotEmpty)
+          'supplier_id': salesmanId.value,
         'doc_date': docDate.value,
         if (expectedDate.value.trim().isNotEmpty) 'expected_date': expectedDate.value.trim(),
         'status': status.value,

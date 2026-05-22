@@ -4,16 +4,21 @@ class SalesOrder {
   final String? financialYear;
   final int customerId;
   final String? customerName;
+  final String? customerEmail;
+  final String? customerPhone;
   final String docDate;
   final String? expectedDate;
   final String status;
   final String? narration;
   final String? departmentId;
   final double? totalAmount;
+  final double? discount;
+  final double? deliveryCharge;
   final double? chargesTotal;
   final double? totalWithCharges;
   final List<SalesOrderCharge> chargesJson;
   final List<SalesOrderItem> items;
+  final int? itemsCount;
   // Bill / Invoice fields
   final String? billNumber;
   final String? billDt;
@@ -23,7 +28,8 @@ class SalesOrder {
   final String? billStatement;
   final double? billRoff;
   final String? docYear;
-  final String? supplierId;
+  final String? salesmanId;
+  final String? salesmanName;
   // Return fields
   final String? salesReturnVoucherNo;
   final String? salesReturnDt;
@@ -34,16 +40,21 @@ class SalesOrder {
     this.financialYear,
     required this.customerId,
     this.customerName,
+    this.customerEmail,
+    this.customerPhone,
     required this.docDate,
     this.expectedDate,
     required this.status,
     this.narration,
     this.departmentId,
     this.totalAmount,
+    this.discount,
+    this.deliveryCharge,
     this.chargesTotal,
     this.totalWithCharges,
     this.chargesJson = const [],
     this.items = const [],
+    this.itemsCount,
     this.billNumber,
     this.billDt,
     this.department,
@@ -52,7 +63,8 @@ class SalesOrder {
     this.billStatement,
     this.billRoff,
     this.docYear,
-    this.supplierId,
+    this.salesmanId,
+    this.salesmanName,
     this.salesReturnVoucherNo,
     this.salesReturnDt,
   });
@@ -94,12 +106,16 @@ class SalesOrder {
       financialYear: json['financial_year']?.toString(),
       customerId: int.tryParse(json['customer_id']?.toString() ?? customer?['id']?.toString() ?? '') ?? 0,
       customerName: customerName,
+      customerEmail: json['customer_email']?.toString(),
+      customerPhone: json['customer_phone']?.toString(),
       docDate: json['doc_date']?.toString() ?? '',
       expectedDate: json['expected_date']?.toString(),
       status: json['status']?.toString() ?? 'DRAFT',
       narration: json['narration']?.toString(),
       departmentId: json['department_id']?.toString() ?? json['departmentId']?.toString(),
       totalAmount: parseDouble(json['total_amount']),
+      discount: parseDouble(json['discount']),
+      deliveryCharge: parseDouble(json['delivery_charge']),
       chargesTotal: parseDouble(json['charges_total']),
       totalWithCharges: parseDouble(json['total_with_charges']),
       chargesJson: rawCharges
@@ -110,6 +126,7 @@ class SalesOrder {
           .whereType<Map<String, dynamic>>()
           .map(SalesOrderItem.fromJson)
           .toList(),
+      itemsCount: int.tryParse(json['items_count']?.toString() ?? ''),
       billNumber: json['bill_number']?.toString(),
       billDt: json['bill_dt']?.toString(),
       department: json['department']?.toString(),
@@ -118,7 +135,8 @@ class SalesOrder {
       billStatement: json['bill_statement']?.toString(),
       billRoff: parseDouble(json['bill_roff']),
       docYear: json['doc_year']?.toString(),
-      supplierId: json['supplier_id']?.toString(),
+      salesmanId: json['supplier_id']?.toString(),
+      salesmanName: json['salesman_name']?.toString(),
       salesReturnVoucherNo: json['sales_return_voucher_no']?.toString(),
       salesReturnDt: json['sales_return_dt']?.toString(),
     );
@@ -130,12 +148,15 @@ class SalesOrder {
       'so_number': soNumber,
       if (financialYear != null) 'financial_year': financialYear,
       'customer_id': customerId,
+      if (customerName != null) 'customer_name': customerName,
       'doc_date': docDate,
       if (expectedDate != null) 'expected_date': expectedDate,
       'status': status,
       if (narration != null) 'narration': narration,
       if (departmentId != null) 'department_id': departmentId,
       if (totalAmount != null) 'total_amount': totalAmount,
+      if (discount != null) 'discount': discount,
+      if (deliveryCharge != null) 'delivery_charge': deliveryCharge,
       if (chargesTotal != null) 'charges_total': chargesTotal,
       if (totalWithCharges != null) 'total_with_charges': totalWithCharges,
       if (chargesJson.isNotEmpty)
@@ -149,7 +170,8 @@ class SalesOrder {
       if (billStatement != null) 'bill_statement': billStatement,
       if (billRoff != null) 'bill_roff': billRoff,
       if (docYear != null) 'doc_year': docYear,
-      if (supplierId != null) 'supplier_id': supplierId,
+      if (salesmanId != null) 'supplier_id': salesmanId,
+      if (salesmanName != null) 'salesman_name': salesmanName,
       if (salesReturnVoucherNo != null) 'sales_return_voucher_no': salesReturnVoucherNo,
       if (salesReturnDt != null) 'sales_return_dt': salesReturnDt,
     };

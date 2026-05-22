@@ -38,7 +38,9 @@ class SalesOrderController extends Controller
             $limit = max(1, min((int) $request->input('limit', 20), 200));
             $page  = max(1, (int) $request->input('page', 1));
 
-            $query = DB::table(self::ORDERS_TABLE . ' as o');
+            $query = DB::table(self::ORDERS_TABLE . ' as o')
+                ->leftJoin('loagma_new.user as u', 'u.userid', '=', 'o.buyer_userid')
+                ->leftJoin('loagma_new.LoginUser_crm as sm', DB::raw('CONVERT(sm.id USING utf8mb4) COLLATE utf8mb4_unicode_ci'), '=', DB::raw('CONVERT(o.salesman_id USING utf8mb4) COLLATE utf8mb4_unicode_ci'));
 
             if ($request->filled('customer_id')) {
                 $query->where('o.buyer_userid', (int) $request->input('customer_id'));
@@ -56,7 +58,8 @@ class SalesOrderController extends Controller
                 $search = $request->input('search');
                 $query->where(function ($q) use ($search) {
                     $q->where('o.order_id', 'like', "%{$search}%")
-                      ->orWhere('o.txn_id', 'like', "%{$search}%");
+                      ->orWhere('o.txn_id', 'like', "%{$search}%")
+                      ->orWhere('u.name', 'like', "%{$search}%");
                 });
             }
 
@@ -74,7 +77,7 @@ class SalesOrderController extends Controller
                     'o.discount',
                     'o.delivery_charge',
                     'o.items_count',
-                    'o.buyer_name',
+                    'u.name as buyer_name',
                     'o.bill_number',
                     'o.Bill_Dt',
                     'o.Department',
@@ -83,8 +86,8 @@ class SalesOrderController extends Controller
                     'o.Bill_Statement',
                     'o.bill_roff',
                     'o.Doc_Year',
-                    'o.Sales_Return_VoucherNo',
-                    'o.Sales_Return_Dt',
+                    'o.salesman_id',
+                    'sm.name as salesman_name',
                 ])
                 ->offset(($page - 1) * $limit)
                 ->limit($limit)
@@ -167,7 +170,7 @@ class SalesOrderController extends Controller
                 'Bill_Statement'  => $billStatement,
                 'bill_roff'               => $billRoff,
                 'Doc_Year'                => $docYear,
-                'supplier_id'             => $salesmanId,
+                'salesman_id'             => $salesmanId,
                 'Sales_Return_VoucherNo'  => $salesReturnVoucherNo,
                 'Sales_Return_Dt'         => $salesReturnDt,
             ], 'order_id');
@@ -269,7 +272,7 @@ class SalesOrderController extends Controller
                 'Bill_Statement'          => $billStatement,
                 'bill_roff'               => $billRoff,
                 'Doc_Year'                => $docYear,
-                'supplier_id'             => $salesmanId,
+                'salesman_id'             => $salesmanId,
                 'Sales_Return_VoucherNo'  => $salesReturnVoucherNo,
                 'Sales_Return_Dt'         => $salesReturnDt,
             ]);
@@ -337,6 +340,8 @@ class SalesOrderController extends Controller
     {
         try {
             $order = DB::table(self::ORDERS_TABLE . ' as o')
+                ->leftJoin('loagma_new.user as u', 'u.userid', '=', 'o.buyer_userid')
+                ->leftJoin('loagma_new.LoginUser_crm as sm', DB::raw('CONVERT(sm.id USING utf8mb4) COLLATE utf8mb4_unicode_ci'), '=', DB::raw('CONVERT(o.salesman_id USING utf8mb4) COLLATE utf8mb4_unicode_ci'))
                 ->where('o.order_id', $id)
                 ->select([
                     'o.order_id',
@@ -348,6 +353,9 @@ class SalesOrderController extends Controller
                     'o.discount',
                     'o.delivery_charge',
                     'o.items_count',
+                    'u.name as buyer_name',
+                    'u.email as buyer_email',
+                    'u.contactno as buyer_phone',
                     'o.bill_number',
                     'o.Bill_Dt',
                     'o.Department',
@@ -356,8 +364,8 @@ class SalesOrderController extends Controller
                     'o.Bill_Statement',
                     'o.bill_roff',
                     'o.Doc_Year',
-                    'o.Sales_Return_VoucherNo',
-                    'o.Sales_Return_Dt',
+                    'o.salesman_id',
+                    'sm.name as salesman_name',
                 ])
                 ->first();
 
@@ -426,29 +434,30 @@ class SalesOrderController extends Controller
         $state = strtolower(trim((string) ($data['order_state'] ?? 'pending')));
 
         return [
-            'id'            => $orderId,
-            'so_number'     => 'ORD-' . $orderId,
-            'customer_id'   => (int) ($data['buyer_userid'] ?? 0),
-            'customer_name' => $data['buyer_name'] ?? null,
-            'doc_date'     => $docDate,
-            'status'       => strtoupper($state),
-            'total_amount' => $total,
-            'discount'     => $discount,
-            'delivery_charge' => $delivery,
-            'total_with_charges' => $total,
-            'narration'    => null,
-            'txn_id'       => $data['txn_id'] ?? null,
-            'bill_number'    => $data['bill_number'] ?? null,
-            'bill_dt'        => $data['Bill_Dt'] ?? null,
-            'department'     => $data['Department'] ?? null,
-            'bill_narration' => $data['Bill_Narration'] ?? null,
-            'bill_vehicle'   => $data['Bill_Vehicle'] ?? null,
-            'bill_statement' => $data['Bill_Statement'] ?? null,
-            'bill_roff'               => (float) ($data['bill_roff'] ?? 0),
-            'doc_year'                => $data['Doc_Year'] ?? null,
-            'supplier_id'             => $data['supplier_id'] ?? null,
-            'sales_return_voucher_no' => $data['Sales_Return_VoucherNo'] ?? null,
-            'sales_return_dt'         => $data['Sales_Return_Dt'] ?? null,
+            'id'               => $orderId,
+            'so_number'        => 'ORD-' . $orderId,
+            'customer_id'      => (int) ($data['buyer_userid'] ?? 0),
+            'customer_name'    => $data['buyer_name'] ?? null,
+            'customer_email'   => $data['buyer_email'] ?? null,
+            'customer_phone'   => $data['buyer_phone'] ?? null,
+            'doc_date'         => $docDate,
+            'status'           => strtoupper($state),
+            'total_amount'     => $total,
+            'discount'         => $discount,
+            'delivery_charge'  => $delivery,
+            'total_with_charges' => round($total - $discount + $delivery, 2),
+            'narration'        => $data['txn_id'] ?? null,
+            'bill_number'      => $data['bill_number'] ?? null,
+            'bill_dt'          => $data['Bill_Dt'] ?? null,
+            'department'       => $data['Department'] ?? null,
+            'bill_narration'   => $data['Bill_Narration'] ?? null,
+            'bill_vehicle'     => $data['Bill_Vehicle'] ?? null,
+            'bill_statement'   => $data['Bill_Statement'] ?? null,
+            'bill_roff'        => (float) ($data['bill_roff'] ?? 0),
+            'doc_year'         => $data['Doc_Year'] ?? null,
+            'supplier_id'      => $data['salesman_id'] ?? null,
+            'salesman_name'    => $data['salesman_name'] ?? null,
+            'items_count'      => (int) ($data['items_count'] ?? 0),
         ];
     }
 

@@ -11,7 +11,7 @@ class ApiConfig {
 
   /// Pass --dart-define=USE_LOCAL=true to hit local server during dev.
   /// Default is production.
-  static const bool _useLocal = bool.fromEnvironment('USE_LOCAL', defaultValue: true);
+  static const bool _useLocal = bool.fromEnvironment('USE_LOCAL', defaultValue: false);
   static const String _envOverride = String.fromEnvironment('API_BASE_URL');
 
   static String get baseUrl =>
@@ -75,6 +75,12 @@ class ApiConfig {
 
   /// GET ${ApiConfig.apiBaseUrl}/users
   static String get users => '$apiBaseUrl/users';
+
+  /// GET ${ApiConfig.apiBaseUrl}/users?role=salesman
+  static String get salesmen => '$apiBaseUrl/users';
+
+  /// GET ${ApiConfig.apiBaseUrl}/admin-info?admin_id=X
+  static String get adminInfo => '$apiBaseUrl/admin-info';
 
   /// GET/POST ${ApiConfig.apiBaseUrl}/supplier-products
   static String get supplierProducts => '$apiBaseUrl/supplier-products';

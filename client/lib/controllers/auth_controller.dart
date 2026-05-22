@@ -95,6 +95,22 @@ class AuthController extends GetxController {
     return prefs.getString(_keyState) ?? '';
   }
 
+  /// Fetches org + bank details from admin table via admin_id stored at login.
+  static Future<Map<String, dynamic>?> getAdminInfo() async {
+    try {
+      final adminId = await getAdminId();
+      if (adminId == null) return null;
+      final uri = Uri.parse(ApiConfig.adminInfo).replace(queryParameters: {'admin_id': adminId.toString()});
+      final response = await http.get(uri, headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) return null;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) return null;
+      return data['data'] as Map<String, dynamic>?;
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ── Controller methods ────────────────────────────────────────────────────
 
   void setMobile(String number) {
