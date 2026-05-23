@@ -10,6 +10,7 @@ import '../controllers/auth_controller.dart';
 import '../controllers/purchase_order_form_controller.dart';
 import '../controllers/purchase_return_form_controller.dart';
 import '../controllers/purchase_voucher_controller.dart';
+import '../controllers/sales_invoice_form_controller.dart';
 import '../controllers/sales_order_form_controller.dart';
 import '../controllers/sales_return_form_controller.dart';
 
@@ -941,5 +942,238 @@ class ReportExportService {
         ...rows,
       ]),
     );
+  }
+
+  // ─── Sales Invoice ────────────────────────────────────────────────────────────
+
+  static Future<void> printSalesInvoice(SalesInvoiceFormController c) async {
+    final bytes = await buildSalesInvoicePdf(c);
+    await Printing.layoutPdf(onLayout: (_) async => bytes);
+  }
+
+  static Future<void> shareSalesInvoice(SalesInvoiceFormController c) async {
+    final bytes = await buildSalesInvoicePdf(c);
+    final invNo = c.invoiceNumber.value.trim().isEmpty ? 'invoice' : c.invoiceNumber.value.trim();
+    await Share.shareXFiles([
+      XFile.fromData(bytes, mimeType: 'application/pdf', name: 'invoice_$invNo.pdf'),
+    ], text: 'Sales Invoice $invNo');
+  }
+
+  static Future<Uint8List> buildSalesInvoicePdf(SalesInvoiceFormController c) async {
+    final pdf = pw.Document();
+    final theme = await _pdfTheme();
+    final invNo = c.invoiceNumber.value.trim().isEmpty ? '-' : c.invoiceNumber.value.trim();
+
+    final adminInfo = await AuthController.getAdminInfo();
+    final orgName    = adminInfo?['org_name']?.toString()       ?? '';
+    final orgAddress = adminInfo?['org_address']?.toString()    ?? '';
+    final orgGst     = adminInfo?['org_gst']?.toString()        ?? '';
+    final fssaiNo    = adminInfo?['fssai_no']?.toString()       ?? '';
+    final bankName   = adminInfo?['bank_name']?.toString()      ?? '';
+    final bankBranch = adminInfo?['bank_branch']?.toString()    ?? '';
+    final accountNo  = adminInfo?['account_number']?.toString() ?? '';
+    final ifscCode   = adminInfo?['ifsc_code']?.toString()      ?? '';
+
+    final itemRows = c.items.where((r) => r.productId.value != null).map((row) {
+      final orderedQty = row.orderedQtyDouble;
+      final invQty     = row.deliveredQtyDouble;
+      final price      = row.priceDouble;
+      final disc       = double.tryParse(row.discountPercent.value) ?? 0;
+      final packLabel  = row.selectedPackLabel.value.trim();
+      final unitDisp   = packLabel.isNotEmpty ? packLabel : row.unit.value;
+
+      final taxParts = row.taxFieldValues.entries
+          .where((e) => (double.tryParse(e.value) ?? 0) > 0)
+          .map((e) => '${e.key} ${e.value}%')
+          .join(', ');
+
+      return <String>[
+        row.productName.value.trim().isEmpty ? '-' : row.productName.value.trim(),
+        row.productCode.value.trim().isEmpty ? '-' : row.productCode.value.trim(),
+        unitDisp,
+        orderedQty > 0 ? orderedQty.toStringAsFixed(2) : '-',
+        invQty.toStringAsFixed(2),
+        price.toStringAsFixed(2),
+        disc > 0 ? '${disc.toStringAsFixed(1)}%' : '-',
+        taxParts.isEmpty
+            ? (row.taxPercent.value.trim().isEmpty ? '-' : '${row.taxPercent.value}%')
+            : taxParts,
+        row.lineTotalExclTax.toStringAsFixed(2),
+        row.lineTotal.toStringAsFixed(2),
+      ];
+    }).toList();
+
+    pdf.addPage(pw.MultiPage(
+      theme: theme,
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      build: (ctx) => [
+        // ── Header ──
+        pw.Container(
+          decoration: const pw.BoxDecoration(
+            color: PdfColors.grey800,
+            borderRadius: pw.BorderRadius.all(pw.Radius.circular(4)),
+          ),
+          padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                if (orgName.isNotEmpty)
+                  pw.Text(orgName, style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+                if (orgAddress.isNotEmpty)
+                  pw.Text(orgAddress, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey300)),
+                if (orgGst.isNotEmpty)
+                  pw.Text('GST: $orgGst', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey300)),
+                if (fssaiNo.isNotEmpty)
+                  pw.Text('FSSAI: $fssaiNo', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey300)),
+              ]),
+              pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+                pw.Text('TAX INVOICE', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+                pw.Text(invNo, style: pw.TextStyle(fontSize: 11, color: PdfColors.grey200, fontWeight: pw.FontWeight.bold)),
+                pw.Text(_normalizeDate(c.billDt.value), style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey300)),
+                if (c.billDocYear.value.trim().isNotEmpty)
+                  pw.Text('Year: ${c.billDocYear.value.trim()}', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey300)),
+              ]),
+            ],
+          ),
+        ),
+        pw.SizedBox(height: 10),
+
+        // ── Customer | Invoice Details ──
+        pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          pw.Expanded(child: _infoBox('BILL TO', [
+            pw.Text(
+              c.customerName.value.trim().isEmpty ? '-' : c.customerName.value.trim(),
+              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+            ),
+            if (c.customerShopName.value.trim().isNotEmpty)
+              pw.Text(c.customerShopName.value.trim(), style: const pw.TextStyle(fontSize: 9)),
+            if (c.customerPhone.value.trim().isNotEmpty)
+              pw.Text('Ph: ${c.customerPhone.value.trim()}', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+          ])),
+          pw.SizedBox(width: 8),
+          pw.Expanded(child: _infoBox('INVOICE DETAILS', [
+            _kvSmall('Invoice No', invNo),
+            _kvSmall('Invoice Date', _normalizeDate(c.billDt.value)),
+            _kvSmall('Order Date', _normalizeDate(c.docDate.value)),
+            if (c.sourceOrderNumber.value.trim().isNotEmpty)
+              _kvSmall('Source Order', c.sourceOrderNumber.value.trim()),
+            if (c.salesmanName.value.trim().isNotEmpty)
+              _kvSmall('Salesman', c.salesmanName.value.trim()),
+            if (c.billDepartment.value.trim().isNotEmpty)
+              _kvSmall('Department', c.billDepartment.value.trim()),
+            if (c.billVehicle.value.trim().isNotEmpty)
+              _kvSmall('Vehicle', c.billVehicle.value.trim()),
+            if (c.narration.value.trim().isNotEmpty)
+              _kvSmall('Narration', c.narration.value.trim()),
+          ])),
+        ]),
+        pw.SizedBox(height: 10),
+
+        // ── Items ──
+        _sectionTitle('ITEM DETAILS'),
+        pw.SizedBox(height: 4),
+        pw.TableHelper.fromTextArray(
+          headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7),
+          cellStyle: const pw.TextStyle(fontSize: 7),
+          headerDecoration: const pw.BoxDecoration(color: PdfColors.grey200),
+          cellAlignment: pw.Alignment.centerLeft,
+          columnWidths: {
+            0: const pw.FlexColumnWidth(3.0),
+            1: const pw.FlexColumnWidth(1.2),
+            2: const pw.FlexColumnWidth(1.2),
+            3: const pw.FlexColumnWidth(1.0),
+            4: const pw.FlexColumnWidth(1.0),
+            5: const pw.FlexColumnWidth(1.3),
+            6: const pw.FlexColumnWidth(0.9),
+            7: const pw.FlexColumnWidth(1.5),
+            8: const pw.FlexColumnWidth(1.4),
+            9: const pw.FlexColumnWidth(1.4),
+          },
+          headers: const [
+            'Product', 'HSN', 'Pack/Unit', 'SO Qty', 'Inv Qty',
+            'Rate', 'Disc%', 'Tax', 'Taxable Amt', 'Line Total',
+          ],
+          data: itemRows,
+        ),
+        pw.SizedBox(height: 10),
+
+        // ── Charges + Summary ──
+        pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          pw.Expanded(
+            child: c.charges.isEmpty
+                ? pw.SizedBox()
+                : _infoBox('CHARGES', c.charges.map((ch) {
+                    final amt = double.tryParse(ch.amount.value) ?? 0;
+                    final rem = ch.remarks.value.trim();
+                    return pw.Padding(
+                      padding: const pw.EdgeInsets.only(bottom: 3),
+                      child: pw.Row(children: [
+                        pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                          pw.Text(ch.name.value, style: const pw.TextStyle(fontSize: 9)),
+                          if (rem.isNotEmpty)
+                            pw.Text(rem, style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600)),
+                        ])),
+                        pw.Text(amt.toStringAsFixed(2), style: const pw.TextStyle(fontSize: 9)),
+                      ]),
+                    );
+                  }).toList()),
+          ),
+          pw.SizedBox(width: 8),
+          pw.Container(
+            width: 200,
+            padding: const pw.EdgeInsets.all(8),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.grey100,
+              border: pw.Border.all(color: PdfColors.grey300),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
+            ),
+            child: pw.Column(children: [
+              _kvRight('Subtotal (excl. tax)', c.itemsSubtotalExclTax.toStringAsFixed(2)),
+              _kvRight('Tax', c.itemsTaxTotal.toStringAsFixed(2)),
+              if (c.addOnTotal != 0) _kvRight('Charges', c.addOnTotal.toStringAsFixed(2)),
+              if (c.roffTotal != 0) _kvRight('Round Off', c.roffTotal.toStringAsFixed(2)),
+              pw.Divider(color: PdfColors.grey400),
+              pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+                pw.Text('GRAND TOTAL', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                pw.Text(c.grandTotal.toStringAsFixed(2), style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              ]),
+            ]),
+          ),
+        ]),
+
+        // ── Bank + Narration ──
+        if (bankName.isNotEmpty || accountNo.isNotEmpty) ...[
+          pw.SizedBox(height: 10),
+          _sectionTitle('BANK DETAILS'),
+          pw.SizedBox(height: 4),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(8),
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColors.grey300),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
+            ),
+            child: pw.Row(children: [
+              pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                if (bankName.isNotEmpty)   _kvSmall('Bank',       bankName),
+                if (bankBranch.isNotEmpty) _kvSmall('Branch',     bankBranch),
+                if (accountNo.isNotEmpty)  _kvSmall('Account No', accountNo),
+                if (ifscCode.isNotEmpty)   _kvSmall('IFSC Code',  ifscCode),
+              ])),
+            ]),
+          ),
+        ],
+
+        if (c.billStatement.value.trim().isNotEmpty) ...[
+          pw.SizedBox(height: 10),
+          _infoBox('TERMS & CONDITIONS', [
+            pw.Text(c.billStatement.value.trim(), style: const pw.TextStyle(fontSize: 8)),
+          ]),
+        ],
+      ],
+    ));
+    return pdf.save();
   }
 }

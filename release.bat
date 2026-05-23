@@ -45,6 +45,10 @@ if errorlevel 1 (
 )
 
 cd /d "!CLIENT_DIR!"
+if errorlevel 1 (
+    echo [ERROR] Cannot cd to client directory: !CLIENT_DIR!
+    pause & exit /b 1
+)
 
 :: ── 2. Enable Windows desktop support (one-time) ────────────
 if not exist "windows\" (
@@ -86,6 +90,7 @@ if errorlevel 1 (echo [ERROR] flutter clean failed. & pause & exit /b 1)
 :: ── 5. Dependencies ──────────────────────────────────────────
 echo.
 echo [2/3] Getting dependencies...
+echo Current dir: %CD%
 flutter pub get
 if errorlevel 1 (echo [ERROR] pub get failed. & pause & exit /b 1)
 
@@ -94,7 +99,9 @@ echo.
 echo [3/3] Building Windows EXE...
 flutter build windows --release
 if errorlevel 1 (
+    echo.
     echo [ERROR] flutter build windows --release failed.
+    echo Check the output above for the actual error.
     pause & exit /b 1
 )
 
@@ -131,13 +138,42 @@ if errorlevel 1 (
     echo ZIP: !ZIP_PATH!
 )
 
-:: ── 10. Done ─────────────────────────────────────────────────
+:: ── 10. Build Installer (Inno Setup) ──────────────────────────
+echo.
+echo [4/4] Building installer...
+set "ISS_FILE=%PROJECT_ROOT%installer\loagmapms_setup.iss"
+set "INSTALLER_OUT=%PROJECT_ROOT%installer\output\LoagmaPMS_Setup_v!VERSION!.exe"
+
+:: Look for Inno Setup in common install locations
+set "ISCC="
+if exist "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" set "ISCC=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+if exist "C:\Program Files\Inno Setup 6\ISCC.exe"       set "ISCC=C:\Program Files\Inno Setup 6\ISCC.exe"
+if exist "C:\Program Files (x86)\Inno Setup 5\ISCC.exe" set "ISCC=C:\Program Files (x86)\Inno Setup 5\ISCC.exe"
+
+if "!ISCC!"=="" (
+    echo [WARN] Inno Setup not found. Skipping installer build.
+    echo        Install from https://jrsoftware.org/isdl.php and re-run to get the Setup EXE.
+) else (
+    "!ISCC!" /DAppVersion=!VERSION! "!ISS_FILE!"
+    if errorlevel 1 (
+        echo [WARN] Inno Setup compile failed - check the .iss script.
+    ) else (
+        echo Installer: !INSTALLER_OUT!
+        :: Copy installer into release output folder too
+        if exist "!INSTALLER_OUT!" (
+            copy /y "!INSTALLER_OUT!" "!RELEASE_FOLDER!\" >nul
+        )
+    )
+)
+
+:: ── 11. Done ─────────────────────────────────────────────────
 echo.
 echo ==========================================
 echo   BUILD SUCCESSFUL
 echo ==========================================
-echo   EXE : !RELEASE_FOLDER!\LoagmaPMS.exe
-if exist "!ZIP_PATH!" echo   ZIP : !ZIP_PATH!
+echo   EXE     : !RELEASE_FOLDER!\LoagmaPMS.exe
+if exist "!ZIP_PATH!"       echo   ZIP     : !ZIP_PATH!
+if exist "!INSTALLER_OUT!"  echo   SETUP   : !INSTALLER_OUT!
 echo ==========================================
 echo.
 echo Press any key to open release folder...

@@ -14,11 +14,25 @@ class SalesOrderController extends Controller
 
     private static array $CLOSED_STATES = ['cancelled', 'rejected', 'returned'];
 
+    // GET /sales-orders/debug-schema
+    public function debugSchema(Request $request): JsonResponse
+    {
+        $columns = DB::select('DESCRIBE loagma_new.orders');
+        $itemColumns = DB::select('DESCRIBE loagma_new.orders_item');
+        $orderId = (int) $request->input('order_id', 268082);
+        $row = DB::table(self::ORDERS_TABLE)->where('order_id', $orderId)->first();
+        return response()->json([
+            'columns' => $columns,
+            'item_columns' => $itemColumns,
+            'row' => $row,
+        ]);
+    }
+
     // GET /sales-orders/invoice-series
     public function series(): JsonResponse
     {
         try {
-            $count   = DB::table(self::ORDERS_TABLE)->whereNotNull('bill_number')->count();
+            $count   = DB::table(self::ORDERS_TABLE)->whereNotNull('bill_no')->count();
             $nextNum = str_pad((string) ($count + 1), 3, '0', STR_PAD_LEFT);
             return response()->json([
                 'success'     => true,
@@ -59,8 +73,17 @@ class SalesOrderController extends Controller
                 $query->where(function ($q) use ($search) {
                     $q->where('o.order_id', 'like', "%{$search}%")
                       ->orWhere('o.txn_id', 'like', "%{$search}%")
+                      ->orWhere('o.bill_no', 'like', "%{$search}%")
                       ->orWhere('u.name', 'like', "%{$search}%");
                 });
+            }
+
+            if ($request->filled('from_date')) {
+                $query->whereDate('o.short_datetime', '>=', $request->input('from_date'));
+            }
+
+            if ($request->filled('to_date')) {
+                $query->whereDate('o.short_datetime', '<=', $request->input('to_date'));
             }
 
             $query->orderBy('o.order_id', 'desc');
@@ -78,7 +101,7 @@ class SalesOrderController extends Controller
                     'o.delivery_charge',
                     'o.items_count',
                     'u.name as buyer_name',
-                    'o.bill_number',
+                    'o.bill_no',
                     'o.Bill_Dt',
                     'o.Department',
                     'o.Bill_Narration',
@@ -105,7 +128,7 @@ class SalesOrderController extends Controller
             ]);
         } catch (\Throwable $e) {
             Log::error('SalesOrder index error: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Failed to fetch sales orders'], 500);
+            return response()->json(['success' => false, 'message' => 'Failed to fetch sales orders: ' . $e->getMessage()], 500);
         }
     }
 
@@ -129,6 +152,7 @@ class SalesOrderController extends Controller
             $narration = trim((string) $request->input('narration', ''));
 
             // Bill fields (populated when status = 'billed')
+            $billNo        = trim((string) $request->input('bill_number', '')) ?: null;
             $billDt        = $request->input('bill_dt') ?: null;
             $department    = trim((string) $request->input('department', '')) ?: null;
             $billNarration = trim((string) $request->input('bill_narration', '')) ?: null;
@@ -136,11 +160,8 @@ class SalesOrderController extends Controller
             $billStatement = trim((string) $request->input('bill_statement', '')) ?: null;
             $billRoff      = (float) $request->input('bill_roff', 0);
             $docYear       = trim((string) $request->input('doc_year', '')) ?: null;
-            $salesmanId    = trim((string) $request->input('supplier_id', '')) ?: null;
-
-            // Return fields
-            $salesReturnVoucherNo = trim((string) $request->input('sales_return_voucher_no', '')) ?: null;
-            $salesReturnDt        = $request->input('sales_return_dt') ?: null;
+            $rawSalesmanIdStore = $request->input('supplier_id');
+            $salesmanIdStore    = ($rawSalesmanIdStore !== null && $rawSalesmanIdStore !== '') ? trim((string) $rawSalesmanIdStore) : null;
 
             if ($status === 'billed' && empty($billDt)) {
                 return response()->json(['success' => false, 'message' => 'bill_dt is required when status is billed'], 422);
@@ -162,38 +183,42 @@ class SalesOrderController extends Controller
                 'delivery_charge' => $delivery,
                 'items_count'     => count($items),
                 'short_datetime'  => $docDate,
-                'txn_id'          => $narration ?: null,
+                'txn_id'          => $narration,
+                'bill_no'         => $billNo,
                 'Bill_Dt'         => $billDt,
                 'Department'      => $department,
                 'Bill_Narration'  => $billNarration,
                 'Bill_Vehicle'    => $billVehicle,
                 'Bill_Statement'  => $billStatement,
-                'bill_roff'               => $billRoff,
-                'Doc_Year'                => $docYear,
-                'salesman_id'             => $salesmanId,
-                'Sales_Return_VoucherNo'  => $salesReturnVoucherNo,
-                'Sales_Return_Dt'         => $salesReturnDt,
+                'bill_roff'       => $billRoff,
+                'Doc_Year'        => $docYear,
+                'salesman_id'     => $salesmanIdStore,
             ], 'order_id');
 
+            $nextId = $this->nextItemId();
             foreach ($items as $item) {
                 $productId = (int) ($item['product_id'] ?? 0);
-                $qty       = (float) ($item['quantity'] ?? 0);
+                $qty       = (int) round((float) ($item['quantity'] ?? 0));
                 $price     = (float) ($item['price'] ?? 0);
 
                 $pinfo = [];
-                if (!empty($item['hsn_code']))  $pinfo['hsn_code']  = $item['hsn_code'];
-                if (!empty($item['unit']))       $pinfo['unit']      = $item['unit'];
-                if (!empty($item['pack_id']))    $pinfo['selected_pack'] = ['id' => $item['pack_id'], 'unit' => $item['unit'] ?? 'Nos'];
-                if (!empty($item['description'])) $pinfo['description'] = $item['description'];
+                if (!empty($item['hsn_code']))        $pinfo['hsn_code']         = $item['hsn_code'];
+                if (!empty($item['unit']))             $pinfo['unit']             = $item['unit'];
+                if (!empty($item['pack_id']))          $pinfo['selected_pack']    = ['id' => $item['pack_id'], 'unit' => $item['unit'] ?? 'Nos'];
+                if (!empty($item['description']))      $pinfo['description']      = $item['description'];
+                if (isset($item['discount_percent']))  $pinfo['discount_percent'] = (float) $item['discount_percent'];
+                if (isset($item['tax_percent']))       $pinfo['tax_percent']      = (float) $item['tax_percent'];
 
                 DB::table(self::ITEMS_TABLE)->insert([
-                    'order_id'    => $orderId,
-                    'product_id'  => $productId,
-                    'quantity'    => $qty,
-                    'item_price'  => $price,
-                    'item_total'  => round($qty * $price, 2),
-                    'pinfo'       => !empty($pinfo) ? json_encode($pinfo) : null,
-                    'qty_delivered' => 0,
+                    'item_id'       => $nextId++,
+                    'order_id'      => $orderId,
+                    'product_id'    => $productId,
+                    'quantity'      => $qty,
+                    'item_price'    => $price,
+                    'item_total'    => round($qty * $price, 2),
+                    'pinfo'         => json_encode(!empty($pinfo) ? $pinfo : new \stdClass()),
+                    'commission'    => 0,
+                    'qty_delivered' => (int) round((float) ($item['qty_delivered'] ?? 0)),
                     'qty_returned'  => 0,
                 ]);
             }
@@ -218,6 +243,15 @@ class SalesOrderController extends Controller
                 return response()->json(['success' => false, 'message' => 'Order not found'], 404);
             }
 
+            if ($request->boolean('cancel_invoice')) {
+                DB::table(self::ORDERS_TABLE)->where('order_id', $id)->update([
+                    'bill_no'     => null,
+                    'Bill_Dt'     => null,
+                    'order_state' => 'pending',
+                ]);
+                return response()->json(['success' => true, 'message' => 'Invoice cancelled, order reverted to Pending']);
+            }
+
             $items = $request->input('items', []);
             if (empty($items)) {
                 return response()->json(['success' => false, 'message' => 'At least one item is required'], 422);
@@ -225,12 +259,12 @@ class SalesOrderController extends Controller
 
             $status   = strtolower(trim((string) $request->input('status', $order->order_state ?? 'pending')));
             $docDate  = trim((string) $request->input('doc_date', $order->short_datetime ?? date('Y-m-d')));
-            $discount = (float) $request->input('discount', $order->discount ?? 0);
-            $delivery = (float) $request->input('delivery_charge', $order->delivery_charge ?? 0);
+            $discount = (float) $request->input('discount', is_numeric($order->discount ?? '') ? $order->discount : 0);
+            $delivery = (float) $request->input('delivery_charge', is_numeric($order->delivery_charge ?? '') ? $order->delivery_charge : 0);
             $narration = trim((string) $request->input('narration', ''));
 
-            // Bill fields
-            $billNumber    = trim((string) $request->input('bill_number', '')) ?: ($order->bill_number ?? null);
+            // Bill fields — bill_no (varchar) stores the invoice number string; bill_number is a legacy INT column we don't touch
+            $billNo        = trim((string) $request->input('bill_number', '')) ?: ($order->bill_no ?? null);
             $billDt        = $request->input('bill_dt') ?: null;
             $department    = trim((string) $request->input('department', '')) ?: null;
             $billNarration = trim((string) $request->input('bill_narration', '')) ?: null;
@@ -238,11 +272,8 @@ class SalesOrderController extends Controller
             $billStatement = trim((string) $request->input('bill_statement', '')) ?: null;
             $billRoff      = (float) $request->input('bill_roff', 0);
             $docYear       = trim((string) $request->input('doc_year', '')) ?: null;
-            $salesmanId    = trim((string) $request->input('supplier_id', '')) ?: null;
-
-            // Return fields
-            $salesReturnVoucherNo = trim((string) $request->input('sales_return_voucher_no', '')) ?: null;
-            $salesReturnDt        = $request->input('sales_return_dt') ?: null;
+            $rawSalesmanId = $request->input('supplier_id');
+            $salesmanId    = ($rawSalesmanId !== null && $rawSalesmanId !== '') ? trim((string) $rawSalesmanId) : null;
 
             if ($status === 'billed' && empty($billDt)) {
                 return response()->json(['success' => false, 'message' => 'bill_dt is required when status is billed'], 422);
@@ -262,42 +293,44 @@ class SalesOrderController extends Controller
                 'discount'        => $discount,
                 'delivery_charge' => $delivery,
                 'items_count'     => count($items),
-                'short_datetime'  => $docDate,
-                'txn_id'          => $narration ?: null,
-                'bill_number'             => $billNumber,
-                'Bill_Dt'                 => $billDt,
-                'Department'              => $department,
-                'Bill_Narration'          => $billNarration,
-                'Bill_Vehicle'            => $billVehicle,
-                'Bill_Statement'          => $billStatement,
-                'bill_roff'               => $billRoff,
-                'Doc_Year'                => $docYear,
-                'salesman_id'             => $salesmanId,
-                'Sales_Return_VoucherNo'  => $salesReturnVoucherNo,
-                'Sales_Return_Dt'         => $salesReturnDt,
+                'txn_id'          => $narration,
+                'bill_no'         => $billNo,
+                'Bill_Dt'         => $billDt,
+                'Department'      => $department,
+                'Bill_Narration'  => $billNarration,
+                'Bill_Vehicle'    => $billVehicle,
+                'Bill_Statement'  => $billStatement,
+                'bill_roff'       => $billRoff,
+                'Doc_Year'        => $docYear,
+                'salesman_id'     => $salesmanId,
             ]);
 
             DB::table(self::ITEMS_TABLE)->where('order_id', $id)->delete();
 
+            $nextId = $this->nextItemId();
             foreach ($items as $item) {
                 $productId = (int) ($item['product_id'] ?? 0);
-                $qty       = (float) ($item['quantity'] ?? 0);
+                $qty       = (int) round((float) ($item['quantity'] ?? 0));
                 $price     = (float) ($item['price'] ?? 0);
 
                 $pinfo = [];
-                if (!empty($item['hsn_code']))    $pinfo['hsn_code']  = $item['hsn_code'];
-                if (!empty($item['unit']))         $pinfo['unit']      = $item['unit'];
-                if (!empty($item['pack_id']))      $pinfo['selected_pack'] = ['id' => $item['pack_id'], 'unit' => $item['unit'] ?? 'Nos'];
-                if (!empty($item['description'])) $pinfo['description'] = $item['description'];
+                if (!empty($item['hsn_code']))       $pinfo['hsn_code']        = $item['hsn_code'];
+                if (!empty($item['unit']))            $pinfo['unit']            = $item['unit'];
+                if (!empty($item['pack_id']))         $pinfo['selected_pack']   = ['id' => $item['pack_id'], 'unit' => $item['unit'] ?? 'Nos'];
+                if (!empty($item['description']))     $pinfo['description']     = $item['description'];
+                if (isset($item['discount_percent'])) $pinfo['discount_percent'] = (float) $item['discount_percent'];
+                if (isset($item['tax_percent']))      $pinfo['tax_percent']     = (float) $item['tax_percent'];
 
                 DB::table(self::ITEMS_TABLE)->insert([
+                    'item_id'       => $nextId++,
                     'order_id'      => $id,
                     'product_id'    => $productId,
                     'quantity'      => $qty,
                     'item_price'    => $price,
                     'item_total'    => round($qty * $price, 2),
-                    'pinfo'         => !empty($pinfo) ? json_encode($pinfo) : null,
-                    'qty_delivered' => (float) ($item['qty_delivered'] ?? 0),
+                    'pinfo'         => json_encode(!empty($pinfo) ? $pinfo : new \stdClass()),
+                    'commission'    => 0,
+                    'qty_delivered' => (int) round((float) ($item['qty_delivered'] ?? 0)),
                     'qty_returned'  => 0,
                 ]);
             }
@@ -309,8 +342,8 @@ class SalesOrderController extends Controller
                 'data'    => $this->normalizeHeader($updated),
             ]);
         } catch (\Throwable $e) {
-            Log::error('SalesOrder update error: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Failed to update sales order'], 500);
+            Log::error('SalesOrder update error: ' . $e->getMessage() . ' ' . $e->getTraceAsString());
+            return response()->json(['success' => false, 'message' => 'Failed to update sales order: ' . $e->getMessage()], 500);
         }
     }
 
@@ -321,10 +354,10 @@ class SalesOrderController extends Controller
             if (!$order) {
                 return response()->json(['success' => false, 'message' => 'Order not found'], 404);
             }
-            if (!empty($order->bill_number)) {
+            if (!empty($order->bill_no)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Cannot delete order: invoice ' . $order->bill_number . ' is linked. Delete the invoice first.',
+                    'message' => 'Cannot delete order: invoice ' . $order->bill_no . ' is linked. Delete the invoice first.',
                 ], 422);
             }
             DB::table(self::ITEMS_TABLE)->where('order_id', $id)->delete();
@@ -356,7 +389,7 @@ class SalesOrderController extends Controller
                     'u.name as buyer_name',
                     'u.email as buyer_email',
                     'u.contactno as buyer_phone',
-                    'o.bill_number',
+                    'o.bill_no',
                     'o.Bill_Dt',
                     'o.Department',
                     'o.Bill_Narration',
@@ -419,6 +452,12 @@ class SalesOrderController extends Controller
         }
     }
 
+    private function nextItemId(): int
+    {
+        $max = DB::table(self::ITEMS_TABLE)->max('item_id') ?? 0;
+        return (int) $max + 1;
+    }
+
     private function normalizeHeader(object $row): array
     {
         $data = json_decode(json_encode($row), true) ?: [];
@@ -447,7 +486,7 @@ class SalesOrderController extends Controller
             'delivery_charge'  => $delivery,
             'total_with_charges' => round($total - $discount + $delivery, 2),
             'narration'        => $data['txn_id'] ?? null,
-            'bill_number'      => $data['bill_number'] ?? null,
+            'bill_number'      => $data['bill_no'] ?? null,
             'bill_dt'          => $data['Bill_Dt'] ?? null,
             'department'       => $data['Department'] ?? null,
             'bill_narration'   => $data['Bill_Narration'] ?? null,

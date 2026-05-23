@@ -38,7 +38,7 @@ class _SalesOrderListScreenState extends State<SalesOrderListScreen> {
     'registered': 'Registered',
     'dispatched': 'Dispatched',
     'delivered': 'Delivered',
-    'billed': 'Billed',
+    'billed': 'Invoiced',
     'cancelled': 'Cancelled',
   };
 
@@ -542,7 +542,7 @@ class _SOCard extends StatelessWidget {
                       ),
                     ),
                     child: Text(
-                      so.status,
+                      so.status.toUpperCase() == 'BILLED' ? 'INVOICED' : so.status,
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,

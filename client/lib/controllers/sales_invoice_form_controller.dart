@@ -6,17 +6,38 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 
 import '../api_config.dart';
+import '../constants/charge_constants.dart';
+import '../controllers/auth_controller.dart';
+import '../models/party_result.dart';
+import '../models/product_model.dart';
 import '../models/sales_order_model.dart';
 import '../services/customer_api_service.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Line row — mirrors SOLineRow with full tax support
+// ─────────────────────────────────────────────────────────────────────────────
 
 class SILineRow {
   final productId = Rxn<int>();
   final productName = ''.obs;
-  final productCode = ''.obs;
-  final unit = 'Nos'.obs;
+  final productCode = ''.obs; // HSN code
+  final unit = 'PCS'.obs;
   final orderedQty = '0'.obs;
-  final qtyDelivered = '0'.obs;
+  final qtyDelivered = '1'.obs;
   final price = '0'.obs;
+  final discountPercent = ''.obs;
+  final taxPercent = ''.obs;
+  final isInclusiveTax = false.obs;
+  final sgst = ''.obs;
+  final cgst = ''.obs;
+  final igst = ''.obs;
+  final cess = ''.obs;
+  final roff = ''.obs;
+  final taxFieldValues = <String, String>{}.obs;
+  final availableTaxKeys = <String>[].obs;
+  final isTaxLoading = false.obs;
+  final selectedPackId = ''.obs;
+  final selectedPackLabel = ''.obs;
 
   SILineRow({
     int? productId,
@@ -26,6 +47,8 @@ class SILineRow {
     String? orderedQty,
     String? qtyDelivered,
     String? price,
+    String? discountPercent,
+    String? taxPercent,
   }) {
     if (productId != null) this.productId.value = productId;
     if (productName != null) this.productName.value = productName;
@@ -34,37 +57,115 @@ class SILineRow {
     if (orderedQty != null) this.orderedQty.value = orderedQty;
     if (qtyDelivered != null) this.qtyDelivered.value = qtyDelivered;
     if (price != null) this.price.value = price;
+    if (discountPercent != null) this.discountPercent.value = discountPercent;
+    if (taxPercent != null) this.taxPercent.value = taxPercent;
   }
 
   double get deliveredQtyDouble => double.tryParse(qtyDelivered.value) ?? 0;
   double get orderedQtyDouble => double.tryParse(orderedQty.value) ?? 0;
   double get priceDouble => double.tryParse(price.value) ?? 0;
-  double get lineTotal => deliveredQtyDouble * priceDouble;
+
+  double get _effectiveTaxPercent {
+    final fromTaxPercent = double.tryParse(taxPercent.value) ?? 0;
+    if (fromTaxPercent > 0) return fromTaxPercent;
+    final s = double.tryParse(sgst.value) ?? 0;
+    final c = double.tryParse(cgst.value) ?? 0;
+    final i = double.tryParse(igst.value) ?? 0;
+    final cs = double.tryParse(cess.value) ?? 0;
+    final r = double.tryParse(roff.value) ?? 0;
+    final fromBreakdown = s + c + i + cs + r;
+    return fromBreakdown > 0 ? fromBreakdown : 0;
+  }
+
+  double get lineTotalExclTax {
+    final qty = deliveredQtyDouble;
+    final p = isInclusiveTax.value ? _priceExclFromInclusive() : priceDouble;
+    final d = double.tryParse(discountPercent.value) ?? 0;
+    return qty * p * (1 - d / 100);
+  }
+
+  double get lineTotal {
+    final qty = deliveredQtyDouble;
+    final pExcl = isInclusiveTax.value ? _priceExclFromInclusive() : priceDouble;
+    final d = double.tryParse(discountPercent.value) ?? 0;
+    final t = _effectiveTaxPercent;
+    if (isInclusiveTax.value) {
+      return qty * priceDouble * (1 - d / 100);
+    }
+    return qty * pExcl * (1 - d / 100) * (1 + t / 100);
+  }
+
+  double _priceExclFromInclusive() {
+    final t = _effectiveTaxPercent;
+    if (t <= 0) return priceDouble;
+    return priceDouble / (1 + t / 100);
+  }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Charge row — mirrors SOChargeRow
+// ─────────────────────────────────────────────────────────────────────────────
+
+class SIChargeRow {
+  final name = ''.obs;
+  final amount = '0'.obs;
+  final remarks = ''.obs;
+
+  SIChargeRow({required String name, String? amount, String? remarks}) {
+    if (name.isNotEmpty) this.name.value = name;
+    if (amount != null) this.amount.value = amount;
+    if (remarks != null) this.remarks.value = remarks;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Controller
+// ─────────────────────────────────────────────────────────────────────────────
+
 class SalesInvoiceFormController extends GetxController {
+  final formKey = GlobalKey<FormState>();
   final int? soId;
-  final bool viewOnly;
+  final RxBool viewOnly = false.obs;
+
+  static const List<String> chargeTypeNames = addonChargeTypeNames;
 
   final isLoading = false.obs;
+  final isPdfBusy = false.obs;
   final isSaving = false.obs;
 
-  // Step 1: customer selection
+  // ── Meta ──────────────────────────────────────────────────────────────────
+  final invoiceNumber = ''.obs;
+  final invoicePrefix = 'INV/25-26/'.obs;
+  final financialYear = '25-26'.obs;
+  final currentSoNumber = ''.obs;
+  final RxnInt currentSoSeq = RxnInt();
+
+  // ── Customer ──────────────────────────────────────────────────────────────
+  final customerId = Rxn<int>();
+  final customerName = ''.obs;
+  final customerPhone = ''.obs;
+  final customerShopName = ''.obs;
+
+  // Step-1 picker (used when creating standalone invoice)
   final selectedCustomerId = Rxn<int>();
   final selectedCustomerName = ''.obs;
 
-  // Step 2: source order
+  // ── Source order ──────────────────────────────────────────────────────────
   final sourceOrderId = Rxn<int>();
   final sourceOrderNumber = ''.obs;
-
-  // Customer (from loaded order)
-  final customerId = Rxn<int>();
-  final customerName = ''.obs;
-
-  // Invoice header
-  final invoiceNumber = ''.obs;
-  final invoicePrefix = 'INV/25-26/'.obs;
   final orderDate = ''.obs;
+  final availableOrders = <Map<String, dynamic>>[].obs;
+
+  // ── Header fields ─────────────────────────────────────────────────────────
+  final docDate = ''.obs;
+  final expectedDate = ''.obs;
+  final status = 'DRAFT'.obs;
+  final narration = ''.obs;
+  final departmentId = Rxn<String>();
+  final salesmanId = Rxn<String>();
+  final salesmanName = ''.obs;
+
+  // ── Bill / Invoice fields ─────────────────────────────────────────────────
   final billDt = ''.obs;
   final billDepartment = ''.obs;
   final billNarration = ''.obs;
@@ -73,128 +174,336 @@ class SalesInvoiceFormController extends GetxController {
   final billRoff = '0'.obs;
   final billDocYear = ''.obs;
 
+  // ── Lists ─────────────────────────────────────────────────────────────────
+  final departments = <Map<String, dynamic>>[].obs;
+  final salesmen = <Map<String, dynamic>>[].obs;
+  final unitTypes = <String>[].obs;
+  final charges = <SIChargeRow>[].obs;
   final items = <SILineRow>[].obs;
 
-  SalesInvoiceFormController({this.soId, this.viewOnly = false});
+  // ── Tax state ─────────────────────────────────────────────────────────────
+  int? _adminVendorId;
+  String _companyState = '';
+  String _customerState = '';
+
+  final bool _startViewOnly;
+
+  SalesInvoiceFormController({this.soId, bool viewOnly = false}) : _startViewOnly = viewOnly;
 
   @override
   void onInit() {
     super.onInit();
+    viewOnly.value = _startViewOnly;
+    _ensureDefaultCharges();
+    _loadAdminVendorId();
+    _loadDepartments();
+    _loadSalesmen();
+    _loadUnitTypes();
+    AuthController.getCompanyState().then((s) => _companyState = s);
+
     // Default invoice date to today
     billDt.value = _today();
-    // Default doc year to current financial year
     billDocYear.value = _currentFinancialYear();
     billDepartment.value = 'Sales';
 
     if (soId != null) {
       _loadOrder(soId!);
     } else {
+      _setDefaultDocDate();
       unawaited(_fetchNextInvoiceNumber());
+      addItem();
     }
   }
 
-  double get grandTotal {
+  // ── Computed ──────────────────────────────────────────────────────────────
+
+  bool get isEditMode => soId != null;
+  bool get isReadOnly => viewOnly.value || status.value != 'DRAFT';
+  bool get isBillMode => status.value == 'BILLED';
+
+  String get customerDisplayTitle =>
+      customerName.value.trim().isEmpty ? '-' : customerName.value.trim();
+
+  String get customerDisplaySubtitle {
+    final parts = <String>[];
+    final shop = customerShopName.value.trim();
+    final phone = customerPhone.value.trim();
+    if (shop.isNotEmpty) parts.add(shop);
+    if (phone.isNotEmpty) parts.add(phone);
+    return parts.join(' • ');
+  }
+
+  String get customerDisplayLabel {
+    final parts = <String>[];
+    final name = customerName.value.trim();
+    final shop = customerShopName.value.trim();
+    final phone = customerPhone.value.trim();
+    if (name.isNotEmpty) parts.add(name);
+    if (shop.isNotEmpty) parts.add(shop);
+    if (phone.isNotEmpty) parts.add(phone);
+    return parts.join(' • ');
+  }
+
+  double get itemsSubtotalExclTax {
+    double v = 0;
+    for (final r in items) { v += r.lineTotalExclTax; }
+    return v;
+  }
+
+  double get itemsTaxTotal {
+    double v = 0;
+    for (final r in items) { v += (r.lineTotal - r.lineTotalExclTax); }
+    return v;
+  }
+
+  double get addOnTotal {
+    double v = 0;
+    for (final c in charges) { v += double.tryParse(c.amount.value) ?? 0; }
+    return v;
+  }
+
+  double get roffTotal => _sumTaxAmountByKey('ROFF');
+
+  double get grandTotal => itemsSubtotalExclTax + itemsTaxTotal + addOnTotal;
+
+  double _sumTaxAmountByKey(String key) {
     double total = 0;
-    for (final r in items) {
-      total += r.lineTotal;
+    for (final row in items) {
+      final percent = double.tryParse(row.taxFieldValues[key] ?? '') ?? 0;
+      if (percent <= 0) continue;
+      total += row.lineTotalExclTax * percent / 100;
     }
-    final roff = double.tryParse(billRoff.value) ?? 0;
-    return total + roff;
+    return total;
   }
 
-  // ── Customer search (step 1) ────────────────────────────────────────────────
+  // ── Initialization helpers ─────────────────────────────────────────────────
 
-  Future<List<Map<String, dynamic>>> searchCustomers(String query) async {
+  Future<void> _loadAdminVendorId() async {
+    _adminVendorId = await AuthController.getAdminId();
+  }
+
+  void _setDefaultDocDate() {
+    final now = DateTime.now();
+    docDate.value =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _loadDepartments() async {
     try {
-      final uri = Uri.parse(ApiConfig.customers).replace(queryParameters: {
-        'search': query,
-        'limit': '30',
-      });
-      final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
-          .timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) return [];
+      final response = await http.get(
+        Uri.parse(ApiConfig.departments),
+        headers: {'Accept': 'application/json'},
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        if (data['success'] == true) {
+          final List list = data['data'] ?? [];
+          departments.value = list
+              .map((e) => {
+                    'id': (e as Map)['id']?.toString(),
+                    'name': (e)['name']?.toString() ?? 'Department ${(e)['id'] ?? ''}',
+                  })
+              .where((e) => (e['id'] ?? '').toString().isNotEmpty)
+              .toList();
+          if (departmentId.value == null) {
+            final sales = departments.firstWhereOrNull(
+              (d) => (d['name'] ?? '').toString().toLowerCase() == 'sales',
+            );
+            if (sales != null) departmentId.value = sales['id']?.toString();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[SI FORM] Load departments error: $e');
+    }
+  }
+
+  Future<void> _loadSalesmen() async {
+    try {
+      final response = await http.get(
+        Uri.parse(ApiConfig.salesmen).replace(queryParameters: {'role': 'salesman', 'limit': '500'}),
+        headers: {'Accept': 'application/json'},
+      );
+      if (response.statusCode != 200) return;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (data['success'] != true) return [];
-      final List list = data['data'] ?? [];
-      return list
+      if (data['success'] != true) return;
+      salesmen.value = (data['data'] as List)
           .whereType<Map<String, dynamic>>()
-          .where((j) => (int.tryParse(j['id']?.toString() ?? '') ?? 0) > 0)
+          .map((e) => {'id': e['id']?.toString(), 'name': (e['name'] ?? '').toString()})
+          .where((e) => (e['id'] ?? '').isNotEmpty)
           .toList();
     } catch (e) {
-      debugPrint('[SI FORM] Search customers error: $e');
-      return [];
+      debugPrint('[SI FORM] Load salesmen error: $e');
     }
   }
 
-  void selectCustomer(int id, String name) {
+  Future<void> _loadUnitTypes() async {
+    try {
+      final response = await http.get(
+        Uri.parse(ApiConfig.unitTypes),
+        headers: {'Accept': 'application/json'},
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        if (data['success'] == true) {
+          final List types = data['data'] ?? [];
+          unitTypes.value = types.cast<String>();
+        }
+      }
+    } catch (e) {
+      unitTypes.value = ['1 Kg', 'Nos', '5 Kg', 'grams', '1 Ltr'];
+    }
+  }
+
+  Future<void> _fetchNextInvoiceNumber() async {
+    try {
+      final response = await http
+          .get(Uri.parse(ApiConfig.salesInvoiceSeries), headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) return;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] == true) {
+        invoicePrefix.value = data['prefix']?.toString() ?? 'INV/25-26/';
+        invoiceNumber.value = data['full_number']?.toString() ?? '';
+      }
+    } catch (e) {
+      debugPrint('[SI FORM] Fetch series error: $e');
+    }
+  }
+
+  // ── Tax ───────────────────────────────────────────────────────────────────
+
+  Future<void> applyProductTaxesToRow(SILineRow row, int productId) async {
+    _clearTaxBreakdown(row);
+    _applyFixedGst(row);
+  }
+
+  void _applyFixedGst(SILineRow row) {
+    final sameState = _isSameState();
+    if (sameState) {
+      row.sgst.value = '2.50';
+      row.cgst.value = '2.50';
+      row.taxFieldValues['SGST'] = '2.50';
+      row.taxFieldValues['CGST'] = '2.50';
+      row.availableTaxKeys.assignAll(['SGST', 'CGST']);
+      row.taxPercent.value = '5.00';
+    } else {
+      row.igst.value = '5.00';
+      row.taxFieldValues['IGST'] = '5.00';
+      row.availableTaxKeys.assignAll(['IGST']);
+      row.taxPercent.value = '5.00';
+    }
+  }
+
+  void _clearTaxBreakdown(SILineRow row) {
+    row.sgst.value = '';
+    row.cgst.value = '';
+    row.igst.value = '';
+    row.cess.value = '';
+    row.roff.value = '';
+    row.taxFieldValues.clear();
+    row.availableTaxKeys.clear();
+  }
+
+  bool _isSameState() {
+    final company = _companyState.trim().toLowerCase();
+    final customer = _customerState.trim().toLowerCase();
+    if (company.isEmpty || customer.isEmpty) return true;
+    return company == customer;
+  }
+
+  // ── Customer ──────────────────────────────────────────────────────────────
+
+  void setCustomer(int id, String name, {String? phone, String? shopName}) {
+    customerId.value = id;
+    customerName.value = name;
+    customerPhone.value = phone ?? '';
+    customerShopName.value = shopName ?? '';
     selectedCustomerId.value = id;
     selectedCustomerName.value = name;
-    // Clear previously selected order when customer changes
+    unawaited(_hydrateCustomerDetails(id));
+    // Clear any previously linked order
     sourceOrderId.value = null;
     sourceOrderNumber.value = '';
-    items.clear();
+    unawaited(_refreshAvailableOrders());
   }
 
-  // ── Order search filtered by customer (step 2) ──────────────────────────────
+  Future<void> _refreshAvailableOrders() async {
+    availableOrders.value = await searchOrders('');
+  }
 
-  Future<List<Map<String, dynamic>>> searchOrders(String query) async {
+  void selectCustomer(int id, String name) => setCustomer(id, name);
+
+  Future<List<PartyResult>> searchCustomers(String query) async {
     try {
-      final params = <String, String>{
-        'limit': '50',
-        'exclude_closed': 'true',
-      };
-      if (query.isNotEmpty) params['search'] = query;
-      if (selectedCustomerId.value != null) {
-        params['customer_id'] = selectedCustomerId.value.toString();
+      return await CustomerApiService.searchPartyResults(query: query, limit: 50);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> _hydrateCustomerDetails(int? id) async {
+    if (id == null) return;
+    final customer = await CustomerApiService.fetchCustomerById(id);
+    if (customer == null || customerId.value != id) return;
+    customerName.value = customer.name;
+    customerPhone.value = customer.contactNumber ?? '';
+    customerShopName.value = customer.shopName ?? '';
+    _customerState = customer.state?.trim() ?? '';
+    for (final item in items) {
+      final pid = item.productId.value;
+      if (pid != null && pid > 0) {
+        unawaited(applyProductTaxesToRow(item, pid));
       }
-
-      final uri = Uri.parse(ApiConfig.salesOrders).replace(queryParameters: params);
-      final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
-          .timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) return [];
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (data['success'] != true) return [];
-      final List list = data['data'] ?? [];
-      return list
-          .whereType<Map<String, dynamic>>()
-          // Only show orders that can still be invoiced (not already billed)
-          .where((o) => (o['status']?.toString().toLowerCase() ?? '') != 'billed')
-          .toList();
-    } catch (e) {
-      debugPrint('[SI FORM] Search orders error: $e');
-      return [];
     }
   }
 
-  // ── Product search (for adding extra items) ─────────────────────────────────
+  // ── Salesman ──────────────────────────────────────────────────────────────
 
-  Future<List<Map<String, dynamic>>> searchProducts(String query) async {
-    try {
-      final uri = Uri.parse(ApiConfig.products).replace(queryParameters: {
-        'search': query,
-        'limit': '30',
-      });
-      final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
-          .timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) return [];
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (data['success'] != true) return [];
-      return (data['data'] as List? ?? [])
-          .whereType<Map<String, dynamic>>()
-          .toList();
-    } catch (e) {
-      debugPrint('[SI FORM] Search products error: $e');
-      return [];
-    }
+  void setSalesman(String? id, String name) {
+    salesmanId.value = id;
+    salesmanName.value = name;
   }
 
-  // ── Item management ──────────────────────────────────────────────────────────
+  Future<List<PartyResult>> searchSalesmen(String query) async {
+    final q = query.trim().toLowerCase();
+    final filtered = q.isEmpty
+        ? salesmen
+        : salesmen.where((s) => (s['name'] ?? '').toString().toLowerCase().contains(q)).toList();
+    return filtered
+        .map((s) => PartyResult(
+              id: int.tryParse(s['id']?.toString() ?? '0') ?? 0,
+              name: s['name']?.toString() ?? '',
+              phone: null,
+              shopName: null,
+              code: s['id']?.toString(),
+              state: null,
+            ))
+        .toList();
+  }
+
+  // ── Setters ───────────────────────────────────────────────────────────────
+
+  void setFinancialYear(String v) => financialYear.value = v;
+  void setDepartmentId(String? v) => departmentId.value = v;
+  void setDocDate(String v) => docDate.value = v;
+  void setExpectedDate(String v) => expectedDate.value = v;
+  void setStatus(String v) => status.value = v;
+  void setNarration(String v) => narration.value = v;
+  void setBillDt(String v) => billDt.value = v;
+  void setBillDepartment(String v) => billDepartment.value = v;
+  void setBillNarration(String v) => billNarration.value = v;
+  void setBillVehicle(String v) => billVehicle.value = v;
+  void setBillStatement(String v) => billStatement.value = v;
+  void setBillRoff(String v) => billRoff.value = v;
+  void setBillDocYear(String v) => billDocYear.value = v;
+
+  // ── Items ─────────────────────────────────────────────────────────────────
 
   void addItem() {
-    items.add(SILineRow(qtyDelivered: '1'));
+    final row = SILineRow(qtyDelivered: '1');
+    if (unitTypes.isNotEmpty) row.unit.value = unitTypes.first;
+    items.add(row);
   }
 
   void removeItem(int index) {
@@ -209,35 +518,141 @@ class SalesInvoiceFormController extends GetxController {
     row.price.value = price.toString();
     row.orderedQty.value = '0';
     row.qtyDelivered.value = '1';
+    unawaited(applyProductTaxesToRow(row, productId));
   }
 
-  // ── Load order ──────────────────────────────────────────────────────────────
+  // ── Charges ───────────────────────────────────────────────────────────────
 
-  Future<void> loadOrder(int orderId) async {
-    await _loadOrder(orderId);
+  void _ensureDefaultCharges({bool reset = false}) {
+    if (!reset && charges.isNotEmpty) return;
+    charges.assignAll([SIChargeRow(name: 'Hamali', amount: '0')]);
   }
+
+  void addChargeRow() => charges.add(SIChargeRow(name: chargeTypeNames.first, amount: '0'));
+
+  void removeChargeRow(int index) {
+    if (index >= 0 && index < charges.length) charges.removeAt(index);
+    if (charges.isEmpty) _ensureDefaultCharges(reset: true);
+  }
+
+  // ── Product search ────────────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> searchProducts(String query) async {
+    try {
+      final params = <String, String>{
+        'limit': '50',
+        if (query.trim().isNotEmpty) 'search': query.trim(),
+        if (_adminVendorId != null) 'admin_vendor_id': _adminVendorId.toString(),
+        if (salesmanId.value != null && salesmanId.value!.isNotEmpty)
+          'supplier_id': salesmanId.value!,
+      };
+      final uri = Uri.parse(ApiConfig.vendorProducts).replace(queryParameters: params);
+      final response = await http
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return [];
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) return [];
+      return (data['data'] as List? ?? []).whereType<Map<String, dynamic>>().toList();
+    } catch (e) {
+      debugPrint('[SI FORM] Search products error: $e');
+      return [];
+    }
+  }
+
+  Future<List<Product>> searchProductsAsModels(String query) async {
+    final raw = await searchProducts(query);
+    return raw
+        .map((e) { try { return Product.fromJson(e); } catch (_) { return null; } })
+        .whereType<Product>()
+        .toList();
+  }
+
+  Future<List<Product>> searchAllProductsUnfiltered(String query) async {
+    try {
+      final params = <String, String>{
+        'limit': '50',
+        if (query.trim().isNotEmpty) 'search': query.trim(),
+        if (_adminVendorId != null) 'admin_vendor_id': _adminVendorId.toString(),
+      };
+      final uri = Uri.parse(ApiConfig.vendorProducts).replace(queryParameters: params);
+      final response = await http
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return [];
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) return [];
+      return (data['data'] as List? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map((e) { try { return Product.fromJson(e); } catch (_) { return null; } })
+          .whereType<Product>()
+          .toList();
+    } catch (e) {
+      debugPrint('[SI FORM] Search all products error: $e');
+      return [];
+    }
+  }
+
+  // ── Order search ──────────────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> searchOrders(String query) async {
+    try {
+      final params = <String, String>{
+        'limit': '50',
+        'exclude_closed': 'true',
+        if (query.isNotEmpty) 'search': query,
+        if (selectedCustomerId.value != null)
+          'customer_id': selectedCustomerId.value.toString(),
+      };
+      final uri = Uri.parse(ApiConfig.salesOrders).replace(queryParameters: params);
+      final response = await http
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return [];
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) return [];
+      return (data['data'] as List? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .where((o) {
+            final s = o['status']?.toString().toLowerCase() ?? '';
+            return ['pending', 'registered', 'confirmed', 'draft'].contains(s);
+          })
+          .toList();
+    } catch (e) {
+      debugPrint('[SI FORM] Search orders error: $e');
+      return [];
+    }
+  }
+
+  // ── Load order ────────────────────────────────────────────────────────────
+
+  Future<void> loadOrder(int orderId) => _loadOrder(orderId);
 
   Future<void> _loadOrder(int orderId) async {
     try {
       isLoading.value = true;
       final response = await http
-          .get(
-            Uri.parse('${ApiConfig.salesOrders}/$orderId'),
-            headers: {'Accept': 'application/json'},
-          )
+          .get(Uri.parse('${ApiConfig.salesOrders}/$orderId'), headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: 20));
-
       if (response.statusCode != 200) return;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       if (data['success'] != true) return;
-
       final so = SalesOrder.fromJson(data['data'] as Map<String, dynamic>);
-      _applyOrder(so);
-
+      await _applyOrder(so);
       if (so.billNumber != null && so.billNumber!.isNotEmpty) {
         invoiceNumber.value = so.billNumber!;
       } else if (invoiceNumber.value.isEmpty) {
         await _fetchNextInvoiceNumber();
+      }
+      if (so.billNumber == null || so.billNumber!.isEmpty) {
+        Get.snackbar(
+          'Order Linked',
+          '${so.soNumber} — ${so.items.length} item(s) loaded. Fill invoice details and save.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green.shade100,
+          colorText: Colors.green.shade900,
+          duration: const Duration(seconds: 3),
+        );
       }
     } catch (e) {
       debugPrint('[SI FORM] Load order error: $e');
@@ -246,36 +661,57 @@ class SalesInvoiceFormController extends GetxController {
     }
   }
 
-  void _applyOrder(SalesOrder so) {
+  Future<void> _applyOrder(SalesOrder so) async {
     sourceOrderId.value = so.id;
     sourceOrderNumber.value = so.soNumber;
-    customerId.value = so.customerId;
-    customerName.value = so.customerName ?? '';
+    currentSoNumber.value = so.soNumber;
     orderDate.value = so.docDate;
 
-    // Only override billDt if the SO already has an invoice date (viewing existing invoice)
-    if (so.billDt != null && so.billDt!.isNotEmpty) {
-      billDt.value = so.billDt!;
+    // Header fields from SO
+    financialYear.value = so.financialYear ?? _currentFinancialYear();
+    customerId.value = so.customerId;
+    customerName.value = so.customerName ?? '';
+    selectedCustomerId.value = so.customerId;
+    selectedCustomerName.value = so.customerName ?? '';
+    departmentId.value = so.departmentId;
+    salesmanId.value = so.salesmanId;
+    if (so.salesmanId != null && salesmen.isNotEmpty) {
+      final match = salesmen.firstWhereOrNull((s) => s['id'] == so.salesmanId);
+      salesmanName.value = match?['name']?.toString() ?? '';
     }
-    // else keep the today default set in onInit
+    docDate.value = so.docDate;
+    expectedDate.value = so.expectedDate ?? '';
+    // Keep status as DRAFT for a new invoice being created from a SO.
+    // Only restore the actual status when loading an already-billed order.
+    if (so.billNumber != null && so.billNumber!.isNotEmpty) {
+      status.value = so.status;
+      narration.value = so.narration ?? '';
+    } else {
+      status.value = 'DRAFT';
+      // Don't copy SO narration into invoice — leave blank for user to fill
+    }
 
+    // Bill fields
+    if (so.billDt != null && so.billDt!.isNotEmpty) billDt.value = so.billDt!;
     if (so.department != null && so.department!.isNotEmpty) billDepartment.value = so.department!;
     billNarration.value = so.billNarration ?? '';
     billVehicle.value = so.billVehicle ?? '';
     billStatement.value = so.billStatement ?? '';
     billRoff.value = so.billRoff?.toStringAsFixed(2) ?? '0';
+    if (so.docYear != null && so.docYear!.isNotEmpty) billDocYear.value = so.docYear!;
 
-    // Only override docYear if the SO already has one
-    if (so.docYear != null && so.docYear!.isNotEmpty) {
-      billDocYear.value = so.docYear!;
+    // Charges
+    if (so.chargesJson.isNotEmpty) {
+      charges.assignAll(so.chargesJson.map((c) => SIChargeRow(
+            name: c.name,
+            amount: c.amount.toStringAsFixed(2),
+            remarks: c.remarks ?? '',
+          )));
+    } else {
+      _ensureDefaultCharges(reset: true);
     }
 
-    // Also sync customer picker to the order's customer
-    if (selectedCustomerId.value == null) {
-      selectedCustomerId.value = so.customerId;
-      selectedCustomerName.value = so.customerName ?? '';
-    }
-
+    // Items
     items.clear();
     for (final item in so.items) {
       final delivered = item.usedQty > 0 ? item.usedQty : item.quantity;
@@ -287,66 +723,58 @@ class SalesInvoiceFormController extends GetxController {
         orderedQty: item.quantity.toString(),
         qtyDelivered: delivered.toString(),
         price: item.price.toString(),
+        discountPercent: item.discountPercent?.toString() ?? '',
+        taxPercent: item.taxPercent?.toString() ?? '',
       ));
     }
+    if (items.isEmpty) addItem();
+    await _hydrateLineItemTaxes();
 
     if (customerName.value.isEmpty && customerId.value != null) {
-      unawaited(_hydrateCustomer(customerId.value!));
+      unawaited(_hydrateCustomerDetails(customerId.value));
     }
   }
 
-  Future<void> _hydrateCustomer(int id) async {
-    final c = await CustomerApiService.fetchCustomerById(id);
-    if (c != null && customerId.value == id) {
-      customerName.value = c.name;
+  Future<void> _hydrateLineItemTaxes() async {
+    for (final row in items) {
+      final pid = row.productId.value;
+      if (pid == null || pid <= 0) continue;
+      await applyProductTaxesToRow(row, pid);
     }
   }
 
-  Future<void> _fetchNextInvoiceNumber() async {
-    try {
-      final response = await http
-          .get(
-            Uri.parse(ApiConfig.salesInvoiceSeries),
-            headers: {'Accept': 'application/json'},
-          )
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode != 200) return;
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (data['success'] == true) {
-        invoicePrefix.value = data['prefix']?.toString() ?? 'INV/25-26/';
-        invoiceNumber.value = data['full_number']?.toString() ?? '';
-      }
-    } catch (e) {
-      debugPrint('[SI FORM] Fetch series error: $e');
-    }
-  }
+  // ── Validate & Save ───────────────────────────────────────────────────────
 
-  // ── Validation & save ───────────────────────────────────────────────────────
-
-  bool validate() {
-    if (selectedCustomerId.value == null) {
+  bool validateForm() {
+    if (!(formKey.currentState?.validate() ?? false)) return false;
+    final effectiveCustomerId = customerId.value ?? selectedCustomerId.value;
+    if (effectiveCustomerId == null) {
       _showError('Please select a customer');
       return false;
     }
+    if (docDate.value.trim().isEmpty) {
+      _showError('Please enter document date');
+      return false;
+    }
     if (billDt.value.trim().isEmpty) {
-      _showError('Invoice date is required');
+      _showError('Please enter invoice date');
       return false;
     }
-    if (items.isEmpty) {
-      _showError('No items to invoice');
+    if (invoiceNumber.value.trim().isEmpty) {
+      _showError('Invoice number not loaded yet — please wait a moment and try again');
       return false;
     }
-    for (final r in items) {
-      if (r.productId.value == null) {
-        _showError('Please select a product for all items');
-        return false;
-      }
+    final validItems = items.where((r) => r.productId.value != null).toList();
+    if (validItems.isEmpty) {
+      _showError('Please add at least one line item');
+      return false;
+    }
+    for (final r in validItems) {
       final qty = r.deliveredQtyDouble;
       if (qty <= 0) {
-        _showError('Qty delivered must be greater than 0 for ${r.productName.value.isEmpty ? 'item' : r.productName.value}');
+        _showError('Qty must be > 0 for ${r.productName.value.isEmpty ? "item" : r.productName.value}');
         return false;
       }
-      // Only enforce ordered qty limit if item came from a linked SO (orderedQty > 0)
       if (r.orderedQtyDouble > 0 && qty > r.orderedQtyDouble) {
         _showError('Delivered qty cannot exceed ordered qty for ${r.productName.value}');
         return false;
@@ -356,7 +784,7 @@ class SalesInvoiceFormController extends GetxController {
   }
 
   Future<void> save() async {
-    if (!validate()) return;
+    if (!validateForm()) return;
     isSaving.value = true;
     try {
       if (sourceOrderId.value != null) {
@@ -372,9 +800,45 @@ class SalesInvoiceFormController extends GetxController {
     }
   }
 
+  Map<String, dynamic> _buildItemPayload(SILineRow r, int lineNo) {
+    final discount = double.tryParse(r.discountPercent.value);
+    final sgst = double.tryParse(r.sgst.value) ?? 0;
+    final cgst = double.tryParse(r.cgst.value) ?? 0;
+    final igst = double.tryParse(r.igst.value) ?? 0;
+    final cess = double.tryParse(r.cess.value) ?? 0;
+    final roff = double.tryParse(r.roff.value) ?? 0;
+    final taxFromBreakdown = sgst + cgst + igst + cess + roff;
+    final tax = taxFromBreakdown > 0
+        ? taxFromBreakdown
+        : (double.tryParse(r.taxPercent.value));
+    return {
+      'product_id': r.productId.value,
+      'line_no': lineNo,
+      if (r.productCode.value.trim().isNotEmpty) 'hsn_code': r.productCode.value.trim(),
+      if (r.unit.value.trim().isNotEmpty) 'unit': r.unit.value.trim(),
+      if (r.selectedPackId.value.trim().isNotEmpty) 'pack_id': r.selectedPackId.value.trim(),
+      'quantity': r.orderedQtyDouble > 0 ? r.orderedQtyDouble : r.deliveredQtyDouble,
+      'qty_delivered': r.deliveredQtyDouble,
+      'price': r.priceDouble,
+      if (discount != null && discount > 0) 'discount_percent': discount,
+      if (tax != null && tax > 0) 'tax_percent': tax,
+    };
+  }
+
   Future<void> _putExistingOrder(int orderId) async {
+    final effectiveCustomerId = customerId.value ?? selectedCustomerId.value;
+    final validItems = items.where((r) => r.productId.value != null).toList();
     final payload = {
-      'status': 'billed',
+      'financial_year': financialYear.value,
+      'customer_id': effectiveCustomerId,
+      if (departmentId.value != null && departmentId.value!.trim().isNotEmpty)
+        'department_id': departmentId.value,
+      if (salesmanId.value != null && salesmanId.value!.trim().isNotEmpty)
+        'supplier_id': salesmanId.value,
+      'doc_date': docDate.value,
+      if (expectedDate.value.trim().isNotEmpty) 'expected_date': expectedDate.value.trim(),
+      'status': status.value == 'DRAFT' ? 'billed' : status.value.toLowerCase(),
+      if (narration.value.trim().isNotEmpty) 'narration': narration.value.trim(),
       'bill_number': invoiceNumber.value.trim(),
       'bill_dt': billDt.value.trim(),
       if (billDepartment.value.trim().isNotEmpty) 'department': billDepartment.value.trim(),
@@ -383,13 +847,12 @@ class SalesInvoiceFormController extends GetxController {
       if (billStatement.value.trim().isNotEmpty) 'bill_statement': billStatement.value.trim(),
       'bill_roff': double.tryParse(billRoff.value) ?? 0,
       if (billDocYear.value.trim().isNotEmpty) 'doc_year': billDocYear.value.trim(),
-      'items': items.map((r) => {
-        'product_id': r.productId.value,
-        'quantity': r.orderedQtyDouble > 0 ? r.orderedQtyDouble : r.deliveredQtyDouble,
-        'qty_delivered': r.deliveredQtyDouble,
-        'price': r.priceDouble,
-        if (r.unit.value.isNotEmpty) 'unit': r.unit.value,
+      'charges': charges.map((c) => {
+        'name': c.name.value,
+        'amount': double.tryParse(c.amount.value) ?? 0,
+        if (c.remarks.value.trim().isNotEmpty) 'remarks': c.remarks.value.trim(),
       }).toList(),
+      'items': validItems.asMap().entries.map((e) => _buildItemPayload(e.value, e.key + 1)).toList(),
     };
 
     final response = await http.put(
@@ -397,42 +860,45 @@ class SalesInvoiceFormController extends GetxController {
       headers: {'Accept': 'application/json', 'Content-Type': 'application/json'},
       body: jsonEncode(payload),
     );
-
+    debugPrint('[SI FORM] PUT $orderId → ${response.statusCode}: ${response.body}');
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode == 200 && data['success'] == true) {
-      Get.snackbar(
-        'Success',
-        'Invoice ${invoiceNumber.value} saved',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
+      _showSuccess('Invoice ${invoiceNumber.value} saved successfully');
+      await Future.delayed(const Duration(milliseconds: 800));
       Get.back(result: true);
     } else {
-      _showError(data['message']?.toString() ?? 'Failed to save invoice');
+      _showError(data['message']?.toString() ?? 'Failed to save invoice (${response.statusCode})');
     }
   }
 
   Future<void> _createNewOrderAsBilled() async {
+    final effectiveCustomerId = customerId.value ?? selectedCustomerId.value;
+    final validItems = items.where((r) => r.productId.value != null).toList();
     final payload = {
-      'customer_id': selectedCustomerId.value,
+      'financial_year': financialYear.value,
+      'customer_id': effectiveCustomerId,
+      if (departmentId.value != null && departmentId.value!.trim().isNotEmpty)
+        'department_id': departmentId.value,
+      if (salesmanId.value != null && salesmanId.value!.trim().isNotEmpty)
+        'supplier_id': salesmanId.value,
+      'doc_date': docDate.value,
+      if (expectedDate.value.trim().isNotEmpty) 'expected_date': expectedDate.value.trim(),
       'status': 'billed',
+      if (narration.value.trim().isNotEmpty) 'narration': narration.value.trim(),
       'bill_number': invoiceNumber.value.trim(),
       'bill_dt': billDt.value.trim(),
-      'doc_date': billDt.value.trim(),
       if (billDepartment.value.trim().isNotEmpty) 'department': billDepartment.value.trim(),
       if (billNarration.value.trim().isNotEmpty) 'bill_narration': billNarration.value.trim(),
       if (billVehicle.value.trim().isNotEmpty) 'bill_vehicle': billVehicle.value.trim(),
       if (billStatement.value.trim().isNotEmpty) 'bill_statement': billStatement.value.trim(),
       'bill_roff': double.tryParse(billRoff.value) ?? 0,
       if (billDocYear.value.trim().isNotEmpty) 'doc_year': billDocYear.value.trim(),
-      'items': items.map((r) => {
-        'product_id': r.productId.value,
-        'quantity': r.orderedQtyDouble > 0 ? r.orderedQtyDouble : r.deliveredQtyDouble,
-        'qty_delivered': r.deliveredQtyDouble,
-        'price': r.priceDouble,
-        if (r.unit.value.isNotEmpty) 'unit': r.unit.value,
+      'charges': charges.map((c) => {
+        'name': c.name.value,
+        'amount': double.tryParse(c.amount.value) ?? 0,
+        if (c.remarks.value.trim().isNotEmpty) 'remarks': c.remarks.value.trim(),
       }).toList(),
+      'items': validItems.asMap().entries.map((e) => _buildItemPayload(e.value, e.key + 1)).toList(),
     };
 
     final response = await http.post(
@@ -440,23 +906,18 @@ class SalesInvoiceFormController extends GetxController {
       headers: {'Accept': 'application/json', 'Content-Type': 'application/json'},
       body: jsonEncode(payload),
     );
-
+    debugPrint('[SI FORM] POST → ${response.statusCode}: ${response.body}');
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     if ((response.statusCode == 200 || response.statusCode == 201) && data['success'] == true) {
-      Get.snackbar(
-        'Success',
-        'Invoice ${invoiceNumber.value} created',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
+      _showSuccess('Invoice ${invoiceNumber.value} created successfully');
+      await Future.delayed(const Duration(milliseconds: 800));
       Get.back(result: true);
     } else {
-      _showError(data['message']?.toString() ?? 'Failed to create invoice');
+      _showError(data['message']?.toString() ?? 'Failed to create invoice (${response.statusCode})');
     }
   }
 
-  // ── Helpers ─────────────────────────────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
   String _today() {
     final now = DateTime.now();
@@ -465,7 +926,6 @@ class SalesInvoiceFormController extends GetxController {
 
   String _currentFinancialYear() {
     final now = DateTime.now();
-    // Indian FY: April 1 to March 31
     final startYear = now.month >= 4 ? now.year : now.year - 1;
     final s = startYear.toString().substring(2);
     final e = (startYear + 1).toString().substring(2);
@@ -473,12 +933,16 @@ class SalesInvoiceFormController extends GetxController {
   }
 
   void _showError(String msg) {
-    Get.snackbar(
-      'Error',
-      msg,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.redAccent,
-      colorText: Colors.white,
-    );
+    Get.snackbar('Error', msg,
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white);
+  }
+
+  void _showSuccess(String msg) {
+    Get.snackbar('Success', msg,
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green,
+        colorText: Colors.white);
   }
 }

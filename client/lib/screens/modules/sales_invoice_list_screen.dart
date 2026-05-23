@@ -118,8 +118,9 @@ class _SalesInvoiceListScreenState extends State<SalesInvoiceListScreen> {
                       child: _InvoiceCard(
                         invoice: inv,
                         onTap: () => Get.to(
-                          () => SalesInvoiceFormScreen(soId: inv.id, viewOnly: true),
+                          () => SalesInvoiceFormScreen(soId: inv.id, startInViewOnly: true),
                         )?.then((_) => controller.refresh()),
+                        onCancelInvoice: () => _showCancelInvoiceDialog(context, controller, inv),
                       ),
                     );
                   },
@@ -141,11 +142,40 @@ class _SalesInvoiceListScreenState extends State<SalesInvoiceListScreen> {
   }
 }
 
+void _showCancelInvoiceDialog(
+  BuildContext context,
+  SalesInvoiceListController controller,
+  SalesInvoiceSummary inv,
+) {
+  showDialog(
+    context: context,
+    builder: (d) => AlertDialog(
+      title: const Text('Cancel invoice?'),
+      content: Text(
+        'Cancel ${inv.invoiceNumber.isNotEmpty ? inv.invoiceNumber : inv.orderNumber}? '
+        'The linked order will be reverted to Pending.',
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(d), child: const Text('No')),
+        TextButton(
+          onPressed: () async {
+            Navigator.pop(d);
+            await controller.cancelInvoice(inv);
+          },
+          style: TextButton.styleFrom(foregroundColor: Colors.red),
+          child: const Text('Cancel Invoice'),
+        ),
+      ],
+    ),
+  );
+}
+
 class _InvoiceCard extends StatelessWidget {
   final SalesInvoiceSummary invoice;
   final VoidCallback onTap;
+  final VoidCallback? onCancelInvoice;
 
-  const _InvoiceCard({required this.invoice, required this.onTap});
+  const _InvoiceCard({required this.invoice, required this.onTap, this.onCancelInvoice});
 
   @override
   Widget build(BuildContext context) {
@@ -213,6 +243,17 @@ class _InvoiceCard extends StatelessWidget {
                         'Returned',
                         style: TextStyle(fontSize: 11, color: Colors.purple, fontWeight: FontWeight.w600),
                       ),
+                    ),
+                  if (onCancelInvoice != null)
+                    PopupMenuButton<String>(
+                      onSelected: (value) {
+                        if (value == 'cancel') onCancelInvoice!();
+                      },
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(value: 'cancel', child: Text('Cancel Invoice')),
+                      ],
                     ),
                 ],
               ),

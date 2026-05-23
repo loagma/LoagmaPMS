@@ -97,12 +97,12 @@ List<_SalesTile> get _salesTiles => [
     title: 'Sales Invoice',
     subtitle: 'Create and view invoices',
     icon: Icons.receipt_outlined,
-    onTap: () => Get.toNamed(AppRoutes.salesInvoiceList),
+    onTap: () => Get.toNamed(AppRoutes.salesInvoiceForm),
   ),
   _SalesTile(
     title: 'Sales Return',
     subtitle: 'Return goods or create credit note',
     icon: Icons.assignment_return_outlined,
-    onTap: () => Get.toNamed(AppRoutes.salesReturnList),
+    onTap: () => Get.toNamed(AppRoutes.salesReturnForm),
   ),
 ];

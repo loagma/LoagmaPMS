@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../router/app_router.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
+import 'sales_invoice_list_screen.dart';
 import 'sales_order_list_screen.dart';
+import 'sales_return_list_screen.dart';
 
 class SalesModuleReportsScreen extends StatelessWidget {
   const SalesModuleReportsScreen({super.key});
@@ -19,10 +20,16 @@ class SalesModuleReportsScreen extends StatelessWidget {
         onTap: () => Get.to(() => const SalesOrderListScreen()),
       ),
       _SalesReportTile(
+        title: 'Sales Invoices',
+        subtitle: 'View all invoices',
+        icon: Icons.receipt_outlined,
+        onTap: () => Get.to(() => const SalesInvoiceListScreen()),
+      ),
+      _SalesReportTile(
         title: 'Sales Returns',
         subtitle: 'View return and credit note documents',
         icon: Icons.assignment_return_outlined,
-        onTap: () => Get.toNamed(AppRoutes.salesReturnList),
+        onTap: () => Get.to(() => const SalesReturnListScreen()),
       ),
     ];
 

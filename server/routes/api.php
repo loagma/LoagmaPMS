@@ -148,6 +148,7 @@ Route::get('/product-packages/{id}', [ProductPackageController::class, 'show'])-
 Route::put('/product-packages/{id}', [ProductPackageController::class, 'update'])->where('id', '[0-9]+');
 
 // Sales Order routes (invoice-series must be before /{id})
+Route::get('/sales-orders/debug-schema', [SalesOrderController::class, 'debugSchema']);
 Route::get('/sales-orders/invoice-series', [SalesOrderController::class, 'series']);
 Route::get('/sales-orders', [SalesOrderController::class, 'index']);
 Route::post('/sales-orders', [SalesOrderController::class, 'store']);

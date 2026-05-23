@@ -122,4 +122,44 @@ class SalesInvoiceListController extends GetxController {
     hasMore.value = true;
     await fetchInvoices();
   }
+
+  Future<void> cancelInvoice(SalesInvoiceSummary inv) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('${ApiConfig.salesOrders}/${inv.id}'),
+            headers: {'Accept': 'application/json', 'Content-Type': 'application/json'},
+            body: jsonEncode({'cancel_invoice': true}),
+          )
+          .timeout(const Duration(seconds: 15));
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200 && data['success'] == true) {
+        Get.snackbar(
+          'Success',
+          'Invoice cancelled, order reverted to Pending',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green.shade100,
+          colorText: Colors.green.shade900,
+        );
+        await refresh();
+      } else {
+        Get.snackbar(
+          'Error',
+          data['message']?.toString() ?? 'Failed to cancel invoice',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade100,
+          colorText: Colors.red.shade900,
+        );
+      }
+    } catch (e) {
+      debugPrint('[INV LIST] Cancel invoice error: $e');
+      Get.snackbar(
+        'Error',
+        'Failed to cancel invoice',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
+    }
+  }
 }
