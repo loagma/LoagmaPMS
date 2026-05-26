@@ -111,6 +111,7 @@ class SalesOrderController extends Controller
                     'o.Doc_Year',
                     'o.salesman_id',
                     'sm.name as salesman_name',
+                    'o.Sales_Return_VoucherNo',
                 ])
                 ->offset(($page - 1) * $limit)
                 ->limit($limit)
@@ -399,6 +400,7 @@ class SalesOrderController extends Controller
                     'o.Doc_Year',
                     'o.salesman_id',
                     'sm.name as salesman_name',
+                    'o.Sales_Return_VoucherNo',
                 ])
                 ->first();
 
@@ -494,9 +496,10 @@ class SalesOrderController extends Controller
             'bill_statement'   => $data['Bill_Statement'] ?? null,
             'bill_roff'        => (float) ($data['bill_roff'] ?? 0),
             'doc_year'         => $data['Doc_Year'] ?? null,
-            'supplier_id'      => $data['salesman_id'] ?? null,
-            'salesman_name'    => $data['salesman_name'] ?? null,
-            'items_count'      => (int) ($data['items_count'] ?? 0),
+            'supplier_id'                => $data['salesman_id'] ?? null,
+            'salesman_name'              => $data['salesman_name'] ?? null,
+            'items_count'                => (int) ($data['items_count'] ?? 0),
+            'sales_return_voucher_no'    => $data['Sales_Return_VoucherNo'] ?? null,
         ];
     }
 

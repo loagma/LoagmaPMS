@@ -121,6 +121,13 @@ class _SalesInvoiceListScreenState extends State<SalesInvoiceListScreen> {
                           () => SalesInvoiceFormScreen(soId: inv.id, startInViewOnly: true),
                         )?.then((_) => controller.refresh()),
                         onCancelInvoice: () => _showCancelInvoiceDialog(context, controller, inv),
+                        onCreateReturn: () async {
+                          final result = await Get.toNamed(
+                            AppRoutes.salesReturnForm,
+                            arguments: {'sourceSiId': inv.id},
+                          );
+                          if (result == true) controller.refresh();
+                        },
                       ),
                     );
                   },
@@ -174,8 +181,14 @@ class _InvoiceCard extends StatelessWidget {
   final SalesInvoiceSummary invoice;
   final VoidCallback onTap;
   final VoidCallback? onCancelInvoice;
+  final VoidCallback? onCreateReturn;
 
-  const _InvoiceCard({required this.invoice, required this.onTap, this.onCancelInvoice});
+  const _InvoiceCard({
+    required this.invoice,
+    required this.onTap,
+    this.onCancelInvoice,
+    this.onCreateReturn,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -244,15 +257,28 @@ class _InvoiceCard extends StatelessWidget {
                         style: TextStyle(fontSize: 11, color: Colors.purple, fontWeight: FontWeight.w600),
                       ),
                     ),
-                  if (onCancelInvoice != null)
+                  if (onCancelInvoice != null || onCreateReturn != null)
                     PopupMenuButton<String>(
                       onSelected: (value) {
-                        if (value == 'cancel') onCancelInvoice!();
+                        if (value == 'cancel') onCancelInvoice?.call();
+                        if (value == 'return') onCreateReturn?.call();
                       },
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      itemBuilder: (_) => const [
-                        PopupMenuItem(value: 'cancel', child: Text('Cancel Invoice')),
+                      itemBuilder: (_) => [
+                        if (onCreateReturn != null)
+                          const PopupMenuItem(
+                            value: 'return',
+                            child: Row(
+                              children: [
+                                Icon(Icons.keyboard_return_rounded, size: 18),
+                                SizedBox(width: 8),
+                                Text('Create Return'),
+                              ],
+                            ),
+                          ),
+                        if (onCancelInvoice != null)
+                          const PopupMenuItem(value: 'cancel', child: Text('Cancel Invoice')),
                       ],
                     ),
                 ],

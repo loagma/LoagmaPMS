@@ -90,8 +90,38 @@ class SalesReturnFormController extends GetxController {
     } else {
       if (sourceSiId != null) {
         _loadSalesInvoiceItems(sourceSiId!);
+      } else {
+        // New return with no invoice pre-selected: fetch series number upfront
+        _fetchSeriesNumber();
       }
     }
+  }
+
+  Future<void> _fetchSeriesNumber() async {
+    try {
+      final response = await http
+          .get(Uri.parse(ApiConfig.salesReturnSeries), headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        if (data['success'] == true) {
+          _applySeriesData(data);
+        }
+      }
+    } catch (e) {
+      debugPrint('[SR FORM] Fetch series error: $e');
+    }
+  }
+
+  void _applySeriesData(Map<String, dynamic> data) {
+    // Accept both nested { data: { prefix, number } } and flat { doc_no_prefix, next_number }
+    final nested = data['data'] as Map<String, dynamic>?;
+    docNoPrefix.value = nested?['prefix']?.toString() ??
+        data['doc_no_prefix']?.toString() ??
+        docNoPrefix.value;
+    docNoNumber.value = nested?['number']?.toString() ??
+        data['next_number']?.toString() ??
+        '';
   }
 
   bool get isEditMode => returnId != null;
@@ -221,17 +251,13 @@ class SalesReturnFormController extends GetxController {
 
   Future<void> _loadNextDocNoNumberForCustomer(int cId) async {
     try {
-      final uri = Uri.parse(ApiConfig.salesReturnSeries)
-          .replace(queryParameters: {'customer_id': cId.toString()});
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(Uri.parse(ApiConfig.salesReturnSeries), headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: 15));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         if (data['success'] == true) {
-          final series = data['data'] as Map<String, dynamic>;
-          docNoPrefix.value = series['prefix']?.toString() ?? docNoPrefix.value;
-          docNoNumber.value = series['number']?.toString() ?? '';
+          _applySeriesData(data);
         }
       }
     } catch (e) {
@@ -286,8 +312,13 @@ class SalesReturnFormController extends GetxController {
         if (data['success'] == true) {
           final siData = _normalizeInvoicePayload(data['data'] as Map<String, dynamic>);
 
+          // SalesOrderController normalizeHeader returns 'bill_number' (not 'bill_no') for the invoice string
           sourceSiNumber.value =
-              siData['doc_no']?.toString() ?? siData['doc_no_number']?.toString() ?? '';
+              siData['bill_number']?.toString() ??
+              siData['bill_no']?.toString() ??
+              siData['doc_no']?.toString() ??
+              siData['so_number']?.toString() ??
+              siData['doc_no_number']?.toString() ?? '';
           customerId.value = _safeInt(siData['customer_id']);
           customerName.value = siData['customer_name']?.toString() ?? '';
           customerPhone.value = '';
@@ -315,7 +346,8 @@ class SalesReturnFormController extends GetxController {
               ..originalQty.value = originalQty.toString()
               ..availableQty.value = effectiveAvailableQty.toString()
               ..returnedQty.value = ''
-              ..unitPrice.value = (_safeDouble(item['unit_price'])?.toString()) ?? '0';
+              // SalesOrderController sends 'price'; SalesReturnController sends 'unit_price'
+              ..unitPrice.value = (_safeDouble(item['price'] ?? item['unit_price'])?.toString()) ?? '0';
 
             items.add(row);
           }
@@ -345,7 +377,11 @@ class SalesReturnFormController extends GetxController {
           final sr = SalesReturn.fromJson(returnData);
 
           docNoPrefix.value = sr.header.docNoPrefix;
-          docNoNumber.value = sr.header.docNoNumber;
+          // docNoNumber from backend is the full voucher string; strip prefix so PDF doesn't double it
+          final fullVoucher = sr.header.docNoNumber;
+          docNoNumber.value = fullVoucher.startsWith(sr.header.docNoPrefix)
+              ? fullVoucher.substring(sr.header.docNoPrefix.length)
+              : fullVoucher;
           sourceSiNumber.value = sr.header.sourceSiNumber ?? '';
           sourceSiIdSelected.value = sr.header.sourceSalesInvoiceId;
           customerId.value = sr.header.customerId;

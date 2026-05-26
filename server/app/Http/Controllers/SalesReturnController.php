@@ -12,24 +12,39 @@ class SalesReturnController extends Controller
     private const ORDERS_TABLE = 'loagma_new.orders';
     private const ITEMS_TABLE  = 'loagma_new.orders_item';
 
-    private const VOUCHER_PREFIX = 'SR/25-26/';
+    // Dynamic FY prefix: SR/25-26/ before April, SR/26-27/ from April onwards
+    private function voucherPrefix(): string
+    {
+        $year  = (int) date('Y');
+        $month = (int) date('m');
+        $fyStart = $month >= 4 ? $year : $year - 1;
+        $fyEnd   = $fyStart + 1;
+        return 'SR/' . substr((string) $fyStart, 2) . '-' . substr((string) $fyEnd, 2) . '/';
+    }
 
     // GET /sales-returns/series
     public function series(): JsonResponse
     {
         try {
-            // Next number based on existing return vouchers on orders
+            $prefix = $this->voucherPrefix();
+
             $lastNo = DB::table(self::ORDERS_TABLE)
                 ->whereNotNull('Sales_Return_VoucherNo')
+                ->where('Sales_Return_VoucherNo', 'like', $prefix . '%')
                 ->count();
 
             $nextNum = str_pad((string) ($lastNo + 1), 3, '0', STR_PAD_LEFT);
 
             return response()->json([
                 'success'       => true,
-                'doc_no_prefix' => self::VOUCHER_PREFIX,
+                'doc_no_prefix' => $prefix,
                 'next_number'   => $nextNum,
-                'full_number'   => self::VOUCHER_PREFIX . $nextNum,
+                'full_number'   => $prefix . $nextNum,
+                // Nested shape expected by Flutter form controller
+                'data' => [
+                    'prefix' => $prefix,
+                    'number' => $nextNum,
+                ],
             ]);
         } catch (\Throwable $e) {
             Log::error('SalesReturn series error: ' . $e->getMessage());
@@ -67,6 +82,11 @@ class SalesReturnController extends Controller
 
             if ($request->filled('to_date')) {
                 $query->where('o.Sales_Return_Dt', '<=', $request->input('to_date'));
+            }
+
+            // Filter by status maps to order_state
+            if ($request->filled('status')) {
+                $query->where('o.order_state', $request->input('status'));
             }
 
             $query->orderBy('o.Sales_Return_Dt', 'desc')->orderBy('o.order_id', 'desc');
@@ -160,35 +180,38 @@ class SalesReturnController extends Controller
 
             $docDate  = trim((string) $request->input('doc_date', date('Y-m-d')));
             $reason   = trim((string) $request->input('reason', ''));
+            $status   = strtoupper(trim((string) $request->input('status', 'DRAFT')));
+            $status   = in_array($status, ['DRAFT', 'POSTED', 'CANCELLED']) ? $status : 'DRAFT';
 
             $voucherNo = $this->generateVoucherNo();
 
-            // Write return header onto the order row
-            DB::table(self::ORDERS_TABLE)->where('order_id', $sourceOrderId)->update([
-                'Sales_Return_VoucherNo' => $voucherNo,
-                'Sales_Return_Dt'        => $docDate,
-                'Sales_Return_Reason'    => $reason ?: null,
-            ]);
+            DB::transaction(function () use ($sourceOrderId, $voucherNo, $docDate, $reason, $status, $items) {
+                DB::table(self::ORDERS_TABLE)->where('order_id', $sourceOrderId)->update([
+                    'Sales_Return_VoucherNo' => $voucherNo,
+                    'Sales_Return_Dt'        => $docDate,
+                    'Sales_Return_Reason'    => $reason ?: null,
+                    'order_state'            => $status,
+                ]);
 
-            // Update qty_returned per item
-            foreach ($items as $item) {
-                $orderItemId = (int) (
-                    $item['source_sales_invoice_item_id']
-                    ?? $item['order_item_id']
-                    ?? $item['item_id']
-                    ?? 0
-                );
-                $returnedQty = (float) ($item['returned_quantity'] ?? $item['return_qty'] ?? 0);
+                foreach ($items as $item) {
+                    $orderItemId = (int) (
+                        $item['source_sales_invoice_item_id']
+                        ?? $item['order_item_id']
+                        ?? $item['item_id']
+                        ?? 0
+                    );
+                    $returnedQty = (float) ($item['returned_quantity'] ?? $item['return_qty'] ?? 0);
 
-                if ($orderItemId > 0 && $returnedQty > 0) {
-                    DB::table(self::ITEMS_TABLE)
-                        ->where('item_id', $orderItemId)
-                        ->where('order_id', $sourceOrderId)
-                        ->update([
-                            'qty_returned' => DB::raw("COALESCE(qty_returned, 0) + {$returnedQty}"),
-                        ]);
+                    if ($orderItemId > 0 && $returnedQty > 0) {
+                        DB::table(self::ITEMS_TABLE)
+                            ->where('item_id', $orderItemId)
+                            ->where('order_id', $sourceOrderId)
+                            ->update([
+                                'qty_returned' => DB::raw("COALESCE(qty_returned, 0) + {$returnedQty}"),
+                            ]);
+                    }
                 }
-            }
+            });
 
             return $this->show($sourceOrderId);
         } catch (\Throwable $e) {
@@ -209,43 +232,41 @@ class SalesReturnController extends Controller
             $docDate = trim((string) $request->input('doc_date', $order->Sales_Return_Dt));
             $reason  = trim((string) $request->input('reason', $order->Sales_Return_Reason ?? ''));
             $items   = $request->input('items', []);
+            $rawStatus = strtoupper(trim((string) $request->input('status', $order->order_state ?? 'DRAFT')));
+            $status  = in_array($rawStatus, ['DRAFT', 'POSTED', 'CANCELLED']) ? $rawStatus : ($order->order_state ?? 'DRAFT');
 
-            if (!empty($items)) {
-                // Reverse existing qty_returned for all items of this order
-                $oldItems = DB::table(self::ITEMS_TABLE)->where('order_id', $id)->get();
-                foreach ($oldItems as $old) {
-                    DB::table(self::ITEMS_TABLE)
-                        ->where('item_id', $old->item_id)
-                        ->update([
-                            'qty_returned' => DB::raw("GREATEST(0, COALESCE(qty_returned, 0) - COALESCE({$old->qty_returned}, 0))"),
-                        ]);
-                }
+            DB::transaction(function () use ($id, $docDate, $reason, $status, $items) {
+                if (!empty($items)) {
+                    // Reset all returned quantities to 0 first (avoids negative drift)
+                    DB::table(self::ITEMS_TABLE)->where('order_id', $id)->update(['qty_returned' => 0]);
 
-                // Re-apply from new payload
-                foreach ($items as $item) {
-                    $orderItemId = (int) (
-                        $item['source_sales_invoice_item_id']
-                        ?? $item['order_item_id']
-                        ?? $item['item_id']
-                        ?? 0
-                    );
-                    $returnedQty = (float) ($item['returned_quantity'] ?? $item['return_qty'] ?? 0);
+                    // Re-apply from new payload
+                    foreach ($items as $item) {
+                        $orderItemId = (int) (
+                            $item['source_sales_invoice_item_id']
+                            ?? $item['order_item_id']
+                            ?? $item['item_id']
+                            ?? 0
+                        );
+                        $returnedQty = (float) ($item['returned_quantity'] ?? $item['return_qty'] ?? 0);
 
-                    if ($orderItemId > 0 && $returnedQty > 0) {
-                        DB::table(self::ITEMS_TABLE)
-                            ->where('item_id', $orderItemId)
-                            ->where('order_id', $id)
-                            ->update([
-                                'qty_returned' => DB::raw("COALESCE(qty_returned, 0) + {$returnedQty}"),
-                            ]);
+                        if ($orderItemId > 0 && $returnedQty > 0) {
+                            DB::table(self::ITEMS_TABLE)
+                                ->where('item_id', $orderItemId)
+                                ->where('order_id', $id)
+                                ->update([
+                                    'qty_returned' => DB::raw("COALESCE(qty_returned, 0) + {$returnedQty}"),
+                                ]);
+                        }
                     }
                 }
-            }
 
-            DB::table(self::ORDERS_TABLE)->where('order_id', $id)->update([
-                'Sales_Return_Dt'     => $docDate,
-                'Sales_Return_Reason' => $reason ?: null,
-            ]);
+                DB::table(self::ORDERS_TABLE)->where('order_id', $id)->update([
+                    'Sales_Return_Dt'     => $docDate,
+                    'Sales_Return_Reason' => $reason ?: null,
+                    'order_state'         => $status,
+                ]);
+            });
 
             return $this->show($id);
         } catch (\Throwable $e) {
@@ -263,22 +284,15 @@ class SalesReturnController extends Controller
                 return response()->json(['success' => false, 'message' => 'Sales return not found'], 404);
             }
 
-            // Reverse qty_returned for all items
-            $orderItems = DB::table(self::ITEMS_TABLE)->where('order_id', $id)->get();
-            foreach ($orderItems as $oi) {
-                if ($oi->qty_returned > 0) {
-                    DB::table(self::ITEMS_TABLE)
-                        ->where('item_id', $oi->item_id)
-                        ->update(['qty_returned' => 0]);
-                }
-            }
+            DB::transaction(function () use ($id) {
+                DB::table(self::ITEMS_TABLE)->where('order_id', $id)->update(['qty_returned' => 0]);
 
-            // Clear return columns from the order
-            DB::table(self::ORDERS_TABLE)->where('order_id', $id)->update([
-                'Sales_Return_VoucherNo' => null,
-                'Sales_Return_Dt'        => null,
-                'Sales_Return_Reason'    => null,
-            ]);
+                DB::table(self::ORDERS_TABLE)->where('order_id', $id)->update([
+                    'Sales_Return_VoucherNo' => null,
+                    'Sales_Return_Dt'        => null,
+                    'Sales_Return_Reason'    => null,
+                ]);
+            });
 
             return response()->json(['success' => true, 'message' => 'Sales return deleted']);
         } catch (\Throwable $e) {
@@ -289,13 +303,22 @@ class SalesReturnController extends Controller
 
     private function generateVoucherNo(): string
     {
-        $count   = DB::table(self::ORDERS_TABLE)->whereNotNull('Sales_Return_VoucherNo')->count();
+        $prefix  = $this->voucherPrefix();
+        $count   = DB::table(self::ORDERS_TABLE)
+            ->whereNotNull('Sales_Return_VoucherNo')
+            ->where('Sales_Return_VoucherNo', 'like', $prefix . '%')
+            ->count();
         $nextNum = str_pad((string) ($count + 1), 3, '0', STR_PAD_LEFT);
-        return self::VOUCHER_PREFIX . $nextNum;
+        return $prefix . $nextNum;
     }
 
     private function normalizeSummary(object $row): array
     {
+        $total = (float) (DB::table(self::ITEMS_TABLE)
+            ->where('order_id', $row->order_id)
+            ->selectRaw('SUM(COALESCE(qty_returned, 0) * item_price) as total')
+            ->value('total') ?? 0);
+
         return [
             'id'            => (int) ($row->order_id ?? 0),
             'voucher_no'    => $row->Sales_Return_VoucherNo ?? null,
@@ -306,7 +329,7 @@ class SalesReturnController extends Controller
             'customer_name' => $row->buyer_name ?? null,
             'reason'        => $row->Sales_Return_Reason ?? null,
             'status'        => $row->order_state ?? 'DRAFT',
-            'total_value'   => 0,
+            'total_value'   => $total,
         ];
     }
 
@@ -316,13 +339,13 @@ class SalesReturnController extends Controller
             'id'                      => (int) ($order->order_id ?? 0),
             'voucher_no'              => $order->Sales_Return_VoucherNo ?? null,
             'doc_number'              => $order->Sales_Return_VoucherNo ?? null,
-            'doc_no_prefix'           => self::VOUCHER_PREFIX,
+            'doc_no_prefix'           => $this->voucherPrefix(),
             'doc_no_number'           => $order->Sales_Return_VoucherNo ?? '',
             'return_dt'               => $order->Sales_Return_Dt ?? null,
             'doc_date'                => $order->Sales_Return_Dt ?? null,
             'source_order_id'         => (int) ($order->order_id ?? 0),
             'source_sales_invoice_id' => (int) ($order->order_id ?? 0),
-            'source_si_number'        => $order->bill_number ?? ('ORD-' . ($order->order_id ?? 0)),
+            'source_si_number'        => $order->bill_no ?? ('ORD-' . ($order->order_id ?? 0)),
             'customer_id'             => (int) ($order->buyer_userid ?? 0),
             'customer_name'           => $order->buyer_name ?? null,
             'reason'                  => $order->Sales_Return_Reason ?? null,

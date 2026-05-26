@@ -932,9 +932,6 @@ CREATE TABLE `admin` (
   `gst_no` varchar(255) DEFAULT NULL,
   `licence_1` varchar(255) DEFAULT NULL,
   `licence_2` varchar(255) DEFAULT NULL,
-  `company_name` varchar(255) DEFAULT NULL,
-  `company_address` text DEFAULT NULL,
-  `company_contact_no` varchar(255) DEFAULT NULL,
   `bank_name` varchar(255) DEFAULT NULL,
   `bank_branch` varchar(255) DEFAULT NULL,
   `account_number` varchar(255) DEFAULT NULL,
@@ -945,6 +942,25 @@ CREATE TABLE `admin` (
   `gpay_no` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`userid`) /*T![clustered_index] CLUSTERED */
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_bin AUTO_INCREMENT=30126;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `area_assign_crm`
+--
+
+DROP TABLE IF EXISTS `area_assign_crm`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `area_assign_crm` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `area_ids` json NOT NULL,
+  `area_names` json NOT NULL,
+  `employee_id` bigint unsigned NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`) /*T![clustered_index] CLUSTERED */,
+  UNIQUE KEY `area_assign_crm_employee_id_unique` (`employee_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=30001;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1336,8 +1352,10 @@ DROP TABLE IF EXISTS `fa_cash_line`;
 CREATE TABLE `fa_cash_line` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `cash_receipt_id` bigint unsigned NOT NULL,
+  `account_id` bigint unsigned DEFAULT NULL,
   `account_code` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `account_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `account_type` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `amount` decimal(15,2) NOT NULL DEFAULT '0',
   `bill_no` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `narration` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -1370,6 +1388,38 @@ CREATE TABLE `fa_cash_main` (
   KEY `fa_cash_main_book_account_id_foreign` (`book_account_id`),
   UNIQUE KEY `fa_cash_main_doc_no_unique` (`doc_no`),
   CONSTRAINT `fa_cash_main_book_account_id_foreign` FOREIGN KEY (`book_account_id`) REFERENCES `general_account` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=30001;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `fa_main_line`
+--
+
+DROP TABLE IF EXISTS `fa_main_line`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `fa_main_line` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `voucher_type` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `voucher_id` bigint unsigned NOT NULL,
+  `voucher_no` int unsigned NOT NULL,
+  `voucher_date` date NOT NULL,
+  `account_id` bigint unsigned DEFAULT NULL,
+  `account_code` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `account_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `account_type` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `dr_cr` char(1) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'D',
+  `amount` decimal(15,2) NOT NULL DEFAULT '0',
+  `bill_no` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `narration` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`) /*T![clustered_index] CLUSTERED */,
+  KEY `idx_fml_voucher` (`voucher_type`,`voucher_id`),
+  KEY `idx_fml_account_date` (`account_id`,`voucher_date`),
+  KEY `idx_fml_date` (`voucher_date`),
+  KEY `idx_fml_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=30001;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1681,6 +1731,7 @@ DROP TABLE IF EXISTS `orders`;
 CREATE TABLE `orders` (
   `order_id` bigint unsigned NOT NULL,
   `bill_number` int DEFAULT NULL,
+  `bill_no` varchar(100) COLLATE utf8mb4_general_ci DEFAULT NULL,
   `Bill_Dt` date DEFAULT NULL,
   `Department` varchar(100) COLLATE utf8mb4_general_ci DEFAULT NULL,
   `Bill_Narration` text COLLATE utf8mb4_general_ci DEFAULT NULL,
@@ -2160,7 +2211,7 @@ CREATE TABLE `purchase_order_items` (
   KEY `purchase_order_items_written_off_quantity_index` (`written_off_quantity`),
   CONSTRAINT `purchase_order_items_purchase_order_id_foreign` FOREIGN KEY (`purchase_order_id`) REFERENCES `purchase_orders` (`id`) ON DELETE CASCADE,
   CONSTRAINT `purchase_order_items_product_id_foreign` FOREIGN KEY (`product_id`) REFERENCES `product_old` (`product_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=240001;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=270001;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2198,7 +2249,7 @@ CREATE TABLE `purchase_orders` (
   KEY `purchase_orders_salesman_id_index` (`salesman_id`),
   KEY `purchase_orders_department_id_index` (`department_id`),
   CONSTRAINT `purchase_orders_supplier_id_foreign` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=240001;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=270001;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2335,7 +2386,7 @@ CREATE TABLE `purchase_voucher_items` (
   CONSTRAINT `purchase_voucher_items_purchase_voucher_id_foreign` FOREIGN KEY (`purchase_voucher_id`) REFERENCES `purchase_vouchers` (`id`) ON DELETE CASCADE,
   CONSTRAINT `purchase_voucher_items_product_id_foreign` FOREIGN KEY (`product_id`) REFERENCES `product_old` (`product_id`),
   CONSTRAINT `purchase_voucher_items_source_purchase_order_item_id_foreign` FOREIGN KEY (`source_purchase_order_item_id`) REFERENCES `purchase_order_items` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=210001;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=240001;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2379,7 +2430,7 @@ CREATE TABLE `purchase_vouchers` (
   KEY `purchase_vouchers_status_index` (`status`),
   CONSTRAINT `purchase_vouchers_vendor_id_foreign` FOREIGN KEY (`vendor_id`) REFERENCES `suppliers` (`id`),
   CONSTRAINT `purchase_vouchers_purchase_order_id_foreign` FOREIGN KEY (`purchase_order_id`) REFERENCES `purchase_orders` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=180001;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=210001;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2757,7 +2808,7 @@ CREATE TABLE `supplier_products` (
   UNIQUE KEY `supplier_products_supplier_id_product_id_unique` (`supplier_id`,`product_id`),
   CONSTRAINT `supplier_products_product_id_foreign` FOREIGN KEY (`product_id`) REFERENCES `product_old` (`product_id`),
   CONSTRAINT `supplier_products_supplier_id_foreign` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci AUTO_INCREMENT=300003;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci AUTO_INCREMENT=330003;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -3343,4 +3394,4 @@ CREATE TABLE `zone_vehicles` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-05-21 19:06:32
+-- Dump completed on 2026-05-25 10:59:51

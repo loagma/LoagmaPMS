@@ -7,6 +7,7 @@ import '../../models/customer_model.dart';
 import '../../models/party_result.dart';
 import '../../models/product_model.dart';
 import '../../services/customer_api_service.dart';
+import '../../router/app_router.dart';
 import '../../services/report_export_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
@@ -190,6 +191,15 @@ class SalesInvoiceFormScreen extends StatelessWidget {
                     label: 'Back',
                     onPressed: () => Get.back(),
                   ),
+                  if (controller.isBillMode && controller.soId != null)
+                    ActionButton(
+                      label: 'Create Return',
+                      isPrimary: false,
+                      onPressed: () => Get.toNamed(
+                        AppRoutes.salesReturnForm,
+                        arguments: {'sourceSiId': controller.soId},
+                      ),
+                    ),
                 ],
               ),
             ],

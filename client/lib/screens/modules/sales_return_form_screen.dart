@@ -936,7 +936,10 @@ class _SISelectorDialogState extends State<_SISelectorDialog> {
                         separatorBuilder: (_, __) => const SizedBox(height: 8),
                         itemBuilder: (ctx, i) {
                           final si = searchResults[i];
-                          final docNo = si['doc_no_number']?.toString() ?? '';
+                          // SalesOrderController returns 'bill_number' for the invoice string; fallback to SO number
+                          final docNo = si['bill_number']?.toString().isNotEmpty == true
+                              ? si['bill_number'].toString()
+                              : si['so_number']?.toString() ?? '';
                           final customerName = si['customer_name']?.toString() ?? '-';
                           final docDate = si['doc_date']?.toString() ?? '-';
 

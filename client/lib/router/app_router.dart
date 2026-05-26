@@ -255,9 +255,22 @@ final List<GetPage<dynamic>> appPages = [
   ),
   GetPage(
     name: AppRoutes.salesReturnForm,
-    page: () => SalesReturnFormScreen(
-      returnId: Get.arguments is int ? Get.arguments as int? : null,
-    ),
+    page: () {
+      final args = Get.arguments;
+      int? returnId;
+      int? sourceSiId;
+      if (args is int) {
+        returnId = args;
+      } else if (args is Map) {
+        returnId   = args['returnId'] as int?;
+        sourceSiId = args['sourceSiId'] as int?;
+      }
+      return SalesReturnFormScreen(
+        returnId: returnId,
+        sourceSiId: sourceSiId,
+        startInViewOnly: returnId != null,
+      );
+    },
   ),
   GetPage(
     name: AppRoutes.salesModuleReports,
