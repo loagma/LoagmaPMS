@@ -692,8 +692,8 @@ class PurchaseVoucherController extends GetxController {
           unitTypes.value = types.cast<String>();
         }
       }
-    } catch (_) {
-      unitTypes.value = ['Nos', 'KG', 'PCS', 'LTR', 'MTR', 'GM', 'ML'];
+    } catch (e) {
+      debugPrint('[PV] Load unit types error: $e');
     }
   }
 

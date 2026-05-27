@@ -344,8 +344,12 @@ class _SalesOrderListScreenState extends State<SalesOrderListScreen> {
                         statusColor: controller.statusColor(so.status),
                         onTap: () {
                           if (so.id != null) {
+                            final ids = controller.salesOrders
+                                .map((o) => o.id)
+                                .whereType<int>()
+                                .toList();
                             Get.to(
-                              () => SalesOrderDetailScreen(soId: so.id!),
+                              () => SalesOrderDetailScreen(soId: so.id!, allIds: ids),
                             )?.then((_) => controller.refresh());
                           }
                         },
@@ -380,7 +384,27 @@ void _showDeleteCancelDialog(
   SalesOrderListController controller,
   SalesOrder so,
 ) {
-  final isDraft = so.status.toUpperCase() == 'DRAFT';
+  final status = so.status.toUpperCase();
+  final isBilled = status == 'BILLED' || (so.billNumber?.isNotEmpty ?? false);
+  final isDraft = status == 'DRAFT' || status == 'PENDING';
+
+  if (isBilled) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cannot delete or cancel'),
+        content: Text(
+          '${so.soNumber} has a linked invoice (${so.billNumber ?? 'INVOICED'}). '
+          'Cancel the invoice first before deleting or cancelling this order.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+        ],
+      ),
+    );
+    return;
+  }
+
   showDialog(
     context: context,
     builder: (ctx) => AlertDialog(

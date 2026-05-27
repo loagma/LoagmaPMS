@@ -270,7 +270,8 @@ class SalesReturnFormController extends GetxController {
       isSearchingInvoices.value = true;
       final uri = Uri.parse(ApiConfig.salesOrders).replace(
         queryParameters: {
-          'limit': '20',
+          'limit': '50',
+          'returnable': 'true', // delivered, dispatched, billed only
           if (query.trim().isNotEmpty) 'search': query.trim(),
           if (customerIdFilter != null) 'customer_id': customerIdFilter.toString(),
         },
@@ -312,13 +313,11 @@ class SalesReturnFormController extends GetxController {
         if (data['success'] == true) {
           final siData = _normalizeInvoicePayload(data['data'] as Map<String, dynamic>);
 
-          // SalesOrderController normalizeHeader returns 'bill_number' (not 'bill_no') for the invoice string
-          sourceSiNumber.value =
-              siData['bill_number']?.toString() ??
-              siData['bill_no']?.toString() ??
-              siData['doc_no']?.toString() ??
-              siData['so_number']?.toString() ??
-              siData['doc_no_number']?.toString() ?? '';
+          // bill_number = invoice string (INV/25-26/001) for billed orders; so_number = ORD-{id} for plain orders
+          final billNo = siData['bill_number']?.toString() ?? '';
+          sourceSiNumber.value = billNo.isNotEmpty
+              ? billNo
+              : siData['so_number']?.toString() ?? siData['id']?.toString() ?? '';
           customerId.value = _safeInt(siData['customer_id']);
           customerName.value = siData['customer_name']?.toString() ?? '';
           customerPhone.value = '';
@@ -546,9 +545,8 @@ class SalesReturnFormController extends GetxController {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (data['success'] == true) {
-          _showSuccess(returnId == null ? 'Return saved successfully' : 'Return updated successfully');
-          await Future.delayed(const Duration(milliseconds: 500));
           Get.back(result: true);
+          _showSuccess(returnId == null ? 'Sales return saved successfully' : 'Sales return updated successfully');
           return;
         }
       }
@@ -571,9 +569,8 @@ class SalesReturnFormController extends GetxController {
           .timeout(const Duration(seconds: 15));
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode == 200 && data['success'] == true) {
-        _showSuccess('Return deleted successfully');
-        await Future.delayed(const Duration(milliseconds: 500));
         Get.back(result: true);
+        _showSuccess('Sales return deleted successfully');
         return;
       }
       _showError(data['message']?.toString() ?? 'Failed to delete return');

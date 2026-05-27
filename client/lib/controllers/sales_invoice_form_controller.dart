@@ -126,12 +126,16 @@ class SalesInvoiceFormController extends GetxController {
   final formKey = GlobalKey<FormState>();
   final int? soId;
   final RxBool viewOnly = false.obs;
+  final isBrowsing = false.obs;
 
   static const List<String> chargeTypeNames = addonChargeTypeNames;
 
   final isLoading = false.obs;
   final isPdfBusy = false.obs;
   final isSaving = false.obs;
+
+  // ── Browse navigation ─────────────────────────────────────────────────────
+  final currentBrowseId = Rxn<int>();
 
   // ── Meta ──────────────────────────────────────────────────────────────────
   final invoiceNumber = ''.obs;
@@ -207,6 +211,7 @@ class SalesInvoiceFormController extends GetxController {
     billDepartment.value = 'Sales';
 
     if (soId != null) {
+      currentBrowseId.value = soId;
       _loadOrder(soId!);
     } else {
       _setDefaultDocDate();
@@ -218,7 +223,9 @@ class SalesInvoiceFormController extends GetxController {
   // ── Computed ──────────────────────────────────────────────────────────────
 
   bool get isEditMode => soId != null;
-  bool get isReadOnly => viewOnly.value || status.value != 'DRAFT';
+  bool get _isEditable => status.value == 'DRAFT' || status.value == 'PENDING';
+  bool get isReadOnly => !isBrowsing.value && (viewOnly.value || !_isEditable);
+  bool get isFieldsLocked => viewOnly.value || !_isEditable;
   bool get isBillMode => status.value == 'BILLED';
 
   String get customerDisplayTitle =>
@@ -351,7 +358,7 @@ class SalesInvoiceFormController extends GetxController {
         }
       }
     } catch (e) {
-      unitTypes.value = ['1 Kg', 'Nos', '5 Kg', 'grams', '1 Ltr'];
+      debugPrint('[SI] Load unit types error: $e');
     }
   }
 
@@ -661,6 +668,29 @@ class SalesInvoiceFormController extends GetxController {
     }
   }
 
+  Future<void> loadInvoiceById(int orderId) async {
+    isBrowsing.value = true;
+    currentBrowseId.value = orderId;
+    try {
+      isLoading.value = true;
+      final response = await http
+          .get(Uri.parse('${ApiConfig.salesOrders}/$orderId'), headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 20));
+      if (response.statusCode != 200) return;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['success'] != true) return;
+      final so = SalesOrder.fromJson(data['data'] as Map<String, dynamic>);
+      await _applyOrder(so);
+      if (so.billNumber != null && so.billNumber!.isNotEmpty) {
+        invoiceNumber.value = so.billNumber!;
+      }
+    } catch (e) {
+      debugPrint('[SI FORM] Browse invoice error: $e');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   Future<void> _applyOrder(SalesOrder so) async {
     sourceOrderId.value = so.id;
     sourceOrderNumber.value = so.soNumber;
@@ -727,7 +757,7 @@ class SalesInvoiceFormController extends GetxController {
         taxPercent: item.taxPercent?.toString() ?? '',
       ));
     }
-    if (items.isEmpty) addItem();
+    if (items.isEmpty && !viewOnly.value) addItem();
     await _hydrateLineItemTaxes();
 
     if (customerName.value.isEmpty && customerId.value != null) {
@@ -783,8 +813,55 @@ class SalesInvoiceFormController extends GetxController {
     return true;
   }
 
+  Future<void> cancelInvoice() async {
+    final confirm = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('Cancel invoice?'),
+        content: Text(
+          'Cancel invoice ${invoiceNumber.value.trim()}? '
+          'The linked sales order will revert to DRAFT and can be re-edited or re-invoiced.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('No'),
+          ),
+          TextButton(
+            onPressed: () => Get.back(result: true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Cancel Invoice'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    if (sourceOrderId.value == null) return;
+
+    isSaving.value = true;
+    try {
+      final response = await http.patch(
+        Uri.parse('${ApiConfig.salesOrders}/${sourceOrderId.value}'),
+        headers: {'Accept': 'application/json', 'Content-Type': 'application/json'},
+        body: jsonEncode({'cancel_invoice': true}),
+      );
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200 && data['success'] == true) {
+        _showSuccess('Invoice cancelled. The sales order has been reverted to DRAFT.');
+        await Future.delayed(const Duration(milliseconds: 800));
+        Get.back(result: true);
+      } else {
+        _showError(data['message']?.toString() ?? 'Failed to cancel invoice (${response.statusCode})');
+      }
+    } catch (e) {
+      _showError('Failed to cancel invoice: $e');
+    } finally {
+      isSaving.value = false;
+    }
+  }
+
   Future<void> save() async {
     if (!validateForm()) return;
+    isBrowsing.value = false;
     isSaving.value = true;
     try {
       if (sourceOrderId.value != null) {
@@ -837,7 +914,7 @@ class SalesInvoiceFormController extends GetxController {
         'supplier_id': salesmanId.value,
       'doc_date': docDate.value,
       if (expectedDate.value.trim().isNotEmpty) 'expected_date': expectedDate.value.trim(),
-      'status': status.value == 'DRAFT' ? 'billed' : status.value.toLowerCase(),
+      'status': _isEditable ? 'billed' : status.value.toLowerCase(),
       if (narration.value.trim().isNotEmpty) 'narration': narration.value.trim(),
       'bill_number': invoiceNumber.value.trim(),
       'bill_dt': billDt.value.trim(),

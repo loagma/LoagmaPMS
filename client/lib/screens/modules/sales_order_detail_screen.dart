@@ -14,7 +14,8 @@ import 'sales_order_form_screen.dart';
 
 class SalesOrderDetailScreen extends StatefulWidget {
   final int soId;
-  const SalesOrderDetailScreen({super.key, required this.soId});
+  final List<int> allIds;
+  const SalesOrderDetailScreen({super.key, required this.soId, this.allIds = const []});
 
   @override
   State<SalesOrderDetailScreen> createState() => _SalesOrderDetailScreenState();
@@ -25,20 +26,39 @@ class _SalesOrderDetailScreenState extends State<SalesOrderDetailScreen> {
   bool _loading = true;
   String? _error;
   bool _pdfBusy = false;
+  late int _currentId;
 
   @override
   void initState() {
     super.initState();
+    _currentId = widget.soId;
+    _load();
+  }
+
+  int? get _prevId {
+    final idx = widget.allIds.indexOf(_currentId);
+    return (idx > 0) ? widget.allIds[idx - 1] : null;
+  }
+
+  int? get _nextId {
+    final idx = widget.allIds.indexOf(_currentId);
+    return (idx >= 0 && idx < widget.allIds.length - 1) ? widget.allIds[idx + 1] : null;
+  }
+
+  void _goTo(int id) {
+    setState(() { _currentId = id; });
     _load();
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() { _loading = true; _error = null; });
     try {
       final res = await http
-          .get(Uri.parse('${ApiConfig.salesOrders}/${widget.soId}'),
+          .get(Uri.parse('${ApiConfig.salesOrders}/$_currentId'),
               headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: 15));
+      if (!mounted) return;
       final body = jsonDecode(res.body) as Map<String, dynamic>;
       if (body['success'] == true) {
         setState(() {
@@ -49,6 +69,7 @@ class _SalesOrderDetailScreenState extends State<SalesOrderDetailScreen> {
         setState(() { _error = body['message']?.toString() ?? 'Failed to load'; _loading = false; });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() { _error = 'Network error: $e'; _loading = false; });
     }
   }
@@ -70,9 +91,9 @@ class _SalesOrderDetailScreenState extends State<SalesOrderDetailScreen> {
     if (_order == null || _pdfBusy) return;
     setState(() => _pdfBusy = true);
     try {
-      final tag = 'pdf_${share ? "share" : "print"}_${widget.soId}';
+      final tag = 'pdf_${share ? "share" : "print"}_$_currentId';
       final ctrl = Get.put(
-        SalesOrderFormController(soId: widget.soId, startInViewOnly: true),
+        SalesOrderFormController(soId: _currentId, startInViewOnly: true),
         tag: tag,
       );
       await Future.doWhile(() async {
@@ -109,6 +130,18 @@ class _SalesOrderDetailScreenState extends State<SalesOrderDetailScreen> {
                 ),
               ]
             : [
+                if (_prevId != null)
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left_rounded, color: Colors.white),
+                    tooltip: 'Previous order',
+                    onPressed: () => _goTo(_prevId!),
+                  ),
+                if (_nextId != null)
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right_rounded, color: Colors.white),
+                    tooltip: 'Next order',
+                    onPressed: () => _goTo(_nextId!),
+                  ),
                 IconButton(
                   icon: const Icon(Icons.print_outlined, color: Colors.white),
                   tooltip: 'Print / Download PDF',
@@ -121,11 +154,11 @@ class _SalesOrderDetailScreenState extends State<SalesOrderDetailScreen> {
                 ),
               ],
       ),
-      floatingActionButton: _order != null
+      floatingActionButton: (_order != null && (_order!.status.toUpperCase() == 'DRAFT' || _order!.status.toUpperCase() == 'PENDING'))
           ? FloatingActionButton.extended(
               onPressed: () =>
-                  Get.to(() => SalesOrderFormScreen(soId: widget.soId))
-                      ?.then((_) => _load()),
+                  Get.to(() => SalesOrderFormScreen(soId: _currentId, startInViewOnly: true, allIds: widget.allIds))
+                      ?.then((_) { if (mounted) _load(); }),
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               icon: const Icon(Icons.edit_outlined),

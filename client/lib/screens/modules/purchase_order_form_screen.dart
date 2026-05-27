@@ -999,9 +999,7 @@ class _ItemRow extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: _fieldVerticalGap),
                   child: Obx(
                     () {
-                      final units = controller.unitTypes.isEmpty
-                          ? ['KG', 'PCS', 'LTR', 'MTR', 'GM', 'ML']
-                          : controller.unitTypes;
+                      final units = controller.unitTypes;
                       final current = row.unit.value;
                       final value = units.contains(current) ? current : units.first;
                       if (value != current && !controller.isReadOnly) {

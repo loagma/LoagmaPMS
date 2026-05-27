@@ -117,9 +117,12 @@ class _SalesInvoiceListScreenState extends State<SalesInvoiceListScreen> {
                       padding: const EdgeInsets.only(bottom: 12),
                       child: _InvoiceCard(
                         invoice: inv,
-                        onTap: () => Get.to(
-                          () => SalesInvoiceFormScreen(soId: inv.id, startInViewOnly: true),
-                        )?.then((_) => controller.refresh()),
+                        onTap: () {
+                          final ids = controller.invoices.map((i) => i.id).toList();
+                          Get.to(
+                            () => SalesInvoiceFormScreen(soId: inv.id, startInViewOnly: true, allIds: ids),
+                          )?.then((_) => controller.refresh());
+                        },
                         onCancelInvoice: () => _showCancelInvoiceDialog(context, controller, inv),
                         onCreateReturn: () async {
                           final result = await Get.toNamed(

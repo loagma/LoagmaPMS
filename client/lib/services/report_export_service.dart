@@ -720,10 +720,132 @@ class ReportExportService {
     ], text: 'Sales Return ${docNo.isEmpty ? '' : docNo}'.trim());
   }
 
+  static Future<void> printSalesReturnList(
+    List<Map<String, dynamic>> returns, {
+    String? fromDate,
+    String? toDate,
+    String? status,
+  }) async {
+    final bytes = await buildSalesReturnListPdf(returns, fromDate: fromDate, toDate: toDate, status: status);
+    await Printing.layoutPdf(onLayout: (_) async => bytes);
+  }
+
+  static Future<void> shareSalesReturnList(
+    List<Map<String, dynamic>> returns, {
+    String? fromDate,
+    String? toDate,
+    String? status,
+  }) async {
+    final bytes = await buildSalesReturnListPdf(returns, fromDate: fromDate, toDate: toDate, status: status);
+    final now = DateTime.now();
+    final stamp = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+    await Share.shareXFiles([
+      XFile.fromData(bytes, mimeType: 'application/pdf', name: 'sales_returns_$stamp.pdf'),
+    ], text: 'Sales Returns Report');
+  }
+
+  static Future<Uint8List> buildSalesReturnListPdf(
+    List<Map<String, dynamic>> returns, {
+    String? fromDate,
+    String? toDate,
+    String? status,
+  }) async {
+    final pdf = pw.Document();
+    final theme = await _pdfTheme();
+    final now = DateTime.now();
+    final generatedOn = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+    String filterLabel = '';
+    final parts = <String>[];
+    if (status != null && status.isNotEmpty) parts.add('Status: $status');
+    if (fromDate != null && fromDate.isNotEmpty) parts.add('From: $fromDate');
+    if (toDate != null && toDate.isNotEmpty) parts.add('To: $toDate');
+    filterLabel = parts.isEmpty ? 'All Returns' : parts.join('   ');
+
+    double grandTotal = 0;
+    for (final r in returns) {
+      final v = r['total_value'];
+      if (v != null) {
+        grandTotal += (v is num) ? v.toDouble() : (double.tryParse(v.toString()) ?? 0);
+      }
+    }
+
+    final rows = returns.map((r) {
+      final docNo = r['voucher_no']?.toString() ?? r['doc_number']?.toString() ?? '-';
+      final customer = r['customer_name']?.toString() ?? '-';
+      final date = _normalizeDate(r['return_dt']?.toString() ?? r['doc_date']?.toString() ?? '');
+      final st = r['status']?.toString() ?? '-';
+      final val = (r['total_value'] is num)
+          ? (r['total_value'] as num).toDouble()
+          : double.tryParse(r['total_value']?.toString() ?? '') ?? 0.0;
+      return [docNo, customer, date, st, val.toStringAsFixed(2)];
+    }).toList();
+
+    pdf.addPage(pw.MultiPage(
+      theme: theme,
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      build: (ctx) => [
+        pw.Container(
+          decoration: pw.BoxDecoration(color: PdfColors.grey800, borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4))),
+          padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              pw.Text('SALES RETURNS REPORT', style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+              pw.Text(filterLabel, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey300)),
+            ]),
+            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+              pw.Text('${returns.length} record${returns.length == 1 ? '' : 's'}', style: pw.TextStyle(fontSize: 10, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Generated: $generatedOn', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey200)),
+            ]),
+          ]),
+        ),
+        pw.SizedBox(height: 12),
+        pw.TableHelper.fromTextArray(
+          headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8),
+          cellStyle: const pw.TextStyle(fontSize: 8),
+          headerDecoration: const pw.BoxDecoration(color: PdfColors.grey200),
+          cellAlignment: pw.Alignment.centerLeft,
+          columnWidths: {
+            0: const pw.FlexColumnWidth(2.5),
+            1: const pw.FlexColumnWidth(3.0),
+            2: const pw.FlexColumnWidth(1.8),
+            3: const pw.FlexColumnWidth(1.5),
+            4: const pw.FlexColumnWidth(1.8),
+          },
+          headers: const ['Return No.', 'Customer', 'Date', 'Status', 'Amount (₹)'],
+          data: rows,
+        ),
+        pw.SizedBox(height: 8),
+        pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
+          pw.Container(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.grey100,
+              border: pw.Border.all(color: PdfColors.grey400),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
+            ),
+            child: pw.Row(children: [
+              pw.Text('GRAND TOTAL  ', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              pw.Text('₹ ${grandTotal.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+            ]),
+          ),
+        ]),
+      ],
+    ));
+    return pdf.save();
+  }
+
   static Future<Uint8List> buildSalesReturnPdf(SalesReturnFormController c) async {
     final pdf = pw.Document();
     final theme = await _pdfTheme();
     final docNo = '${c.docNoPrefix.value}${c.docNoNumber.value}'.trim();
+
+    final adminInfo  = await AuthController.getAdminInfo();
+    final orgName    = adminInfo?['org_name']?.toString()       ?? '';
+    final orgAddress = adminInfo?['org_address']?.toString()    ?? '';
+    final orgGst     = adminInfo?['org_gst']?.toString()        ?? '';
+    final fssaiNo    = adminInfo?['fssai_no']?.toString()       ?? '';
 
     final selectedItems = c.items.where((row) => row.selected.value).toList();
     final allItems = selectedItems.isNotEmpty ? selectedItems : c.items.toList();
@@ -761,15 +883,24 @@ class ReportExportService {
         pw.Container(
           decoration: pw.BoxDecoration(color: PdfColors.grey800, borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4))),
           padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+          child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            // Left: company info
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              pw.Text('SALES RETURN', style: pw.TextStyle(fontSize: 17, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
-              pw.Text('Return Document', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey300)),
+              if (orgName.isNotEmpty)
+                pw.Text(orgName, style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+              if (orgAddress.isNotEmpty)
+                pw.Text(orgAddress, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey300)),
+              if (orgGst.isNotEmpty)
+                pw.Text('GST: $orgGst', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey300)),
+              if (fssaiNo.isNotEmpty)
+                pw.Text('FSSAI: $fssaiNo', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey300)),
             ]),
+            // Right: document info
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-              pw.Text(docNo.isEmpty ? '-' : docNo, style: pw.TextStyle(fontSize: 12, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
-              pw.Text(_normalizeDate(c.docDate.value), style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey200)),
-              pw.Text(c.status.value, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey200)),
+              pw.Text('SALES RETURN', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+              pw.Text(docNo.isEmpty ? '-' : docNo, style: pw.TextStyle(fontSize: 11, color: PdfColors.grey200, fontWeight: pw.FontWeight.bold)),
+              pw.Text(_normalizeDate(c.docDate.value), style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey300)),
+              pw.Text(c.status.value, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey300)),
             ]),
           ]),
         ),

@@ -442,7 +442,7 @@ class PurchaseOrderFormController extends GetxController {
         }
       }
     } catch (e) {
-      unitTypes.value = ['KG', 'PCS', 'LTR', 'MTR', 'GM', 'ML'];
+      debugPrint('[PO] Load unit types error: $e');
     }
   }
 

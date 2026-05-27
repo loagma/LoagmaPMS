@@ -1443,9 +1443,7 @@ class _ItemRow extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: _fieldVerticalGap),
                   child: Obx(() {
-                    final units = controller.unitTypes.isEmpty
-                        ? ['Nos', 'KG', 'PCS', 'LTR']
-                        : controller.unitTypes;
+                    final units = controller.unitTypes;
                     final value = units.contains(row.unitType.value)
                         ? row.unitType.value
                         : (units.isNotEmpty ? units.first : 'Nos');

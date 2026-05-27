@@ -61,6 +61,7 @@ class SalesReturnController extends Controller
             $page  = max(1, (int) $request->input('page', 1));
 
             $query = DB::table(self::ORDERS_TABLE . ' as o')
+                ->leftJoin('loagma_new.user as u', 'u.userid', '=', 'o.buyer_userid')
                 ->whereNotNull('o.Sales_Return_VoucherNo');
 
             if ($request->filled('customer_id')) {
@@ -71,7 +72,7 @@ class SalesReturnController extends Controller
                 $search = $request->input('search');
                 $query->where(function ($q) use ($search) {
                     $q->where('o.Sales_Return_VoucherNo', 'like', "%{$search}%")
-                      ->orWhere('o.buyer_name', 'like', "%{$search}%")
+                      ->orWhere('u.name', 'like', "%{$search}%")
                       ->orWhere('o.order_id', 'like', "%{$search}%");
                 });
             }
@@ -96,7 +97,7 @@ class SalesReturnController extends Controller
                 ->select([
                     'o.order_id',
                     'o.buyer_userid',
-                    'o.buyer_name',
+                    'u.name as buyer_name',
                     'o.Sales_Return_VoucherNo',
                     'o.Sales_Return_Dt',
                     'o.Sales_Return_Reason',
@@ -126,7 +127,11 @@ class SalesReturnController extends Controller
     public function show(int $id): JsonResponse
     {
         try {
-            $order = DB::table(self::ORDERS_TABLE)->where('order_id', $id)->first();
+            $order = DB::table(self::ORDERS_TABLE . ' as o')
+                ->leftJoin('loagma_new.user as u', 'u.userid', '=', 'o.buyer_userid')
+                ->where('o.order_id', $id)
+                ->select(['o.*', 'u.name as buyer_name'])
+                ->first();
             if (!$order) {
                 return response()->json(['success' => false, 'message' => 'Order not found'], 404);
             }

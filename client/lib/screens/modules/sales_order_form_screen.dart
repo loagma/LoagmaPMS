@@ -63,20 +63,25 @@ Future<void> _pickSoDate(
 class SalesOrderFormScreen extends StatelessWidget {
   final int? soId;
   final bool startInViewOnly;
+  final List<int> allIds;
 
   const SalesOrderFormScreen({
     super.key,
     this.soId,
     this.startInViewOnly = false,
+    this.allIds = const [],
   });
 
   @override
   Widget build(BuildContext context) {
+    final tag = soId?.toString() ?? 'new';
+    Get.delete<SalesOrderFormController>(tag: tag, force: true);
     final controller = Get.put(
       SalesOrderFormController(
         soId: soId,
         startInViewOnly: startInViewOnly,
       ),
+      tag: tag,
     );
 
     return Scaffold(
@@ -103,7 +108,8 @@ class SalesOrderFormScreen extends StatelessWidget {
         onBackPressed: () => Get.back(),
         actions: [
           Obx(() {
-            final canEdit = controller.viewOnly.value && controller.status.value == 'DRAFT';
+            final s = controller.status.value;
+            final canEdit = controller.viewOnly.value && (s == 'DRAFT' || s == 'PENDING');
             if (!canEdit) return const SizedBox.shrink();
             return IconButton(
               icon: const Icon(Icons.edit_rounded, color: Colors.white),
@@ -188,9 +194,9 @@ class SalesOrderFormScreen extends StatelessWidget {
                     isPrimary: true,
                     onPressed: () => ReportExportService.printSalesOrder(controller),
                   ),
-                  if (controller.status.value == 'DRAFT')
+                  if (controller.status.value == 'DRAFT' || controller.status.value == 'PENDING')
                     ActionButton(
-                      label: 'Edit Draft',
+                      label: 'Edit',
                       isPrimary: true,
                       onPressed: () => controller.viewOnly.value = false,
                     ),
@@ -232,9 +238,9 @@ class SalesOrderFormScreen extends StatelessWidget {
                       label: 'Save',
                       isPrimary: true,
                       isLoading: controller.isSaving.value,
-                      onPressed: controller.isSaving.value || controller.isReadOnly
+                      onPressed: controller.isSaving.value || controller.isFieldsLocked
                           ? null
-                          : () => controller.save(),
+                          : controller.save,
                     ),
                   ],
                 ),
@@ -549,7 +555,7 @@ class _CustomerDetailSheetState extends State<_CustomerDetailSheet> {
 
   Widget _buildContent(ScrollController scrollCtrl) {
     final c = _customer!;
-    final isEdit = !widget.controller.isReadOnly;
+    final isEdit = !widget.controller.isFieldsLocked;
 
     return ListView(
       controller: scrollCtrl,
@@ -746,7 +752,7 @@ class _HeaderCard extends StatelessWidget {
                                 child: Text(s, overflow: TextOverflow.ellipsis),
                               ))
                           .toList(),
-                      onChanged: controller.isReadOnly
+                      onChanged: controller.isFieldsLocked
                           ? null
                           : (v) {
                               if (v != null) controller.setFinancialYear(v);
@@ -783,20 +789,20 @@ class _HeaderCard extends StatelessWidget {
                             ),
                           ),
                           IconButton(
-                            constraints: const BoxConstraints.tightFor(width: 26, height: 26),
+                            constraints: const BoxConstraints.tightFor(width: 20, height: 20),
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
-                            icon: const Icon(Icons.keyboard_arrow_left_rounded, size: 18),
+                            icon: const Icon(Icons.keyboard_arrow_left_rounded, size: 14),
                             tooltip: 'Previous Voucher',
                             onPressed: controller.isLoading.value
                                 ? null
                                 : () => controller.goToPreviousVoucher(),
                           ),
                           IconButton(
-                            constraints: const BoxConstraints.tightFor(width: 26, height: 26),
+                            constraints: const BoxConstraints.tightFor(width: 20, height: 20),
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
-                            icon: const Icon(Icons.keyboard_arrow_right_rounded, size: 18),
+                            icon: const Icon(Icons.keyboard_arrow_right_rounded, size: 14),
                             tooltip: 'Next Voucher',
                             onPressed: controller.isLoading.value
                                 ? null
@@ -824,7 +830,7 @@ class _HeaderCard extends StatelessWidget {
                       await _showCustomerDetailSheet(context, selectedId, controller);
                       return;
                     }
-                    if (controller.isReadOnly) return;
+                    if (controller.isFieldsLocked) return;
                     final party = await showDialog<PartyResult>(
                       context: context,
                       builder: (_) => PartySearchDialog(
@@ -881,7 +887,7 @@ class _HeaderCard extends StatelessWidget {
                             );
                           }),
                         ),
-                        if (!controller.isReadOnly)
+                        if (!controller.isFieldsLocked)
                           const Icon(Icons.search, size: 18, color: Colors.grey),
                       ],
                     ),
@@ -916,7 +922,7 @@ class _HeaderCard extends StatelessWidget {
                         ),
                       ))
                   .toList(),
-              onChanged: controller.isReadOnly
+              onChanged: controller.isFieldsLocked
                   ? null
                   : (v) => controller.setDepartmentId(v),
             );
@@ -925,7 +931,7 @@ class _HeaderCard extends StatelessWidget {
           Obx(() {
             final name = controller.salesmanName.value.trim();
             return InkWell(
-              onTap: controller.isReadOnly
+              onTap: controller.isFieldsLocked
                   ? null
                   : () async {
                       final party = await showDialog<PartyResult>(
@@ -943,7 +949,7 @@ class _HeaderCard extends StatelessWidget {
                     },
               child: InputDecorator(
                 decoration: _soInputDecoration(labelText: 'Salesman').copyWith(
-                  suffixIcon: controller.isReadOnly
+                  suffixIcon: controller.isFieldsLocked
                       ? null
                       : name.isEmpty
                           ? const Icon(Icons.search, size: 18, color: Colors.grey)
@@ -969,7 +975,7 @@ class _HeaderCard extends StatelessWidget {
               Expanded(
                 child: Obx(() => TextFormField(
                       key: ValueKey('so-doc-date-${controller.docDate.value}'),
-                      enabled: !controller.isReadOnly,
+                      enabled: !controller.isFieldsLocked,
                       readOnly: true,
                       initialValue: controller.docDate.value,
                       decoration: _soInputDecoration(
@@ -977,7 +983,7 @@ class _HeaderCard extends StatelessWidget {
                         suffixIcon: const Icon(Icons.calendar_month_rounded),
                       ),
                       validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                      onTap: controller.isReadOnly
+                      onTap: controller.isFieldsLocked
                           ? null
                           : () => _pickSoDate(
                                 context,
@@ -990,14 +996,14 @@ class _HeaderCard extends StatelessWidget {
               Expanded(
                 child: Obx(() => TextFormField(
                       key: ValueKey('so-expected-date-${controller.expectedDate.value}'),
-                      enabled: !controller.isReadOnly,
+                      enabled: !controller.isFieldsLocked,
                       readOnly: true,
                       initialValue: controller.expectedDate.value,
                       decoration: _soInputDecoration(
                         labelText: 'Expected Date',
                         suffixIcon: const Icon(Icons.calendar_month_rounded),
                       ),
-                      onTap: controller.isReadOnly
+                      onTap: controller.isFieldsLocked
                           ? null
                           : () => _pickSoDate(
                                 context,
@@ -1021,7 +1027,7 @@ class _HeaderCard extends StatelessWidget {
                     DropdownMenuItem(value: 'CLOSED', child: Text('Closed')),
                     DropdownMenuItem(value: 'CANCELLED', child: Text('Cancelled')),
                   ],
-                  onChanged: controller.isReadOnly
+                  onChanged: controller.isFieldsLocked
                       ? null
                       : (v) {
                           if (v != null) controller.setStatus(v);
@@ -1030,7 +1036,7 @@ class _HeaderCard extends StatelessWidget {
           ],
           const SizedBox(height: _sectionGap),
           Obx(() => TextFormField(
-                enabled: !controller.isReadOnly,
+                enabled: !controller.isFieldsLocked,
                 initialValue: controller.narration.value,
                 decoration: _soInputDecoration(labelText: 'Narration').copyWith(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1061,7 +1067,7 @@ class _HeaderCard extends StatelessWidget {
                 const SizedBox(height: _sectionGap),
                 // Bill Date
                 Obx(() => InkWell(
-                      onTap: controller.isReadOnly
+                      onTap: controller.isFieldsLocked
                           ? null
                           : () => _pickSoDate(
                                 context,
@@ -1087,7 +1093,7 @@ class _HeaderCard extends StatelessWidget {
                 // Department
                 Obx(() => TextFormField(
                       key: ValueKey('dept-${controller.billDepartment.value}'),
-                      enabled: !controller.isReadOnly,
+                      enabled: !controller.isFieldsLocked,
                       initialValue: controller.billDepartment.value,
                       decoration: _soInputDecoration(labelText: 'Department'),
                       onChanged: controller.setBillDepartment,
@@ -1095,7 +1101,7 @@ class _HeaderCard extends StatelessWidget {
                 const SizedBox(height: _sectionGap),
                 // Bill Narration
                 Obx(() => TextFormField(
-                      enabled: !controller.isReadOnly,
+                      enabled: !controller.isFieldsLocked,
                       initialValue: controller.billNarration.value,
                       decoration: _soInputDecoration(labelText: 'Bill Narration'),
                       onChanged: controller.setBillNarration,
@@ -1103,7 +1109,7 @@ class _HeaderCard extends StatelessWidget {
                 const SizedBox(height: _sectionGap),
                 // Bill Vehicle
                 Obx(() => TextFormField(
-                      enabled: !controller.isReadOnly,
+                      enabled: !controller.isFieldsLocked,
                       initialValue: controller.billVehicle.value,
                       decoration: _soInputDecoration(labelText: 'Vehicle'),
                       onChanged: controller.setBillVehicle,
@@ -1111,7 +1117,7 @@ class _HeaderCard extends StatelessWidget {
                 const SizedBox(height: _sectionGap),
                 // Bill Statement
                 Obx(() => TextFormField(
-                      enabled: !controller.isReadOnly,
+                      enabled: !controller.isFieldsLocked,
                       initialValue: controller.billStatement.value,
                       decoration: _soInputDecoration(labelText: 'Bill Statement'),
                       onChanged: controller.setBillStatement,
@@ -1119,7 +1125,7 @@ class _HeaderCard extends StatelessWidget {
                 const SizedBox(height: _sectionGap),
                 // Round-off
                 Obx(() => TextFormField(
-                      enabled: !controller.isReadOnly,
+                      enabled: !controller.isFieldsLocked,
                       initialValue: controller.billRoff.value,
                       decoration: _soInputDecoration(labelText: 'Round Off'),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
@@ -1128,7 +1134,7 @@ class _HeaderCard extends StatelessWidget {
                 const SizedBox(height: _sectionGap),
                 // Doc Year
                 Obx(() => TextFormField(
-                      enabled: !controller.isReadOnly,
+                      enabled: !controller.isFieldsLocked,
                       initialValue: controller.billDocYear.value,
                       decoration: _soInputDecoration(labelText: 'Doc Year (e.g. 25-26)'),
                       onChanged: controller.setBillDocYear,
@@ -1172,7 +1178,7 @@ class _ItemsCard extends StatelessWidget {
                   isLast: index == controller.items.length - 1,
                 ),
               ),
-            if (!controller.isReadOnly) ...[
+            if (!controller.isFieldsLocked) ...[
               const SizedBox(height: _sectionGap),
             ],
           ],
@@ -1233,7 +1239,7 @@ class _ItemRow extends StatelessWidget {
                 );
               }),
               const Spacer(),
-              if (!controller.isReadOnly)
+              if (!controller.isFieldsLocked)
                 SizedBox(
                   width: 30,
                   height: 30,
@@ -1249,7 +1255,7 @@ class _ItemRow extends StatelessWidget {
             ],
           ),
           const SizedBox(height: _sectionGap),
-          _ProductPicker(controller: controller, row: row, readOnly: controller.isReadOnly),
+          _ProductPicker(controller: controller, row: row, readOnly: controller.isFieldsLocked),
           Obx(() {
             if (!row.isTaxLoading.value) return const SizedBox.shrink();
             return const Padding(
@@ -1275,7 +1281,7 @@ class _ItemRow extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: _fieldVerticalGap),
                   child: Obx(() => TextFormField(
-                        enabled: !controller.isReadOnly,
+                        enabled: !controller.isFieldsLocked,
                         initialValue: row.quantity.value,
                         decoration: _soInputDecoration(labelText: 'Qty *'),
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -1296,9 +1302,7 @@ class _ItemRow extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: _fieldVerticalGap),
                   child: Obx(() {
-                    final base = controller.unitTypes.isEmpty
-                        ? ['KG', 'PCS', 'LTR', 'MTR', 'GM', 'ML']
-                        : controller.unitTypes;
+                    final base = controller.unitTypes;
                     final current = row.unit.value.trim();
                     // Always include the product's own unit so it's never lost
                     final units = <String>{
@@ -1320,7 +1324,7 @@ class _ItemRow extends StatelessWidget {
                                 child: Text(u, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
                               ))
                           .toList(),
-                      onChanged: controller.isReadOnly
+                      onChanged: controller.isFieldsLocked
                           ? null
                           : (v) {
                               if (v != null) row.unit.value = v;
@@ -1335,7 +1339,7 @@ class _ItemRow extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: _fieldVerticalGap),
                   child: Obx(() => TextFormField(
-                        enabled: !controller.isReadOnly,
+                        enabled: !controller.isFieldsLocked,
                         initialValue: row.price.value,
                         decoration: _soInputDecoration(labelText: 'Unit Price *'),
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -1495,7 +1499,7 @@ class _AddonCard extends StatelessWidget {
                                         child: Text(name, overflow: TextOverflow.ellipsis),
                                       ))
                                   .toList(),
-                              onChanged: controller.isReadOnly
+                              onChanged: controller.isFieldsLocked
                                   ? null
                                   : (v) {
                                       if (v != null) charge.name.value = v;
@@ -1505,7 +1509,7 @@ class _AddonCard extends StatelessWidget {
                       const SizedBox(width: _fieldGap),
                       Expanded(
                         child: TextFormField(
-                          enabled: !controller.isReadOnly,
+                          enabled: !controller.isFieldsLocked,
                           initialValue: charge.amount.value,
                           decoration: _soInputDecoration(labelText: 'Amount'),
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -1513,7 +1517,7 @@ class _AddonCard extends StatelessWidget {
                           onChanged: (v) => charge.amount.value = v,
                         ),
                       ),
-                      if (!controller.isReadOnly) ...[
+                      if (!controller.isFieldsLocked) ...[
                         const SizedBox(width: _fieldGap),
                         SizedBox(
                           width: 30,
@@ -1532,7 +1536,7 @@ class _AddonCard extends StatelessWidget {
                 );
               },
             ),
-            if (!controller.isReadOnly)
+            if (!controller.isFieldsLocked)
               Align(
                 alignment: Alignment.topRight,
                 child: OutlinedButton.icon(

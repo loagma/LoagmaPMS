@@ -332,10 +332,6 @@ class BomController extends Controller
                 ->filter()
                 ->values();
 
-            if ($units->isEmpty()) {
-                $units = collect(['GM', 'KG', 'LTR', 'ML', 'MTR', 'NOS', 'PCS']);
-            }
-
             return response()->json([
                 'success' => true,
                 'data' => $units,

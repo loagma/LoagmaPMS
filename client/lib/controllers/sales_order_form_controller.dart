@@ -24,6 +24,7 @@ class SalesOrderFormController extends GetxController {
   final products = <Map<String, dynamic>>[].obs;
   final unitTypes = <String>[].obs;
   final viewOnly = false.obs;
+  final isBrowsing = false.obs;
 
   final currentSoNumber = ''.obs;
   final RxnInt currentSoSeq = RxnInt();
@@ -296,7 +297,7 @@ class SalesOrderFormController extends GetxController {
         }
       }
     } catch (e) {
-      unitTypes.value = ['1 Kg', 'Nos', '5 Kg', 'grams', '1 Ltr'];
+      debugPrint('[SO] Load unit types error: $e');
     }
   }
 
@@ -435,6 +436,7 @@ class SalesOrderFormController extends GetxController {
   }
 
   Future<void> _resetToNewForm() async {
+    isBrowsing.value = false;
     customerId.value = null;
     customerName.value = '';
     customerPhone.value = '';
@@ -464,6 +466,7 @@ class SalesOrderFormController extends GetxController {
   }
 
   Future<void> loadBySequence(int seq) async {
+    isBrowsing.value = true;
     try {
       isLoading.value = true;
       final uri = Uri.parse(ApiConfig.salesOrders).replace(
@@ -492,7 +495,6 @@ class SalesOrderFormController extends GetxController {
       final soData = detailData['data'] as Map<String, dynamic>;
       final so = SalesOrder.fromJson(soData);
       await _applySalesOrderToState(so);
-      viewOnly.value = true;
     } catch (e) {
       debugPrint('[SO FORM] Load by sequence error: $e');
       await _resetToNewForm();
@@ -683,7 +685,11 @@ class SalesOrderFormController extends GetxController {
   }
 
   bool get isEditMode => soId != null;
-  bool get isReadOnly => viewOnly.value || status.value != 'DRAFT';
+  bool get _isEditable => status.value == 'DRAFT' || status.value == 'PENDING';
+  // Controls layout: false = show form layout, true = show report/detail view.
+  bool get isReadOnly => !isBrowsing.value && (viewOnly.value || !_isEditable);
+  // Controls field editability: true = all inputs disabled.
+  bool get isFieldsLocked => viewOnly.value || !_isEditable;
 
   double get itemsSubtotalExclTax {
     double value = 0;
@@ -749,6 +755,7 @@ class SalesOrderFormController extends GetxController {
   Future<void> save() async {
     if (!validateForm()) return;
 
+    isBrowsing.value = false;
     isSaving.value = true;
     try {
       final validItems = items

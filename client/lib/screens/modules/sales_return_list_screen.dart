@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../controllers/sales_return_list_controller.dart';
 import '../../models/sales_return_model.dart';
+import '../../services/report_export_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 import 'sales_return_form_screen.dart';
@@ -85,6 +86,44 @@ class _SalesReturnListScreenState extends State<SalesReturnListScreen> {
     controller.clearSearch();
   }
 
+  List<Map<String, dynamic>> _returnsAsMapList() {
+    return controller.returns.map((r) => {
+      'voucher_no': r.docNumber,
+      'customer_name': r.customerName,
+      'return_dt': r.docDate,
+      'status': r.status,
+      'total_value': r.totalValue,
+    }).toList();
+  }
+
+  Future<void> _printList() async {
+    if (controller.returns.isEmpty) {
+      Get.snackbar('Nothing to print', 'No returns loaded.',
+          snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+    await ReportExportService.printSalesReturnList(
+      _returnsAsMapList(),
+      fromDate: _localFrom.isEmpty ? null : _localFrom,
+      toDate: _localTo.isEmpty ? null : _localTo,
+      status: _localStatus.isEmpty ? null : _localStatus,
+    );
+  }
+
+  Future<void> _downloadList() async {
+    if (controller.returns.isEmpty) {
+      Get.snackbar('Nothing to export', 'No returns loaded.',
+          snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+    await ReportExportService.shareSalesReturnList(
+      _returnsAsMapList(),
+      fromDate: _localFrom.isEmpty ? null : _localFrom,
+      toDate: _localTo.isEmpty ? null : _localTo,
+      status: _localStatus.isEmpty ? null : _localStatus,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -94,6 +133,16 @@ class _SalesReturnListScreenState extends State<SalesReturnListScreen> {
         subtitle: 'Track returned goods and credit notes',
         onBackPressed: () => Get.back(),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.print_outlined, color: Colors.white),
+            tooltip: 'Print list',
+            onPressed: _printList,
+          ),
+          IconButton(
+            icon: const Icon(Icons.download_outlined, color: Colors.white),
+            tooltip: 'Download PDF',
+            onPressed: _downloadList,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),
             tooltip: 'Refresh',

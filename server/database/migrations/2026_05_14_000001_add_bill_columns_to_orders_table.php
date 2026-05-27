@@ -8,35 +8,35 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('orders', function (Blueprint $table) {
-            if (!Schema::hasColumn('orders', 'Bill_Dt')) {
+        Schema::connection('mysql')->table('orders', function (Blueprint $table) {
+            if (!Schema::connection('mysql')->hasColumn('orders', 'Bill_Dt')) {
                 $table->date('Bill_Dt')->nullable()->after('bill_number');
             }
-            if (!Schema::hasColumn('orders', 'Department')) {
+            if (!Schema::connection('mysql')->hasColumn('orders', 'Department')) {
                 $table->string('Department', 100)->nullable()->after('Bill_Dt');
             }
-            if (!Schema::hasColumn('orders', 'Bill_Narration')) {
+            if (!Schema::connection('mysql')->hasColumn('orders', 'Bill_Narration')) {
                 $table->text('Bill_Narration')->nullable()->after('Department');
             }
-            if (!Schema::hasColumn('orders', 'Bill_Vehicle')) {
+            if (!Schema::connection('mysql')->hasColumn('orders', 'Bill_Vehicle')) {
                 $table->string('Bill_Vehicle', 100)->nullable()->after('Bill_Narration');
             }
-            if (!Schema::hasColumn('orders', 'Bill_Statement')) {
+            if (!Schema::connection('mysql')->hasColumn('orders', 'Bill_Statement')) {
                 $table->string('Bill_Statement', 100)->nullable()->after('Bill_Vehicle');
             }
-            if (!Schema::hasColumn('orders', 'bill_roff')) {
+            if (!Schema::connection('mysql')->hasColumn('orders', 'bill_roff')) {
                 $table->decimal('bill_roff', 10, 2)->default(0)->after('Bill_Statement');
             }
-            if (!Schema::hasColumn('orders', 'Doc_Year')) {
+            if (!Schema::connection('mysql')->hasColumn('orders', 'Doc_Year')) {
                 $table->string('Doc_Year', 20)->nullable()->after('bill_roff');
             }
-            if (!Schema::hasColumn('orders', 'Sales_Return_VoucherNo')) {
+            if (!Schema::connection('mysql')->hasColumn('orders', 'Sales_Return_VoucherNo')) {
                 $table->string('Sales_Return_VoucherNo', 100)->nullable()->after('Doc_Year');
             }
-            if (!Schema::hasColumn('orders', 'Sales_Return_Dt')) {
+            if (!Schema::connection('mysql')->hasColumn('orders', 'Sales_Return_Dt')) {
                 $table->date('Sales_Return_Dt')->nullable()->after('Sales_Return_VoucherNo');
             }
-            if (!Schema::hasColumn('orders', 'Sales_Return_Reason')) {
+            if (!Schema::connection('mysql')->hasColumn('orders', 'Sales_Return_Reason')) {
                 $table->text('Sales_Return_Reason')->nullable()->after('Sales_Return_Dt');
             }
         });
@@ -44,7 +44,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('orders', function (Blueprint $table) {
+        Schema::connection('mysql')->table('orders', function (Blueprint $table) {
             $table->dropColumn([
                 'Bill_Dt',
                 'Department',

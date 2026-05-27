@@ -382,20 +382,22 @@ class _HeaderCard extends StatelessWidget {
           const SizedBox(height: _headerFieldGap),
           Obx(
             () => GestureDetector(
-              onTap: controller.customerId.value == null
-                  ? () {
-                      Get.snackbar(
-                        'Select Customer',
-                        'Please select a customer first.',
-                        snackPosition: SnackPosition.BOTTOM,
-                        backgroundColor: Colors.orange,
-                        colorText: Colors.white,
-                      );
-                    }
-                  : () => _showSalesInvoiceSelector(context, controller),
+              onTap: controller.isReadOnly || controller.isEditMode
+                  ? null
+                  : controller.customerId.value == null
+                      ? () {
+                          Get.snackbar(
+                            'Select Customer',
+                            'Please select a customer first.',
+                            snackPosition: SnackPosition.BOTTOM,
+                            backgroundColor: Colors.orange,
+                            colorText: Colors.white,
+                          );
+                        }
+                      : () => _showSalesInvoiceSelector(context, controller),
               child: InputDecorator(
                 decoration: _srInputDecoration(
-                  labelText: 'Source Sales Invoice',
+                  labelText: 'Source Order / Invoice',
                   suffixIcon: controller.isSearchingInvoices.value
                       ? const SizedBox(
                           width: 20,
@@ -409,7 +411,7 @@ class _HeaderCard extends StatelessWidget {
                 ),
                 child: Text(
                   controller.sourceSiNumber.value.isEmpty
-                      ? 'Select a sales invoice'
+                      ? 'Select a delivered order or invoice'
                       : controller.sourceSiNumber.value,
                   style: TextStyle(
                     fontSize: 14,
@@ -476,6 +478,8 @@ class _ItemsCard extends StatelessWidget {
                 DataColumn(label: Text('Product')),
                 DataColumn(label: Text('Invoiced')),
                 DataColumn(label: Text('Return Qty')),
+                DataColumn(label: Text('Rate'), numeric: true),
+                DataColumn(label: Text('Amount'), numeric: true),
                 DataColumn(label: Text('Reason')),
                 DataColumn(label: Text('Action')),
               ],
@@ -484,6 +488,9 @@ class _ItemsCard extends StatelessWidget {
                 final origQty = double.tryParse(row.originalQty.value) ?? 0;
                 final availableQty = double.tryParse(row.availableQty.value) ?? origQty;
                 final maxQty = availableQty > 0 ? availableQty : origQty;
+                final unitPrice = double.tryParse(row.unitPrice.value) ?? 0;
+                final returnedQty = double.tryParse(row.returnedQty.value) ?? 0;
+                final lineAmt = returnedQty * unitPrice;
                 final details = [
                   if (row.unitType.value.isNotEmpty) row.unitType.value,
                   if (row.productCode.value.isNotEmpty) row.productCode.value,
@@ -555,6 +562,11 @@ class _ItemsCard extends StatelessWidget {
                         ),
                       ),
                     ),
+                    DataCell(Text(unitPrice > 0 ? unitPrice.toStringAsFixed(2) : '-')),
+                    DataCell(Text(
+                      lineAmt > 0 ? lineAmt.toStringAsFixed(2) : '-',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    )),
                     DataCell(
                       SizedBox(
                         width: 132,
@@ -740,12 +752,16 @@ class _SalesReturnReportView extends StatelessWidget {
                     DataColumn(label: Text('Product')),
                     DataColumn(label: Text('Invoiced')),
                     DataColumn(label: Text('Returned')),
+                    DataColumn(label: Text('Rate'), numeric: true),
+                    DataColumn(label: Text('Amount'), numeric: true),
                     DataColumn(label: Text('Reason')),
                   ],
                   rows: List<DataRow>.generate(rows.length, (i) {
                     final row = rows[i];
                     final origQty = double.tryParse(row.originalQty.value) ?? 0;
                     final returnQty = double.tryParse(row.returnedQty.value) ?? 0;
+                    final unitPrice = double.tryParse(row.unitPrice.value) ?? 0;
+                    final lineAmt = returnQty * unitPrice;
 
                     return DataRow(cells: [
                       DataCell(Text('${i + 1}')),
@@ -756,6 +772,11 @@ class _SalesReturnReportView extends StatelessWidget {
                       )),
                       DataCell(Text(origQty.toStringAsFixed(2))),
                       DataCell(Text(returnQty.toStringAsFixed(2))),
+                      DataCell(Text(unitPrice > 0 ? unitPrice.toStringAsFixed(2) : '-')),
+                      DataCell(Text(
+                        lineAmt > 0 ? lineAmt.toStringAsFixed(2) : '-',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      )),
                       DataCell(SizedBox(
                         width: 120,
                         child: Text(row.returnReason.value.isEmpty ? '-' : row.returnReason.value,
@@ -868,11 +889,11 @@ class _SISelectorDialogState extends State<_SISelectorDialog> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'Select Sales Invoice',
+                  'Select Order / Invoice',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark),
                 ),
                 Text(
-                  'Showing invoices for selected customer',
+                  'Delivered orders and billed invoices',
                   style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textMuted),
                 ),
               ],
@@ -936,12 +957,17 @@ class _SISelectorDialogState extends State<_SISelectorDialog> {
                         separatorBuilder: (_, __) => const SizedBox(height: 8),
                         itemBuilder: (ctx, i) {
                           final si = searchResults[i];
-                          // SalesOrderController returns 'bill_number' for the invoice string; fallback to SO number
-                          final docNo = si['bill_number']?.toString().isNotEmpty == true
-                              ? si['bill_number'].toString()
-                              : si['so_number']?.toString() ?? '';
-                          final customerName = si['customer_name']?.toString() ?? '-';
-                          final docDate = si['doc_date']?.toString() ?? '-';
+                          // bill_number = invoice string (INV/25-26/001); so_number = ORD-{id}
+                          final billNo = si['bill_number']?.toString() ?? '';
+                          final soNumber = si['so_number']?.toString() ?? '';
+                          final docNo = billNo.isNotEmpty ? billNo : soNumber;
+                          final status = (si['status']?.toString() ?? '').toUpperCase();
+                          final docDate = si['doc_date']?.toString() ?? '';
+                          final total = si['total_amount'];
+                          final totalStr = total != null
+                              ? '₹ ${(double.tryParse(total.toString()) ?? 0).toStringAsFixed(2)}'
+                              : '';
+                          final isBilled = status == 'BILLED';
 
                           return Material(
                             color: AppColors.surface,
@@ -958,24 +984,52 @@ class _SISelectorDialogState extends State<_SISelectorDialog> {
                                   padding: const EdgeInsets.all(12),
                                   child: Row(
                                     children: [
-                                      const Icon(Icons.description_outlined, color: AppColors.primary),
+                                      Icon(
+                                        isBilled ? Icons.receipt_rounded : Icons.local_shipping_outlined,
+                                        color: AppColors.primary,
+                                      ),
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Text(
-                                              docNo.isEmpty ? 'Invoice' : docNo,
-                                              style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark),
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    docNo.isEmpty ? 'Order' : docNo,
+                                                    style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: isBilled
+                                                        ? Colors.green.withValues(alpha: 0.12)
+                                                        : Colors.orange.withValues(alpha: 0.12),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Text(
+                                                    status,
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: isBilled ? Colors.green.shade700 : Colors.orange.shade700,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                            const SizedBox(height: 2),
+                                            const SizedBox(height: 3),
                                             Text(
-                                              '$customerName • $docDate',
-                                              style: const TextStyle(color: AppColors.textMuted),
+                                              [if (docDate.isNotEmpty) docDate, if (totalStr.isNotEmpty) totalStr].join(' • '),
+                                              style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
                                             ),
                                           ],
                                         ),
                                       ),
+                                      const SizedBox(width: 4),
                                       const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
                                     ],
                                   ),
