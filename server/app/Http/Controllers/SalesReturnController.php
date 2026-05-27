@@ -137,6 +137,7 @@ class SalesReturnController extends Controller
             }
 
             $items = DB::table(self::ITEMS_TABLE . ' as oi')
+                ->leftJoin('product as p', 'p.product_id', '=', 'oi.product_id')
                 ->where('oi.order_id', $id)
                 ->select([
                     'oi.item_id',
@@ -146,6 +147,8 @@ class SalesReturnController extends Controller
                     'oi.item_price',
                     'oi.qty_delivered',
                     'oi.qty_returned',
+                    'p.name as db_product_name',
+                    'p.hsn_code as db_product_code',
                 ])
                 ->get();
 
@@ -360,18 +363,23 @@ class SalesReturnController extends Controller
 
     private function normalizeItem(object $item): array
     {
-        $pinfo       = json_decode($item->pinfo ?? '{}', true) ?: [];
+        $pinfo        = json_decode($item->pinfo ?? '{}', true) ?: [];
         $qtyDelivered = (float) ($item->qty_delivered ?? 0);
         $qtyReturned  = (float) ($item->qty_returned ?? 0);
         $availableQty = max(0, $qtyDelivered - $qtyReturned);
+
+        // pinfo is the primary source; fall back to products table join
+        $productName = $pinfo['product_name'] ?? $pinfo['name'] ?? $item->db_product_name ?? null;
+        $productCode = $pinfo['product_code'] ?? $pinfo['code'] ?? $pinfo['hsn_code'] ?? $item->db_product_code ?? null;
+        $unit        = $pinfo['unit'] ?? 'Nos';
 
         return [
             'order_item_id'                => (int) ($item->item_id ?? 0),
             'source_sales_invoice_item_id' => (int) ($item->item_id ?? 0),
             'product_id'                   => (int) ($item->product_id ?? 0),
-            'product_name'                 => $pinfo['product_name'] ?? $pinfo['name'] ?? null,
-            'product_code'                 => $pinfo['product_code'] ?? $pinfo['code'] ?? null,
-            'unit'                         => $pinfo['unit'] ?? 'Nos',
+            'product_name'                 => $productName,
+            'product_code'                 => $productCode,
+            'unit'                         => $unit,
             'original_quantity'            => (float) ($item->quantity ?? 0),
             'available_quantity'           => $availableQty,
             'returned_qty'                 => $qtyReturned,
