@@ -67,6 +67,10 @@ class SalesOrderController extends Controller
                 $query->whereNotIn('o.order_state', self::$CLOSED_STATES);
             }
 
+            if ($request->boolean('has_invoice')) {
+                $query->whereNotNull('o.bill_no')->where('o.bill_no', '<>', '');
+            }
+
             if ($request->filled('status')) {
                 $query->where('o.order_state', $request->input('status'));
             }

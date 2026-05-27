@@ -74,7 +74,7 @@ String _normalizeDate(String raw) {
 // Screen
 // ─────────────────────────────────────────────────────────────────────────────
 
-class SalesInvoiceFormScreen extends StatelessWidget {
+class SalesInvoiceFormScreen extends StatefulWidget {
   final int? soId;
   final bool startInViewOnly;
   final List<int> allIds;
@@ -87,14 +87,44 @@ class SalesInvoiceFormScreen extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final tag = soId?.toString() ?? 'new';
-    Get.delete<SalesInvoiceFormController>(tag: tag, force: true);
-    final controller = Get.put(
-      SalesInvoiceFormController(soId: soId, viewOnly: startInViewOnly),
-      tag: tag,
-    );
+  State<SalesInvoiceFormScreen> createState() => _SalesInvoiceFormScreenState();
+}
 
+class _SalesInvoiceFormScreenState extends State<SalesInvoiceFormScreen> {
+  late final String _tag;
+  late final SalesInvoiceFormController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _tag = widget.soId?.toString() ?? 'new_${DateTime.now().microsecondsSinceEpoch}';
+    Get.delete<SalesInvoiceFormController>(tag: _tag, force: true);
+    controller = Get.put(
+      SalesInvoiceFormController(soId: widget.soId, viewOnly: widget.startInViewOnly),
+      tag: _tag,
+    );
+  }
+
+  @override
+  void dispose() {
+    Get.delete<SalesInvoiceFormController>(tag: _tag, force: true);
+    super.dispose();
+  }
+
+  int? get _prevId {
+    final cur = controller.currentBrowseId.value ?? widget.soId;
+    final idx = cur != null ? widget.allIds.indexOf(cur) : -1;
+    return idx > 0 ? widget.allIds[idx - 1] : null;
+  }
+
+  int? get _nextId {
+    final cur = controller.currentBrowseId.value ?? widget.soId;
+    final idx = cur != null ? widget.allIds.indexOf(cur) : -1;
+    return (idx >= 0 && idx < widget.allIds.length - 1) ? widget.allIds[idx + 1] : null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       floatingActionButton: Obx(() {
@@ -118,29 +148,27 @@ class SalesInvoiceFormScreen extends StatelessWidget {
         subtitle: 'Loagma',
         onBackPressed: () => Get.back(),
         actions: [
-          if (allIds.isNotEmpty)
+          if (widget.allIds.isNotEmpty)
             Obx(() {
-              final cur = controller.currentBrowseId.value ?? soId;
-              final idx = cur != null ? allIds.indexOf(cur) : -1;
-              final prevId = idx > 0 ? allIds[idx - 1] : null;
-              final nextId = (idx >= 0 && idx < allIds.length - 1) ? allIds[idx + 1] : null;
+              final prev = _prevId;
+              final next = _nextId;
               return Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
                     icon: Icon(Icons.chevron_left_rounded,
-                        color: prevId != null ? Colors.white : Colors.white38),
+                        color: prev != null ? Colors.white : Colors.white38),
                     tooltip: 'Previous invoice',
-                    onPressed: prevId != null
-                        ? () => controller.loadInvoiceById(prevId)
+                    onPressed: prev != null
+                        ? () => controller.loadInvoiceById(prev)
                         : null,
                   ),
                   IconButton(
                     icon: Icon(Icons.chevron_right_rounded,
-                        color: nextId != null ? Colors.white : Colors.white38),
+                        color: next != null ? Colors.white : Colors.white38),
                     tooltip: 'Next invoice',
-                    onPressed: nextId != null
-                        ? () => controller.loadInvoiceById(nextId)
+                    onPressed: next != null
+                        ? () => controller.loadInvoiceById(next)
                         : null,
                   ),
                 ],
@@ -262,7 +290,7 @@ class SalesInvoiceFormScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _HeaderCard(controller: controller, allIds: allIds),
+                      _HeaderCard(controller: controller, allIds: widget.allIds),
                       const SizedBox(height: 6),
                       _ItemsCard(controller: controller),
                       const SizedBox(height: 6),
@@ -813,68 +841,87 @@ class _HeaderCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 flex: 3,
-                child: SizedBox(
-                  height: 48,
-                  child: Obx(() {
-                        final cur = controller.currentBrowseId.value ?? controller.soId;
-                        final idx = (cur != null && allIds.isNotEmpty) ? allIds.indexOf(cur) : -1;
-                        final prevId = idx > 0 ? allIds[idx - 1] : null;
-                        final nextId = (idx >= 0 && idx < allIds.length - 1) ? allIds[idx + 1] : null;
-                        final rawNo = controller.invoiceNumber.value;
-                        final displayNo = rawNo.isEmpty
-                            ? 'Generating…'
-                            : rawNo.contains('/')
-                                ? rawNo.split('/').last
-                                : rawNo;
-                        return InputDecorator(
-                          decoration: _siInputDecoration(labelText: 'Invoice No'),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTap: (controller.isLoading.value || prevId == null)
-                                    ? null
-                                    : () => controller.loadInvoiceById(prevId),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                                  child: Icon(
-                                    Icons.keyboard_arrow_left_rounded,
-                                    size: 18,
-                                    color: prevId != null ? AppColors.primaryDark : Colors.grey.shade300,
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  displayNo,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.textDark),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTap: (controller.isLoading.value || nextId == null)
-                                    ? null
-                                    : () => controller.loadInvoiceById(nextId),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                                  child: Icon(
-                                    Icons.keyboard_arrow_right_rounded,
-                                    size: 18,
-                                    color: nextId != null ? AppColors.primaryDark : Colors.grey.shade300,
-                                  ),
-                                ),
-                              ),
-                            ],
+                child: Obx(() {
+                  final cur = controller.currentBrowseId.value ?? controller.soId;
+                  final idx = (cur != null && allIds.isNotEmpty) ? allIds.indexOf(cur) : -1;
+                  final prevId = idx > 0 ? allIds[idx - 1] : null;
+                  final nextId = (idx >= 0 && idx < allIds.length - 1) ? allIds[idx + 1] : null;
+                  final rawNo = controller.invoiceNumber.value;
+                  final displayNo = rawNo.isEmpty
+                      ? 'Generating…'
+                      : rawNo.contains('/')
+                          ? rawNo.split('/').last
+                          : rawNo;
+                  return Container(
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.primaryLight),
+                    ),
+                    child: Stack(
+                      children: [
+                        // Label
+                        Positioned(
+                          top: -1,
+                          left: 10,
+                          child: Container(
+                            color: AppColors.surface,
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: const Text(
+                              'Invoice No',
+                              style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                            ),
                           ),
-                        );
-                      }),
-                ),
+                        ),
+                        // Arrows + text
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: Icon(
+                                Icons.keyboard_arrow_left_rounded,
+                                size: 24,
+                                color: (prevId != null && !controller.isLoading.value)
+                                    ? AppColors.primaryDark
+                                    : Colors.grey.shade300,
+                              ),
+                              onPressed: (prevId != null && !controller.isLoading.value)
+                                  ? () => controller.loadInvoiceById(prevId)
+                                  : null,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 36, minHeight: 48),
+                            ),
+                            Expanded(
+                              child: Text(
+                                displayNo,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.textDark),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.keyboard_arrow_right_rounded,
+                                size: 24,
+                                color: (nextId != null && !controller.isLoading.value)
+                                    ? AppColors.primaryDark
+                                    : Colors.grey.shade300,
+                              ),
+                              onPressed: (nextId != null && !controller.isLoading.value)
+                                  ? () => controller.loadInvoiceById(nextId)
+                                  : null,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 36, minHeight: 48),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                }),
               ),
             ],
           ),

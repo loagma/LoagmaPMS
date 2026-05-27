@@ -48,7 +48,7 @@ class SalesInvoiceListController extends GetxController {
       final queryParams = <String, String>{
         'limit': limit.toString(),
         'page': currentPage.value.toString(),
-        'status': 'billed',
+        'has_invoice': 'true',
         if (searchQuery.value.isNotEmpty) 'search': searchQuery.value,
         if (customerId != null && customerId.isNotEmpty) 'customer_id': customerId,
         if (fromDate != null && fromDate.isNotEmpty) 'from_date': fromDate,
