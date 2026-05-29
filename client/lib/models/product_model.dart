@@ -299,8 +299,9 @@ String _packFallbackBase(ProductPack pack, Map<String, dynamic> raw, int index) 
 class ProductSelection {
   final Product product;
   final ProductPack? selectedPack;
+  final int quantity;
 
-  const ProductSelection({required this.product, this.selectedPack});
+  const ProductSelection({required this.product, this.selectedPack, this.quantity = 1});
 }
 
 class ProductTaxInfo {

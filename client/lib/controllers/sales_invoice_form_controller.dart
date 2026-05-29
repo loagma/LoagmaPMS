@@ -293,6 +293,15 @@ class SalesInvoiceFormController extends GetxController {
     final now = DateTime.now();
     docDate.value =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    _autoSetExpectedDate(docDate.value);
+  }
+
+  void _autoSetExpectedDate(String fromDate) {
+    final parsed = DateTime.tryParse(fromDate);
+    if (parsed == null) return;
+    final next = parsed.add(const Duration(days: 1));
+    expectedDate.value =
+        '${next.year}-${next.month.toString().padLeft(2, '0')}-${next.day.toString().padLeft(2, '0')}';
   }
 
   Future<void> _loadDepartments() async {
@@ -493,7 +502,11 @@ class SalesInvoiceFormController extends GetxController {
 
   void setFinancialYear(String v) => financialYear.value = v;
   void setDepartmentId(String? v) => departmentId.value = v;
-  void setDocDate(String v) => docDate.value = v;
+  void setDocDate(String v) {
+    docDate.value = v;
+    if (expectedDate.value.isEmpty) _autoSetExpectedDate(v);
+  }
+
   void setExpectedDate(String v) => expectedDate.value = v;
   void setStatus(String v) => status.value = v;
   void setNarration(String v) => narration.value = v;
@@ -688,7 +701,116 @@ class SalesInvoiceFormController extends GetxController {
       debugPrint('[SI FORM] Browse invoice error: $e');
     } finally {
       isLoading.value = false;
+      isBrowsing.value = false;
     }
+  }
+
+  Future<void> loadByNumber(int n, {bool allowCreateNewIfMissing = true}) async {
+    try {
+      isLoading.value = true;
+      final id = await _findInvoiceOrderIdByNumber(n);
+      if (id == null) {
+        final currentNext = _currentInvoiceSequence();
+        if (allowCreateNewIfMissing && currentNext != null && n < currentNext) {
+          await resetToNewForm();
+          invoiceNumber.value = _formatInvoiceNumber(n);
+          return;
+        }
+        if (!allowCreateNewIfMissing) return;
+        _showError('Invoice #$n not found');
+        return;
+      }
+      await loadInvoiceById(id);
+    } catch (e) {
+      _showError('Invoice #$n not found');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  int? _currentInvoiceSequence() {
+    final match = RegExp(r'(\d+)$').firstMatch(invoiceNumber.value.trim());
+    return match == null ? null : int.tryParse(match.group(1)!);
+  }
+
+  int _invoiceSuffixWidth() {
+    final match = RegExp(r'(\d+)$').firstMatch(invoiceNumber.value.trim());
+    return match?.group(1)?.length ?? 3;
+  }
+
+  String _formatInvoiceNumber(int n) {
+    return '${invoicePrefix.value}${n.toString().padLeft(_invoiceSuffixWidth(), '0')}';
+  }
+
+  int? _invoiceSuffix(String? invoiceNumber) {
+    if (invoiceNumber == null || invoiceNumber.isEmpty) return null;
+    final match = RegExp(r'(\d+)$').firstMatch(invoiceNumber);
+    if (match == null) return null;
+    return int.tryParse(match.group(1)!);
+  }
+
+  Future<int?> _findInvoiceOrderIdByNumber(int n) async {
+    try {
+      const pageSize = 100;
+      var page = 1;
+      while (true) {
+        final uri = Uri.parse(ApiConfig.salesOrders).replace(
+          queryParameters: {'limit': pageSize.toString(), 'page': page.toString(), 'has_invoice': 'true'},
+        );
+        final response = await http
+            .get(uri, headers: {'Accept': 'application/json'})
+            .timeout(const Duration(seconds: 15));
+        if (response.statusCode != 200) return null;
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        if (data['success'] != true) return null;
+        final List list = data['data'] ?? [];
+        if (list.isEmpty) return null;
+        for (final item in list.whereType<Map<String, dynamic>>()) {
+          if (_invoiceSuffix(item['bill_number']?.toString()) == n) {
+            final idVal = item['id'];
+            return idVal is int ? idVal : int.tryParse(idVal?.toString() ?? '');
+          }
+        }
+        if (list.length < pageSize) return null;
+        page++;
+      }
+    } catch (e) {
+      debugPrint('[SI FORM] Find invoice error: $e');
+      return null;
+    }
+  }
+
+  Future<void> resetToNewForm() async {
+    isBrowsing.value = false;
+    currentBrowseId.value = null;
+    sourceOrderId.value = null;
+    sourceOrderNumber.value = '';
+    currentSoNumber.value = '';
+    currentSoSeq.value = null;
+    customerId.value = null;
+    selectedCustomerId.value = null;
+    customerName.value = '';
+    selectedCustomerName.value = '';
+    customerPhone.value = '';
+    customerShopName.value = '';
+    docDate.value = '';
+    expectedDate.value = '';
+    status.value = 'DRAFT';
+    narration.value = '';
+    invoiceNumber.value = '';
+    billDt.value = _today();
+    billDepartment.value = 'Sales';
+    billNarration.value = '';
+    billVehicle.value = '';
+    billStatement.value = '';
+    billRoff.value = '0';
+    billDocYear.value = _currentFinancialYear();
+    items.clear();
+    _ensureDefaultCharges(reset: true);
+    _setDefaultDocDate();
+    await _fetchNextInvoiceNumber();
+    addItem();
+    viewOnly.value = false;
   }
 
   Future<void> _applyOrder(SalesOrder so) async {

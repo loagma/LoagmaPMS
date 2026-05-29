@@ -60,7 +60,17 @@ Future<void> _pickSoDate(
   onPicked('${picked.year}-$month-$day');
 }
 
-class SalesOrderFormScreen extends StatelessWidget {
+String _displayDate(String raw) {
+  final text = raw.trim();
+  if (text.isEmpty) return '-';
+  final parsed = DateTime.tryParse(text);
+  if (parsed == null) return text;
+  final day = parsed.day.toString().padLeft(2, '0');
+  final month = parsed.month.toString().padLeft(2, '0');
+  return '$day/$month/${parsed.year}';
+}
+
+class SalesOrderFormScreen extends StatefulWidget {
   final int? soId;
   final bool startInViewOnly;
   final List<int> allIds;
@@ -73,17 +83,81 @@ class SalesOrderFormScreen extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final tag = soId?.toString() ?? 'new';
-    Get.delete<SalesOrderFormController>(tag: tag, force: true);
-    final controller = Get.put(
-      SalesOrderFormController(
-        soId: soId,
-        startInViewOnly: startInViewOnly,
-      ),
-      tag: tag,
-    );
+  State<SalesOrderFormScreen> createState() => _SalesOrderFormScreenState();
+}
 
+class _SalesOrderFormScreenState extends State<SalesOrderFormScreen> {
+  late final String _tag;
+  late final SalesOrderFormController controller;
+  bool _showAllProducts = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tag = widget.soId?.toString() ?? 'new_${DateTime.now().microsecondsSinceEpoch}';
+    Get.delete<SalesOrderFormController>(tag: _tag, force: true);
+    controller = Get.put(
+      SalesOrderFormController(
+        soId: widget.soId,
+        startInViewOnly: widget.startInViewOnly,
+      ),
+      tag: _tag,
+    );
+  }
+
+  @override
+  void dispose() {
+    Get.delete<SalesOrderFormController>(tag: _tag, force: true);
+    super.dispose();
+  }
+
+  Future<void> _addAndSearchProduct() async {
+    final hasSupplierFilter =
+        controller.salesmanId.value != null && controller.salesmanId.value!.isNotEmpty;
+    controller.addItem();
+    final newRow = controller.items.last;
+    final selections = await showDialog<List<ProductSelection>>(
+      context: context,
+      useRootNavigator: true,
+      builder: (ctx) => ProductSearchDialog(
+        title: 'Select Products',
+        searchFn: controller.searchProductsAsModels,
+        allProductsSearchFn: hasSupplierFilter ? controller.searchAllProductsUnfiltered : null,
+        allowMultiSelect: true,
+        showSupplierToggle: hasSupplierFilter,
+        supplierToggleValue: _showAllProducts,
+        onSupplierToggle: (v) => setState(() => _showAllProducts = v),
+      ),
+    );
+    if (selections == null || selections.isEmpty) {
+      controller.removeItem(controller.items.length - 1);
+      return;
+    }
+    for (int i = 0; i < selections.length; i++) {
+      final sel = selections[i];
+      SOLineRow r;
+      if (i == 0) {
+        r = newRow;
+      } else {
+        controller.addItem();
+        r = controller.items.last;
+      }
+      r.productId.value = sel.product.id;
+      r.productName.value = sel.product.name;
+      r.hsnCode.value = sel.product.hsnCode ?? '';
+      r.quantity.value = sel.quantity.toString();
+      if (sel.selectedPack != null) {
+        r.selectedPackId.value = sel.selectedPack!.id;
+        r.selectedPackLabel.value = sel.selectedPack!.label;
+        if (sel.selectedPack!.unit != null) r.unit.value = sel.selectedPack!.unit!;
+        if (sel.selectedPack!.price != null) r.price.value = sel.selectedPack!.price!.toString();
+      }
+      await controller.applyProductTaxesToRow(r, sel.product.id);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       floatingActionButton: Obx(() {
@@ -92,7 +166,7 @@ class SalesOrderFormScreen extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 80),
           child: FloatingActionButton(
             heroTag: 'so_add_item_fab',
-            onPressed: controller.addItem,
+            onPressed: _addAndSearchProduct,
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
             tooltip: 'Add Product',
@@ -375,14 +449,11 @@ class _SalesOrderReportView extends StatelessWidget {
     final text = raw.trim();
     if (text.isEmpty) return '-';
     final parsed = DateTime.tryParse(text);
-    if (parsed == null) {
-      if (text.length >= 10) return text.substring(0, 10);
-      return text;
-    }
+    if (parsed == null) return text;
     final local = parsed.toLocal();
     final m = local.month.toString().padLeft(2, '0');
     final d = local.day.toString().padLeft(2, '0');
-    return '${local.year}-$m-$d';
+    return '$d/$m/${local.year}';
   }
 
   Widget _metaRow(String label, String value, {bool isLast = false}) {
@@ -502,6 +573,7 @@ class _CustomerDetailSheetState extends State<_CustomerDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isEdit = !widget.controller.isFieldsLocked;
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
       minChildSize: 0.4,
@@ -539,6 +611,39 @@ class _CustomerDetailSheetState extends State<_CustomerDetailSheet> {
                 ],
               ),
             ),
+            if (isEdit)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.swap_horiz_rounded),
+                  label: const Text('Change Customer'),
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    final party = await showDialog<PartyResult>(
+                      context: context,
+                      builder: (_) => PartySearchDialog(
+                        title: 'Select Customer',
+                        hint: 'Search by name, phone or ID...',
+                        searchFn: widget.controller.searchCustomers,
+                      ),
+                    );
+                    if (party != null) {
+                      widget.controller.setCustomer(
+                        party.id,
+                        party.name,
+                        phone: party.phone,
+                        shopName: party.shopName,
+                      );
+                    }
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary),
+                    minimumSize: const Size(double.infinity, 40),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
             const Divider(height: 1),
             Expanded(
               child: _loading
@@ -555,7 +660,6 @@ class _CustomerDetailSheetState extends State<_CustomerDetailSheet> {
 
   Widget _buildContent(ScrollController scrollCtrl) {
     final c = _customer!;
-    final isEdit = !widget.controller.isFieldsLocked;
 
     return ListView(
       controller: scrollCtrl,
@@ -584,32 +688,6 @@ class _CustomerDetailSheetState extends State<_CustomerDetailSheet> {
             if (c.gstNo?.isNotEmpty == true) _infoRow(Icons.receipt_long_outlined, 'GST No', c.gstNo!),
             if (c.panNo?.isNotEmpty == true) _infoRow(Icons.credit_card_outlined, 'PAN No', c.panNo!),
           ]),
-        ],
-        if (isEdit) ...[
-          const SizedBox(height: 20),
-          OutlinedButton.icon(
-            icon: const Icon(Icons.swap_horiz_rounded),
-            label: const Text('Change Customer'),
-            onPressed: () async {
-              Navigator.of(context).pop();
-              final party = await showDialog<PartyResult>(
-                context: context,
-                builder: (_) => PartySearchDialog(
-                  title: 'Select Customer',
-                  hint: 'Search by name, phone or ID...',
-                  searchFn: widget.controller.searchCustomers,
-                ),
-              );
-              if (party != null) {
-                widget.controller.setCustomer(
-                  party.id,
-                  party.name,
-                  phone: party.phone,
-                  shopName: party.shopName,
-                );
-              }
-            },
-          ),
         ],
       ],
     );
@@ -716,15 +794,84 @@ class _CustomerInfoHeader extends StatelessWidget {
   }
 }
 
-class _HeaderCard extends StatelessWidget {
+class _HeaderCard extends StatefulWidget {
   final SalesOrderFormController controller;
 
   const _HeaderCard({required this.controller});
 
   @override
+  State<_HeaderCard> createState() => _HeaderCardState();
+}
+
+class _HeaderCardState extends State<_HeaderCard> {
+  late final TextEditingController _voucherCtrl;
+  late final Worker _seqWorker;
+  late final Worker _numberWorker;
+
+  SalesOrderFormController get controller => widget.controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _voucherCtrl = TextEditingController();
+    _seqWorker = ever(controller.currentSoSeq, (_) => _syncVoucherText());
+    _numberWorker = ever(controller.currentSoNumber, (_) => _syncVoucherText());
+    _syncVoucherText();
+  }
+
+  void _syncVoucherText() {
+    final seq = controller.currentSoSeq.value;
+    final soNum = controller.currentSoNumber.value;
+    String display = '';
+    if (seq != null) {
+      display = seq.toString();
+    } else if (soNum.isNotEmpty) {
+      final match = RegExp(r'(\d+)$').firstMatch(soNum);
+      display = match != null ? int.parse(match.group(1)!).toString() : soNum;
+    }
+    if (_voucherCtrl.text != display) {
+      _voucherCtrl.value = TextEditingValue(
+        text: display,
+        selection: TextSelection.collapsed(offset: display.length),
+      );
+    }
+  }
+
+  void _onVoucherSubmit(String value) {
+    final n = int.tryParse(value.trim());
+    if (n == null || n <= 0) {
+      _syncVoucherText();
+      return;
+    }
+    controller.goToVoucherByNumber(n);
+  }
+
+  @override
+  void dispose() {
+    _seqWorker.dispose();
+    _numberWorker.dispose();
+    _voucherCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ContentCard(
       title: 'Customer & Dates',
+      titleAction: Obx(() {
+        final isNew = !controller.isEditMode && !controller.isBrowsing.value;
+        if (isNew) return const SizedBox.shrink();
+        return TextButton.icon(
+          onPressed: controller.isLoading.value ? null : () => controller.resetToNewForm(),
+          icon: const Icon(Icons.add_rounded, size: 16),
+          label: const Text('New'),
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.primary,
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          ),
+        );
+      }),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -743,7 +890,7 @@ class _HeaderCard extends StatelessWidget {
                       '24-25',
                     }.toList();
                     return DropdownButtonFormField<String>(
-                      value: fy.isEmpty ? null : fy,
+                      initialValue: fy.isEmpty ? null : fy,
                       decoration: _soInputDecoration(labelText: 'Financial Year'),
                       isExpanded: true,
                       items: options
@@ -764,55 +911,97 @@ class _HeaderCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 flex: 2,
-                child: SizedBox(
-                  height: 48,
-                  child: Obx(() {
-                    final soNumber = controller.currentSoNumber.value;
-                    final seqValue = controller.currentSoSeq.value;
-                    final labelText = controller.isEditMode
-                        ? (soNumber.isEmpty ? 'Existing (no number)' : soNumber)
-                        : (seqValue != null ? seqValue.toString() : '');
-                    return InputDecorator(
-                      decoration: _soInputDecoration(labelText: 'Voucher No'),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              labelText,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textDark,
-                              ),
-                              overflow: TextOverflow.ellipsis,
+                child: Obx(() {
+                  final isNew = !controller.isEditMode && !controller.isBrowsing.value;
+                  final canPrev = (controller.currentSoSeq.value ?? 0) > 1;
+                  final canNext = true;
+                  return SizedBox(
+                    height: 48,
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.chevron_left_rounded,
+                              color: canPrev ? AppColors.primary : Colors.grey.shade400),
+                          tooltip: 'Previous voucher',
+                          onPressed: canPrev ? controller.goToPreviousVoucher : null,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        Expanded(
+                          child: TextField(
+                            controller: _voucherCtrl,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            readOnly: false,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textDark,
                             ),
+                            textAlign: TextAlign.center,
+                            decoration: _soInputDecoration(
+                              labelText: 'Voucher No',
+                              hintText: isNew ? 'NEW' : 'Type # and press Go',
+                            ),
+                            onSubmitted: _onVoucherSubmit,
+                            textInputAction: TextInputAction.go,
                           ),
-                          IconButton(
-                            constraints: const BoxConstraints.tightFor(width: 20, height: 20),
-                            visualDensity: VisualDensity.compact,
-                            padding: EdgeInsets.zero,
-                            icon: const Icon(Icons.keyboard_arrow_left_rounded, size: 14),
-                            tooltip: 'Previous Voucher',
-                            onPressed: controller.isLoading.value
-                                ? null
-                                : () => controller.goToPreviousVoucher(),
-                          ),
-                          IconButton(
-                            constraints: const BoxConstraints.tightFor(width: 20, height: 20),
-                            visualDensity: VisualDensity.compact,
-                            padding: EdgeInsets.zero,
-                            icon: const Icon(Icons.keyboard_arrow_right_rounded, size: 14),
-                            tooltip: 'Next Voucher',
-                            onPressed: controller.isLoading.value
-                                ? null
-                                : () => controller.goToNextVoucher(),
-                          ),
-                        ],
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.chevron_right_rounded,
+                              color: canNext ? AppColors.primary : Colors.grey.shade400),
+                          tooltip: 'Next voucher',
+                          onPressed: canNext ? controller.goToNextVoucher : null,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ),
+            ],
+          ),
+          const SizedBox(height: _sectionGap),
+          Row(
+            children: [
+              Expanded(
+                child: Obx(() => TextFormField(
+                      key: ValueKey('so-doc-date-${controller.docDate.value}'),
+                      enabled: !controller.isFieldsLocked,
+                      readOnly: true,
+                      initialValue: _displayDate(controller.docDate.value),
+                      decoration: _soInputDecoration(
+                        labelText: 'Document Date *',
+                        suffixIcon: const Icon(Icons.calendar_month_rounded),
                       ),
-                    );
-                  }),
-                ),
+                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                      onTap: controller.isFieldsLocked
+                          ? null
+                          : () => _pickSoDate(
+                                context,
+                                currentValue: controller.docDate.value,
+                                onPicked: controller.setDocDate,
+                              ),
+                    )),
+              ),
+              const SizedBox(width: _fieldGap),
+              Expanded(
+                child: Obx(() => TextFormField(
+                      key: ValueKey('so-expected-date-${controller.expectedDate.value}'),
+                      enabled: !controller.isFieldsLocked,
+                      readOnly: true,
+                      initialValue: _displayDate(controller.expectedDate.value),
+                      decoration: _soInputDecoration(
+                        labelText: 'Expected Date',
+                        suffixIcon: const Icon(Icons.calendar_month_rounded),
+                      ),
+                      onTap: controller.isFieldsLocked
+                          ? null
+                          : () => _pickSoDate(
+                                context,
+                                currentValue: controller.expectedDate.value,
+                                onPicked: controller.setExpectedDate,
+                              ),
+                    )),
               ),
             ],
           ),
@@ -969,51 +1158,6 @@ class _HeaderCard extends StatelessWidget {
               ),
             );
           }),
-          const SizedBox(height: _sectionGap),
-          Row(
-            children: [
-              Expanded(
-                child: Obx(() => TextFormField(
-                      key: ValueKey('so-doc-date-${controller.docDate.value}'),
-                      enabled: !controller.isFieldsLocked,
-                      readOnly: true,
-                      initialValue: controller.docDate.value,
-                      decoration: _soInputDecoration(
-                        labelText: 'Document Date *',
-                        suffixIcon: const Icon(Icons.calendar_month_rounded),
-                      ),
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                      onTap: controller.isFieldsLocked
-                          ? null
-                          : () => _pickSoDate(
-                                context,
-                                currentValue: controller.docDate.value,
-                                onPicked: controller.setDocDate,
-                              ),
-                    )),
-              ),
-              const SizedBox(width: _fieldGap),
-              Expanded(
-                child: Obx(() => TextFormField(
-                      key: ValueKey('so-expected-date-${controller.expectedDate.value}'),
-                      enabled: !controller.isFieldsLocked,
-                      readOnly: true,
-                      initialValue: controller.expectedDate.value,
-                      decoration: _soInputDecoration(
-                        labelText: 'Expected Date',
-                        suffixIcon: const Icon(Icons.calendar_month_rounded),
-                      ),
-                      onTap: controller.isFieldsLocked
-                          ? null
-                          : () => _pickSoDate(
-                                context,
-                                currentValue: controller.expectedDate.value,
-                                onPicked: controller.setExpectedDate,
-                              ),
-                    )),
-              ),
-            ],
-          ),
           if (controller.isEditMode) ...[
             const SizedBox(height: _sectionGap),
             Obx(() => DropdownButtonFormField<String>(
@@ -1077,9 +1221,7 @@ class _HeaderCard extends StatelessWidget {
                       child: InputDecorator(
                         decoration: _soInputDecoration(labelText: 'Bill Date'),
                         child: Text(
-                          controller.billDt.value.isEmpty
-                              ? 'Select date'
-                              : controller.billDt.value,
+                          controller.billDt.value.isEmpty ? 'Select date' : _displayDate(controller.billDt.value),
                           style: TextStyle(
                             fontSize: 14,
                             color: controller.billDt.value.isEmpty
@@ -1281,6 +1423,7 @@ class _ItemRow extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: _fieldVerticalGap),
                   child: Obx(() => TextFormField(
+                        key: ValueKey('qty_${row.productId.value ?? 'empty'}_${row.selectedPackId.value}'),
                         enabled: !controller.isFieldsLocked,
                         initialValue: row.quantity.value,
                         decoration: _soInputDecoration(labelText: 'Qty *'),
@@ -1615,44 +1758,30 @@ class _ProductPickerState extends State<_ProductPicker> {
                       );
                       if (selections == null || selections.isEmpty) return;
 
-                      // Fill the current (triggering) row with the first selection
-                      final first = selections.first;
-                      row.productId.value = first.product.id;
-                      row.productName.value = first.product.name;
-                      row.hsnCode.value = first.product.hsnCode ?? '';
-                      if (first.selectedPack != null) {
-                        row.selectedPackId.value = first.selectedPack!.id;
-                        row.selectedPackLabel.value = first.selectedPack!.label;
-                        if (first.selectedPack!.unit != null) {
-                          row.unit.value = first.selectedPack!.unit!;
-                        }
-                        if (first.selectedPack!.price != null) {
-                          row.price.value = first.selectedPack!.price!.toString();
-                        }
-                      }
-                      await controller.applyProductTaxesToRow(row, first.product.id);
-                      state.didChange(first.product.id);
-                      state.validate();
-
-                      // Add new rows for remaining selections
-                      for (int i = 1; i < selections.length; i++) {
+                      for (int i = 0; i < selections.length; i++) {
                         final sel = selections[i];
-                        controller.addItem();
-                        final newRow = controller.items.last;
-                        newRow.productId.value = sel.product.id;
-                        newRow.productName.value = sel.product.name;
-                        newRow.hsnCode.value = sel.product.hsnCode ?? '';
-                        if (sel.selectedPack != null) {
-                          newRow.selectedPackId.value = sel.selectedPack!.id;
-                          newRow.selectedPackLabel.value = sel.selectedPack!.label;
-                          if (sel.selectedPack!.unit != null) {
-                            newRow.unit.value = sel.selectedPack!.unit!;
-                          }
-                          if (sel.selectedPack!.price != null) {
-                            newRow.price.value = sel.selectedPack!.price!.toString();
-                          }
+                        SOLineRow r;
+                        if (i == 0) {
+                          r = row;
+                        } else {
+                          controller.addItem();
+                          r = controller.items.last;
                         }
-                        await controller.applyProductTaxesToRow(newRow, sel.product.id);
+                        r.productId.value = sel.product.id;
+                        r.productName.value = sel.product.name;
+                        r.hsnCode.value = sel.product.hsnCode ?? '';
+                        r.quantity.value = sel.quantity.toString();
+                        if (sel.selectedPack != null) {
+                          r.selectedPackId.value = sel.selectedPack!.id;
+                          r.selectedPackLabel.value = sel.selectedPack!.label;
+                          if (sel.selectedPack!.unit != null) r.unit.value = sel.selectedPack!.unit!;
+                          if (sel.selectedPack!.price != null) r.price.value = sel.selectedPack!.price!.toString();
+                        }
+                        await controller.applyProductTaxesToRow(r, sel.product.id);
+                        if (i == 0) {
+                          state.didChange(sel.product.id);
+                          state.validate();
+                        }
                       }
                     },
               child: InputDecorator(

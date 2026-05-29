@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../models/party_result.dart';
@@ -317,6 +318,152 @@ class ActionButton extends StatelessWidget {
 ///
 /// Shows a card-style list with image placeholder, product name, code,
 /// GST/HSN details, and package chips. Caller provides a [searchFn] that
+// ─── Qty Numpad ──────────────────────────────────────────────────────────────
+
+class _QtyNumpadDialog extends StatefulWidget {
+  final String label;
+
+  const _QtyNumpadDialog({required this.label});
+
+  @override
+  State<_QtyNumpadDialog> createState() => _QtyNumpadDialogState();
+}
+
+class _QtyNumpadDialogState extends State<_QtyNumpadDialog> {
+  String _input = '';
+
+
+  int get _value => int.tryParse(_input) ?? 0;
+
+  void _tap(String digit) {
+    setState(() {
+      // Discard leading zero
+      if (_input == '0') {
+        _input = digit;
+      } else if (_input.length < 5) {
+        _input += digit;
+      }
+    });
+  }
+
+  void _backspace() {
+    setState(() {
+      if (_input.isNotEmpty) _input = _input.substring(0, _input.length - 1);
+    });
+  }
+
+  void _confirm() {
+    final qty = _value;
+    if (qty <= 0) return;
+    Navigator.pop(context, qty);
+  }
+
+  Widget _key(String label, {VoidCallback? onTap, Color? bg, Color? fg, int flex = 1}) {
+    return Expanded(
+      flex: flex,
+      child: Padding(
+        padding: const EdgeInsets.all(3),
+        child: Material(
+          color: bg ?? AppColors.primaryLighter,
+          borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: onTap,
+            child: SizedBox(
+              height: 44,
+              child: Center(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: label.length > 1 ? 13 : 18,
+                    fontWeight: FontWeight.w600,
+                    color: fg ?? AppColors.primaryDark,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final displayText = _input.isEmpty ? '0' : _input;
+    return AlertDialog(
+      contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.label,
+            style: const TextStyle(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w400),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 6),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.primaryLighter,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.primaryLight, width: 1.5),
+            ),
+            child: Text(
+              displayText,
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primaryDark,
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(children: [
+            _key('7', onTap: () => _tap('7')),
+            _key('8', onTap: () => _tap('8')),
+            _key('9', onTap: () => _tap('9')),
+            _key('⌫', onTap: _backspace, bg: Colors.orange[50], fg: Colors.orange[700]),
+          ]),
+          Row(children: [
+            _key('4', onTap: () => _tap('4')),
+            _key('5', onTap: () => _tap('5')),
+            _key('6', onTap: () => _tap('6')),
+            _key('', onTap: null, bg: Colors.transparent, fg: Colors.transparent),
+          ]),
+          Row(children: [
+            _key('1', onTap: () => _tap('1')),
+            _key('2', onTap: () => _tap('2')),
+            _key('3', onTap: () => _tap('3')),
+            _key('', onTap: null, bg: Colors.transparent, fg: Colors.transparent),
+          ]),
+          Row(children: [
+            _key('', onTap: null, bg: Colors.transparent, fg: Colors.transparent),
+            _key('0', onTap: () => _tap('0')),
+            _key('OK', onTap: _value > 0 ? _confirm : null,
+                bg: _value > 0 ? AppColors.primary : Colors.grey[200],
+                fg: _value > 0 ? Colors.white : Colors.grey[400],
+                flex: 2),
+          ]),
+          const SizedBox(height: 4),
+          TextButton(
+            onPressed: () => Navigator.pop(context, null),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textMuted)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// returns matching [Product] list for a given query string.
 ///
 /// Usage:
@@ -371,6 +518,8 @@ class ProductSearchDialog extends StatefulWidget {
 
 class _ProductSearchDialogState extends State<ProductSearchDialog> {
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
+  bool _didRequestFocus = false;
   List<Product> _results = [];
   bool _loading = false;
   Timer? _debounce;
@@ -396,9 +545,22 @@ class _ProductSearchDialogState extends State<ProductSearchDialog> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Guard ensures requestFocus fires exactly once, even if dependencies change later
+    if (!_didRequestFocus) {
+      _didRequestFocus = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _searchFocus.requestFocus();
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -424,35 +586,58 @@ class _ProductSearchDialogState extends State<ProductSearchDialog> {
     });
   }
 
-  // Used for products with no packs
-  void _toggleProduct(Product product) {
-    final key = _selKey(product.id, '');
-    setState(() {
-      if (_selected.containsKey(key)) {
-        _selected.remove(key);
-      } else {
-        _selected[key] = ProductSelection(product: product, selectedPack: null);
-      }
-    });
+  Future<void> _promptQty(
+    BuildContext ctx,
+    String key,
+    String label, {
+    required ProductSelection Function(int qty) makeSelection,
+  }) async {
+    final existing = _selected[key];
+    if (existing != null) {
+      setState(() => _selected.remove(key));
+      return;
+    }
+    // Hide keyboard so it doesn't fight with the numpad dialog
+    await SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+    if (!ctx.mounted) return;
+    // ignore: use_build_context_synchronously
+    final qty = await showDialog<int>(
+      context: ctx,
+      useRootNavigator: true,
+      builder: (_) => _QtyNumpadDialog(label: label),
+    );
+    if (qty == null || qty <= 0) return;
+    if (mounted) setState(() => _selected[key] = makeSelection(qty));
   }
 
-  // Toggle a specific pack — each pack gets its own line item
-  void _togglePack(Product product, ProductPack pack) {
-    final key = _selKey(product.id, pack.id);
-    setState(() {
-      if (_selected.containsKey(key)) {
-        _selected.remove(key);
-      } else {
-        _selected[key] = ProductSelection(product: product, selectedPack: pack);
-      }
-    });
+  Future<void> _toggleProduct(BuildContext ctx, Product product) async {
+    final key = _selKey(product.id, '');
+    await _promptQty(ctx, key, product.name,
+        makeSelection: (qty) => ProductSelection(product: product, selectedPack: null, quantity: qty));
   }
+
+  Future<void> _togglePack(BuildContext ctx, Product product, ProductPack pack) async {
+    final key = _selKey(product.id, pack.id);
+    await _promptQty(ctx, key, '${product.name} · ${pack.label}',
+        makeSelection: (qty) => ProductSelection(product: product, selectedPack: pack, quantity: qty));
+  }
+
+  int get _totalQty => _selected.values.fold(0, (sum, s) => sum + s.quantity);
 
   Set<String> _selectedPackIds(int productId) {
     return _selected.entries
         .where((e) => e.key.startsWith('${productId}_'))
         .map((e) => e.value.selectedPack?.id ?? '')
         .toSet();
+  }
+
+  // packId → qty for display on chips
+  Map<String, int> _selectedQtys(int productId) {
+    return Map.fromEntries(
+      _selected.entries
+          .where((e) => e.key.startsWith('${productId}_'))
+          .map((e) => MapEntry(e.value.selectedPack?.id ?? '', e.value.quantity)),
+    );
   }
 
   bool _isProductSelected(int productId) {
@@ -527,7 +712,7 @@ class _ProductSearchDialogState extends State<ProductSearchDialog> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                '${_selected.length} selected',
+                '${_selected.length} item${_selected.length == 1 ? '' : 's'} · qty $_totalQty',
                 style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
@@ -547,7 +732,7 @@ class _ProductSearchDialogState extends State<ProductSearchDialog> {
       padding: const EdgeInsets.all(12),
       child: TextField(
         controller: _searchController,
-        autofocus: true,
+        focusNode: _searchFocus,
         decoration: InputDecoration(
           hintText: 'Search by name or code...',
           prefixIcon: const Icon(Icons.search, color: AppColors.primary),
@@ -619,13 +804,16 @@ class _ProductSearchDialogState extends State<ProductSearchDialog> {
         final product = _results[i];
         if (widget.allowMultiSelect) {
           final selectedPackIds = _selectedPackIds(product.id);
+          // Capture itemBuilder's context — stable per list item, won't go stale
+          final itemCtx = context;
           return _ProductCard(
             product: product,
             allowMultiSelect: true,
             isSelected: _isProductSelected(product.id),
             selectedPackIds: selectedPackIds,
-            onToggleSelect: () => _toggleProduct(product),
-            onPackToggled: (pack) => _togglePack(product, pack),
+            selectedQtys: _selectedQtys(product.id),
+            onToggleSelect: () => _toggleProduct(itemCtx, product),
+            onPackToggled: (pack) => _togglePack(itemCtx, product, pack),
             onSelect: (_) {},
           );
         }
@@ -639,6 +827,7 @@ class _ProductSearchDialogState extends State<ProductSearchDialog> {
 
   Widget _buildMultiSelectFooter({bool isPhone = false}) {
     final count = _selected.length;
+    final totalQty = _totalQty;
     return Container(
       padding: EdgeInsets.fromLTRB(16, 10, 16, isPhone ? 20 : 12),
       decoration: BoxDecoration(
@@ -654,7 +843,9 @@ class _ProductSearchDialogState extends State<ProductSearchDialog> {
           onPressed: count > 0 ? _confirmSelection : null,
           icon: const Icon(Icons.check_circle_outline, size: 18),
           label: Text(
-            count == 0 ? 'Select products above' : 'Add $count item${count == 1 ? '' : 's'}',
+            count == 0
+                ? 'Select products above'
+                : 'Add $count line${count == 1 ? '' : 's'} · $totalQty unit${totalQty == 1 ? '' : 's'}',
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
           ),
           style: ElevatedButton.styleFrom(
@@ -717,10 +908,10 @@ class _ProductCard extends StatelessWidget {
   // multi-select extras
   final bool allowMultiSelect;
   final bool isSelected;
-  // Set of pack IDs currently selected for this product
   final Set<String> selectedPackIds;
+  // packId → qty, for label display on selected chips/button
+  final Map<String, int> selectedQtys;
   final VoidCallback? onToggleSelect;
-  // Called when a pack chip is tapped — toggles that pack's selection
   final ValueChanged<ProductPack>? onPackToggled;
 
   const _ProductCard({
@@ -729,6 +920,7 @@ class _ProductCard extends StatelessWidget {
     this.allowMultiSelect = false,
     this.isSelected = false,
     this.selectedPackIds = const {},
+    this.selectedQtys = const {},
     this.onToggleSelect,
     this.onPackToggled,
   });
@@ -816,9 +1008,11 @@ class _ProductCard extends StatelessWidget {
                         final isPackSelected = allowMultiSelect
                             ? selectedPackIds.contains(pack.id)
                             : pack.id == product.defaultPackId;
+                        final packQty = selectedQtys[pack.id];
                         return _PackChip(
                           pack: pack,
                           isSelected: isPackSelected,
+                          qtyLabel: isPackSelected && packQty != null ? '×$packQty' : null,
                           onTap: allowMultiSelect
                               ? () => onPackToggled?.call(pack)
                               : null,
@@ -830,6 +1024,7 @@ class _ProductCard extends StatelessWidget {
                     _PackChip(
                       isSelected: allowMultiSelect ? isSelected : true,
                       fallbackLabel: unitLabel ?? '1 Unit',
+                      qtyLabel: isSelected && (selectedQtys[''] ?? 0) > 0 ? '×${selectedQtys['']}' : null,
                       onTap: allowMultiSelect ? onToggleSelect : null,
                     ),
                   ],
@@ -929,12 +1124,14 @@ class _PackChip extends StatelessWidget {
   final ProductPack? pack;
   final bool isSelected;
   final String fallbackLabel;
+  final String? qtyLabel;
   final VoidCallback? onTap;
 
   const _PackChip({
     this.pack,
     this.isSelected = false,
     this.fallbackLabel = '1 Unit',
+    this.qtyLabel,
     this.onTap,
   });
 
@@ -959,13 +1156,32 @@ class _PackChip extends StatelessWidget {
           width: 1.2,
         ),
       ),
-      child: Text(
-        _label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: isSelected ? Colors.white : AppColors.primaryDark,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: isSelected ? Colors.white : AppColors.primaryDark,
+            ),
+          ),
+          if (isSelected && qtyLabel != null) ...[
+            const SizedBox(width: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                qtyLabel!,
+                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+              ),
+            ),
+          ],
+        ],
       ),
     );
     if (onTap == null) return chip;

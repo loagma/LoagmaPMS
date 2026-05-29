@@ -203,6 +203,15 @@ class SalesOrderFormController extends GetxController {
     final now = DateTime.now();
     docDate.value =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    _autoSetExpectedDate(docDate.value);
+  }
+
+  void _autoSetExpectedDate(String fromDate) {
+    final parsed = DateTime.tryParse(fromDate);
+    if (parsed == null) return;
+    final next = parsed.add(const Duration(days: 1));
+    expectedDate.value =
+        '${next.year}-${next.month.toString().padLeft(2, '0')}-${next.day.toString().padLeft(2, '0')}';
   }
 
   String get customerDisplayTitle =>
@@ -469,20 +478,7 @@ class SalesOrderFormController extends GetxController {
     isBrowsing.value = true;
     try {
       isLoading.value = true;
-      final uri = Uri.parse(ApiConfig.salesOrders).replace(
-        queryParameters: {'limit': '1', 'search': seq.toString()},
-      );
-      final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
-          .timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) { await _resetToNewForm(); return; }
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (data['success'] != true) { await _resetToNewForm(); return; }
-      final List list = data['data'] ?? [];
-      if (list.isEmpty) { await _resetToNewForm(); return; }
-      final summary = list.first as Map<String, dynamic>;
-      final idVal = summary['id'];
-      final id = idVal is int ? idVal : int.tryParse(idVal?.toString() ?? '');
+      final id = await _findSalesOrderIdBySequence(seq);
       if (id == null) { await _resetToNewForm(); return; }
 
       final detailResp = await http.get(
@@ -519,6 +515,70 @@ class SalesOrderFormController extends GetxController {
     }
     await loadBySequence(current + 1);
   }
+
+  Future<void> goToVoucherByNumber(int n) async {
+    try {
+      isLoading.value = true;
+      final id = await _findSalesOrderIdBySequence(n);
+      if (id == null) {
+        final currentNext = currentSoSeq.value;
+        if (currentNext != null && n < currentNext) {
+          await _resetToNewForm();
+          currentSoSeq.value = n;
+          currentSoNumber.value = n.toString();
+          return;
+        }
+        _showError('Voucher #$n not found');
+        return;
+      }
+      final detailResp = await http
+          .get(Uri.parse('${ApiConfig.salesOrders}/$id'), headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 15));
+      if (detailResp.statusCode != 200) { _showError('Voucher #$n not found'); return; }
+      final detailData = jsonDecode(detailResp.body) as Map<String, dynamic>;
+      if (detailData['success'] != true) { _showError('Voucher #$n not found'); return; }
+      final so = SalesOrder.fromJson(detailData['data'] as Map<String, dynamic>);
+      isBrowsing.value = true;
+      await _applySalesOrderToState(so);
+    } catch (e) {
+      _showError('Voucher #$n not found');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<int?> _findSalesOrderIdBySequence(int seq) async {
+    try {
+      const pageSize = 100;
+      var page = 1;
+      while (true) {
+        final uri = Uri.parse(ApiConfig.salesOrders).replace(
+          queryParameters: {'limit': pageSize.toString(), 'page': page.toString()},
+        );
+        final response = await http
+            .get(uri, headers: {'Accept': 'application/json'})
+            .timeout(const Duration(seconds: 15));
+        if (response.statusCode != 200) return null;
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        if (data['success'] != true) return null;
+        final List list = data['data'] ?? [];
+        if (list.isEmpty) return null;
+        for (final item in list.whereType<Map<String, dynamic>>()) {
+          if (_sequenceFromRaw(item['so_number']?.toString(), item['id']) == seq) {
+            final idVal = item['id'];
+            return idVal is int ? idVal : int.tryParse(idVal?.toString() ?? '');
+          }
+        }
+        if (list.length < pageSize) return null;
+        page++;
+      }
+    } catch (e) {
+      debugPrint('[SO FORM] Find sequence error: $e');
+      return null;
+    }
+  }
+
+  Future<void> resetToNewForm() => _resetToNewForm();
 
   Future<void> _loadSalesOrder() async {
     if (soId == null) return;
@@ -655,7 +715,10 @@ class SalesOrderFormController extends GetxController {
             ))
         .toList();
   }
-  void setDocDate(String v) => docDate.value = v;
+  void setDocDate(String v) {
+    docDate.value = v;
+    if (expectedDate.value.isEmpty) _autoSetExpectedDate(v);
+  }
   void setExpectedDate(String v) => expectedDate.value = v;
   void setStatus(String v) => status.value = v;
   void setNarration(String v) => narration.value = v;

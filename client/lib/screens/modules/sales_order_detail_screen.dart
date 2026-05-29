@@ -199,40 +199,6 @@ class _Body extends StatelessWidget {
           _HeaderCard(order: o, statusColor: statusColor),
           const SizedBox(height: 12),
 
-          // ── Customer + Salesman ──
-          ContentCard(
-            title: 'Customer',
-            child: Column(children: [
-              _Row(Icons.person_outline, 'Name',
-                  o.customerName?.isNotEmpty == true
-                      ? o.customerName!
-                      : 'Customer #${o.customerId}'),
-              if (o.customerPhone?.isNotEmpty == true)
-                _Row(Icons.phone_outlined, 'Phone', o.customerPhone!),
-              if (o.customerEmail?.isNotEmpty == true)
-                _Row(Icons.email_outlined, 'Email', o.customerEmail!),
-              if (o.salesmanName?.isNotEmpty == true)
-                _Row(Icons.badge_outlined, 'Salesman', o.salesmanName!),
-            ]),
-          ),
-          const SizedBox(height: 12),
-
-          // ── Order details ──
-          ContentCard(
-            title: 'Order Info',
-            child: Column(children: [
-              _Row(Icons.tag, 'Order No.', o.soNumber),
-              _Row(Icons.calendar_today_outlined, 'Date', o.docDate),
-              if (o.expectedDate?.isNotEmpty == true)
-                _Row(Icons.event_outlined, 'Expected', o.expectedDate!),
-              if (o.narration?.isNotEmpty == true)
-                _Row(Icons.notes_outlined, 'Narration', o.narration!),
-              if (o.departmentId?.isNotEmpty == true)
-                _Row(Icons.business_outlined, 'Department', o.departmentId!),
-            ]),
-          ),
-          const SizedBox(height: 12),
-
           // ── Invoice (only when billed) ──
           if (o.billNumber?.isNotEmpty == true || o.billDt?.isNotEmpty == true) ...[
             ContentCard(
@@ -259,6 +225,24 @@ class _Body extends StatelessWidget {
             ),
             const SizedBox(height: 12),
           ],
+
+          // ── Customer + Salesman ──
+          ContentCard(
+            title: 'Customer',
+            child: Column(children: [
+              _Row(Icons.person_outline, 'Name',
+                  o.customerName?.isNotEmpty == true
+                      ? o.customerName!
+                      : 'Customer #${o.customerId}'),
+              if (o.customerPhone?.isNotEmpty == true)
+                _Row(Icons.phone_outlined, 'Phone', o.customerPhone!),
+              if (o.customerEmail?.isNotEmpty == true)
+                _Row(Icons.email_outlined, 'Email', o.customerEmail!),
+              if (o.salesmanName?.isNotEmpty == true)
+                _Row(Icons.badge_outlined, 'Salesman', o.salesmanName!),
+            ]),
+          ),
+          const SizedBox(height: 12),
 
           // ── Items ──
           ContentCard(

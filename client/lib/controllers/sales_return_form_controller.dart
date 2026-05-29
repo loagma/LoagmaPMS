@@ -21,6 +21,7 @@ class SalesReturnFormController extends GetxController {
   final viewOnly = false.obs;
 
   // Header fields
+  final financialYear = '25-26'.obs;
   final docNoPrefix = '25-26/'.obs;
   final docNoNumber = ''.obs;
   final sourceSiIdSelected = Rxn<int>();
@@ -39,6 +40,8 @@ class SalesReturnFormController extends GetxController {
   final isLoading = false.obs;
   final isSaving = false.obs;
   final isSearchingInvoices = false.obs;
+  final isBrowsing = false.obs;
+  final currentBrowseId = Rxn<int>();
 
   SalesReturnFormController({
     this.returnId,
@@ -119,6 +122,13 @@ class SalesReturnFormController extends GetxController {
     docNoPrefix.value = nested?['prefix']?.toString() ??
         data['doc_no_prefix']?.toString() ??
         docNoPrefix.value;
+    // Sync financialYear from the prefix (e.g. "SR/25-26/" or "25-26/" → "25-26")
+    final parts = docNoPrefix.value.split('/');
+    if (parts.length >= 2) {
+      financialYear.value = parts[parts.length - 2];
+    } else if (parts.length == 1 && parts[0].isNotEmpty) {
+      financialYear.value = parts[0];
+    }
     docNoNumber.value = nested?['number']?.toString() ??
         data['next_number']?.toString() ??
         '';
@@ -129,6 +139,12 @@ class SalesReturnFormController extends GetxController {
   bool get canEditFromView => isReadOnly && status.value == 'DRAFT';
 
   void enterEditMode() { viewOnly.value = false; }
+
+  void setFinancialYear(String fy) {
+    financialYear.value = fy;
+    docNoPrefix.value = '$fy/';
+    _fetchSeriesNumber();
+  }
 
   Future<void> _loadCustomers() async {
     try {
@@ -271,7 +287,7 @@ class SalesReturnFormController extends GetxController {
       final uri = Uri.parse(ApiConfig.salesOrders).replace(
         queryParameters: {
           'limit': '50',
-          'returnable': 'true', // delivered, dispatched, billed only
+          'has_invoice': 'true', // only billed (invoices) — restrict linking to invoices
           if (query.trim().isNotEmpty) 'search': query.trim(),
           if (customerIdFilter != null) 'customer_id': customerIdFilter.toString(),
         },
@@ -362,11 +378,19 @@ class SalesReturnFormController extends GetxController {
     }
   }
 
-  Future<void> _loadSalesReturn() async {
+  Future<void> loadReturnById(int id) async {
+    isBrowsing.value = true;
+    currentBrowseId.value = id;
+    await _loadSalesReturn(overrideId: id);
+  }
+
+  Future<void> _loadSalesReturn({int? overrideId}) async {
+    final targetId = overrideId ?? returnId;
+    if (targetId == null) return;
     try {
       isLoading.value = true;
       final response = await http
-          .get(Uri.parse('${ApiConfig.salesReturns}/$returnId'), headers: {'Accept': 'application/json'})
+          .get(Uri.parse('${ApiConfig.salesReturns}/$targetId'), headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
@@ -440,6 +464,108 @@ class SalesReturnFormController extends GetxController {
       total += name.contains('discount') ? -amt : amt;
     }
     return total.toStringAsFixed(2);
+  }
+
+  Future<void> loadByNumber(int n, {bool allowCreateNewIfMissing = true}) async {
+    try {
+      isLoading.value = true;
+      final id = await _findReturnIdByNumber(n);
+      if (id == null) {
+        final currentNext = _currentReturnSequence();
+        if (allowCreateNewIfMissing && currentNext != null && n < currentNext) {
+          await resetToNewForm();
+          docNoNumber.value = _formatReturnNumber(n);
+          return;
+        }
+        if (!allowCreateNewIfMissing) return;
+        _showError('Voucher #$n not found');
+        return;
+      }
+      await loadReturnById(id);
+    } catch (e) {
+      _showError('Voucher #$n not found');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  int? _currentReturnSequence() {
+    final match = RegExp(r'(\d+)$').firstMatch(docNoNumber.value.trim());
+    return match == null ? null : int.tryParse(match.group(1)!);
+  }
+
+  int _returnSuffixWidth() {
+    final match = RegExp(r'(\d+)$').firstMatch(docNoNumber.value.trim());
+    return match?.group(1)?.length ?? 3;
+  }
+
+  String _formatReturnNumber(int n) {
+    return n.toString().padLeft(_returnSuffixWidth(), '0');
+  }
+
+  int? _voucherSuffix(String? docNumber) {
+    if (docNumber == null || docNumber.isEmpty) return null;
+    final match = RegExp(r'(\d+)$').firstMatch(docNumber);
+    if (match == null) return null;
+    return int.tryParse(match.group(1)!);
+  }
+
+  Future<int?> _findReturnIdByNumber(int n) async {
+    try {
+      const pageSize = 100;
+      var page = 1;
+      while (true) {
+        final uri = Uri.parse(ApiConfig.salesReturns).replace(
+          queryParameters: {'limit': pageSize.toString(), 'page': page.toString()},
+        );
+        final response = await http
+            .get(uri, headers: {'Accept': 'application/json'})
+            .timeout(const Duration(seconds: 15));
+        if (response.statusCode != 200) return null;
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        if (data['success'] != true) return null;
+        final payload = data['data'];
+        final List items;
+        if (payload is Map<String, dynamic>) {
+          items = (payload['data'] as List? ?? const <dynamic>[]).toList();
+        } else if (payload is List) {
+          items = payload;
+        } else {
+          items = const <dynamic>[];
+        }
+        if (items.isEmpty) return null;
+        for (final item in items.whereType<Map<String, dynamic>>()) {
+          if (_voucherSuffix(item['voucher_no']?.toString() ?? item['doc_number']?.toString() ?? item['doc_no_number']?.toString()) == n) {
+            final idVal = item['id'];
+            return idVal is int ? idVal : int.tryParse(idVal?.toString() ?? '');
+          }
+        }
+        if (items.length < pageSize) return null;
+        page++;
+      }
+    } catch (e) {
+      debugPrint('[SR FORM] Find return error: $e');
+      return null;
+    }
+  }
+
+  Future<void> resetToNewForm() async {
+    isBrowsing.value = false;
+    currentBrowseId.value = null;
+    customerId.value = null;
+    customerName.value = '';
+    customerPhone.value = '';
+    customerShopName.value = '';
+    sourceSiIdSelected.value = null;
+    sourceSiNumber.value = '';
+    docDate.value = '';
+    reason.value = '';
+    status.value = 'DRAFT';
+    items.clear();
+    charges.clear();
+    docNoNumber.value = '';
+    await _fetchSeriesNumber();
+    viewOnly.value = false;
   }
 
   void addItemRow() { items.add(SRItemRow()); }
