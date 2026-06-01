@@ -180,53 +180,67 @@ class SalesOrderController extends Controller
             }
             $orderTotal = round($lineTotal - $discount + $delivery, 2);
 
-            $orderId = DB::table(self::ORDERS_TABLE)->insertGetId([
-                'buyer_userid'    => $customerId,
-                'order_state'     => $status,
-                'order_total'     => $orderTotal,
-                'discount'        => $discount,
-                'delivery_charge' => $delivery,
-                'items_count'     => count($items),
-                'short_datetime'  => $docDate,
-                'txn_id'          => $narration,
-                'bill_no'         => $billNo,
-                'Bill_Dt'         => $billDt,
-                'Department'      => $department,
-                'Bill_Narration'  => $billNarration,
-                'Bill_Vehicle'    => $billVehicle,
-                'Bill_Statement'  => $billStatement,
-                'bill_roff'       => $billRoff,
-                'Doc_Year'        => $docYear,
-                'salesman_id'     => $salesmanIdStore,
-            ], 'order_id');
-
-            $nextId = $this->nextItemId();
-            foreach ($items as $item) {
-                $productId = (int) ($item['product_id'] ?? 0);
-                $qty       = (int) round((float) ($item['quantity'] ?? 0));
-                $price     = (float) ($item['price'] ?? 0);
-
-                $pinfo = [];
-                if (!empty($item['hsn_code']))        $pinfo['hsn_code']         = $item['hsn_code'];
-                if (!empty($item['unit']))             $pinfo['unit']             = $item['unit'];
-                if (!empty($item['pack_id']))          $pinfo['selected_pack']    = ['id' => $item['pack_id'], 'unit' => $item['unit'] ?? 'Nos'];
-                if (!empty($item['description']))      $pinfo['description']      = $item['description'];
-                if (isset($item['discount_percent']))  $pinfo['discount_percent'] = (float) $item['discount_percent'];
-                if (isset($item['tax_percent']))       $pinfo['tax_percent']      = (float) $item['tax_percent'];
-
-                DB::table(self::ITEMS_TABLE)->insert([
-                    'item_id'       => $nextId++,
-                    'order_id'      => $orderId,
-                    'product_id'    => $productId,
-                    'quantity'      => $qty,
-                    'item_price'    => $price,
-                    'item_total'    => round($qty * $price, 2),
-                    'pinfo'         => json_encode(!empty($pinfo) ? $pinfo : new \stdClass()),
-                    'commission'    => 0,
-                    'qty_delivered' => (int) round((float) ($item['qty_delivered'] ?? 0)),
-                    'qty_returned'  => 0,
+            $orderId = null;
+            DB::transaction(function () use (
+                $customerId, $status, $orderTotal, $discount, $delivery, $items,
+                $docDate, $narration, $billNo, $billDt, $department, $billNarration,
+                $billVehicle, $billStatement, $billRoff, $docYear, $salesmanIdStore,
+                &$orderId
+            ) {
+                $orderId = $this->nextOrderId();
+                DB::table(self::ORDERS_TABLE)->insert([
+                    'order_id'        => $orderId,
+                    'buyer_userid'    => $customerId,
+                    'order_state'     => $status,
+                    'order_total'     => $orderTotal,
+                    'discount'        => $discount,
+                    'delivery_charge' => $delivery,
+                    'items_count'     => count($items),
+                    'short_datetime'  => $docDate,
+                    'txn_id'          => $narration,
+                    'delivery_info'   => '{}',
+                    'area_name'       => '',
+                    'feedback'        => '',
+                    'bill_number'     => 0,
+                    'bill_no'         => $billNo,
+                    'Bill_Dt'         => $billDt,
+                    'Department'      => $department,
+                    'Bill_Narration'  => $billNarration,
+                    'Bill_Vehicle'    => $billVehicle,
+                    'Bill_Statement'  => $billStatement,
+                    'bill_roff'       => $billRoff,
+                    'Doc_Year'        => $docYear,
+                    'salesman_id'     => $salesmanIdStore,
                 ]);
-            }
+
+                $nextId = $this->nextItemId();
+                foreach ($items as $item) {
+                    $productId = (int) ($item['product_id'] ?? 0);
+                    $qty       = (int) round((float) ($item['quantity'] ?? 0));
+                    $price     = (float) ($item['price'] ?? 0);
+
+                    $pinfo = [];
+                    if (!empty($item['hsn_code']))        $pinfo['hsn_code']         = $item['hsn_code'];
+                    if (!empty($item['unit']))             $pinfo['unit']             = $item['unit'];
+                    if (!empty($item['pack_id']))          $pinfo['selected_pack']    = ['id' => $item['pack_id'], 'unit' => $item['unit'] ?? 'Nos'];
+                    if (!empty($item['description']))      $pinfo['description']      = $item['description'];
+                    if (isset($item['discount_percent']))  $pinfo['discount_percent'] = (float) $item['discount_percent'];
+                    if (isset($item['tax_percent']))       $pinfo['tax_percent']      = (float) $item['tax_percent'];
+
+                    DB::table(self::ITEMS_TABLE)->insert([
+                        'item_id'       => $nextId++,
+                        'order_id'      => $orderId,
+                        'product_id'    => $productId,
+                        'quantity'      => $qty,
+                        'item_price'    => $price,
+                        'item_total'    => round($qty * $price, 2),
+                        'pinfo'         => json_encode(!empty($pinfo) ? $pinfo : new \stdClass()),
+                        'commission'    => 0,
+                        'qty_delivered' => (int) round((float) ($item['qty_delivered'] ?? 0)),
+                        'qty_returned'  => 0,
+                    ]);
+                }
+            });
 
             $order = DB::table(self::ORDERS_TABLE)->where('order_id', $orderId)->first();
             return response()->json([
@@ -236,7 +250,7 @@ class SalesOrderController extends Controller
             ], 201);
         } catch (\Throwable $e) {
             Log::error('SalesOrder store error: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Failed to create sales order'], 500);
+            return response()->json(['success' => false, 'message' => 'Failed to create sales order: ' . $e->getMessage()], 500);
         }
     }
 
@@ -458,6 +472,12 @@ class SalesOrderController extends Controller
             Log::error('SalesOrder show error: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Order not found'], 404);
         }
+    }
+
+    private function nextOrderId(): int
+    {
+        $max = DB::table(self::ORDERS_TABLE)->max('order_id') ?? 0;
+        return (int) $max + 1;
     }
 
     private function nextItemId(): int

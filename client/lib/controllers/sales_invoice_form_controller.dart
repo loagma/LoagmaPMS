@@ -187,6 +187,7 @@ class SalesInvoiceFormController extends GetxController {
 
   // ── Tax state ─────────────────────────────────────────────────────────────
   int? _adminVendorId;
+  late final Future<void> _adminVendorIdReady;
   String _companyState = '';
   String _customerState = '';
 
@@ -199,7 +200,7 @@ class SalesInvoiceFormController extends GetxController {
     super.onInit();
     viewOnly.value = _startViewOnly;
     _ensureDefaultCharges();
-    _loadAdminVendorId();
+    _adminVendorIdReady = _loadAdminVendorId();
     _loadDepartments();
     _loadSalesmen();
     _loadUnitTypes();
@@ -557,13 +558,19 @@ class SalesInvoiceFormController extends GetxController {
 
   // ── Product search ────────────────────────────────────────────────────────
 
-  Future<List<Map<String, dynamic>>> searchProducts(String query) async {
+  Future<List<Map<String, dynamic>>> searchProducts(
+    String query, {
+    bool includeSupplierFilter = true,
+  }) async {
+    await _adminVendorIdReady;
     try {
       final params = <String, String>{
         'limit': '50',
         if (query.trim().isNotEmpty) 'search': query.trim(),
         if (_adminVendorId != null) 'admin_vendor_id': _adminVendorId.toString(),
-        if (salesmanId.value != null && salesmanId.value!.isNotEmpty)
+        if (includeSupplierFilter &&
+            salesmanId.value != null &&
+            salesmanId.value!.isNotEmpty)
           'supplier_id': salesmanId.value!,
       };
       final uri = Uri.parse(ApiConfig.vendorProducts).replace(queryParameters: params);
@@ -581,7 +588,12 @@ class SalesInvoiceFormController extends GetxController {
   }
 
   Future<List<Product>> searchProductsAsModels(String query) async {
-    final raw = await searchProducts(query);
+    var raw = await searchProducts(query, includeSupplierFilter: true);
+    if (raw.isEmpty &&
+        salesmanId.value != null &&
+        salesmanId.value!.isNotEmpty) {
+      raw = await searchProducts(query, includeSupplierFilter: false);
+    }
     return raw
         .map((e) { try { return Product.fromJson(e); } catch (_) { return null; } })
         .whereType<Product>()
@@ -589,20 +601,10 @@ class SalesInvoiceFormController extends GetxController {
   }
 
   Future<List<Product>> searchAllProductsUnfiltered(String query) async {
+    await _adminVendorIdReady;
     try {
-      final params = <String, String>{
-        'limit': '50',
-        if (query.trim().isNotEmpty) 'search': query.trim(),
-        if (_adminVendorId != null) 'admin_vendor_id': _adminVendorId.toString(),
-      };
-      final uri = Uri.parse(ApiConfig.vendorProducts).replace(queryParameters: params);
-      final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
-          .timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) return [];
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (data['success'] != true) return [];
-      return (data['data'] as List? ?? [])
+      final raw = await searchProducts(query, includeSupplierFilter: false);
+      return raw
           .whereType<Map<String, dynamic>>()
           .map((e) { try { return Product.fromJson(e); } catch (_) { return null; } })
           .whereType<Product>()

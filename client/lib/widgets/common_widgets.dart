@@ -664,8 +664,8 @@ class _ProductSearchDialogState extends State<ProductSearchDialog> {
             _buildSearchField(),
             const Divider(height: 1),
             Expanded(child: _buildList()),
+            if (widget.showSupplierToggle) _buildSupplierToggle(),
             if (widget.allowMultiSelect) _buildMultiSelectFooter(isPhone: isPhone),
-            if (widget.showSupplierToggle && !widget.allowMultiSelect) _buildSupplierToggle(),
           ],
         ),
       ),
@@ -856,11 +856,10 @@ class _ProductSearchDialogState extends State<ProductSearchDialog> {
 
   Widget _buildSupplierToggle() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      decoration: BoxDecoration(
-        color: AppColors.primaryLighter.withValues(alpha: 0.4),
-        border: const Border(top: BorderSide(color: AppColors.border)),
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      decoration: const BoxDecoration(
+        color: Color(0xFFEEF4FB),
+        border: Border(top: BorderSide(color: AppColors.border)),
       ),
       child: SizedBox(
         width: double.infinity,

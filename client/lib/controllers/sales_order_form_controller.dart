@@ -54,6 +54,7 @@ class SalesOrderFormController extends GetxController {
   final items = <SOLineRow>[].obs;
 
   int? _adminVendorId;
+  late final Future<void> _adminVendorIdReady;
   String _companyState = '';
   String _customerState = '';
 
@@ -69,7 +70,7 @@ class SalesOrderFormController extends GetxController {
     super.onInit();
     viewOnly.value = startInViewOnly;
     _ensureDefaultCharges();
-    _loadAdminVendorId();
+    _adminVendorIdReady = _loadAdminVendorId();
     _loadDepartments();
     _loadSalesmen();
     _loadUnitTypes();
@@ -88,13 +89,19 @@ class SalesOrderFormController extends GetxController {
     _adminVendorId = await AuthController.getAdminId();
   }
 
-  Future<List<Map<String, dynamic>>> _searchAllProducts(String query) async {
+  Future<List<Map<String, dynamic>>> _searchAllProducts(
+    String query, {
+    bool includeSupplierFilter = true,
+  }) async {
+    await _adminVendorIdReady;
     try {
       final params = <String, String>{
         'limit': '50',
         if (query.trim().isNotEmpty) 'search': query.trim(),
         if (_adminVendorId != null) 'admin_vendor_id': _adminVendorId.toString(),
-        if (salesmanId.value != null && salesmanId.value!.isNotEmpty)
+        if (includeSupplierFilter &&
+            salesmanId.value != null &&
+            salesmanId.value!.isNotEmpty)
           'supplier_id': salesmanId.value!,
       };
       final uri = Uri.parse(ApiConfig.vendorProducts).replace(queryParameters: params);
@@ -116,7 +123,12 @@ class SalesOrderFormController extends GetxController {
       _searchAllProducts(query);
 
   Future<List<Product>> searchProductsAsModels(String query) async {
-    final raw = await _searchAllProducts(query);
+    var raw = await _searchAllProducts(query, includeSupplierFilter: true);
+    if (raw.isEmpty &&
+        salesmanId.value != null &&
+        salesmanId.value!.isNotEmpty) {
+      raw = await _searchAllProducts(query, includeSupplierFilter: false);
+    }
     return raw
         .map((e) {
           try {
@@ -131,31 +143,17 @@ class SalesOrderFormController extends GetxController {
 
   // Searches without supplier filter — used by the "Show all products" toggle.
   Future<List<Product>> searchAllProductsUnfiltered(String query) async {
-    try {
-      final params = <String, String>{
-        'limit': '50',
-        if (query.trim().isNotEmpty) 'search': query.trim(),
-        if (_adminVendorId != null) 'admin_vendor_id': _adminVendorId.toString(),
-      };
-      final uri = Uri.parse(ApiConfig.vendorProducts).replace(queryParameters: params);
-      final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
-          .timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) return [];
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (data['success'] != true) return [];
-      final List list = data['data'] ?? [];
-      return list
-          .whereType<Map<String, dynamic>>()
-          .map((e) {
-            try { return Product.fromJson(e); } catch (_) { return null; }
-          })
-          .whereType<Product>()
-          .toList();
-    } catch (e) {
-      debugPrint('[SO FORM] Search all products error: $e');
-      return [];
-    }
+    final raw = await _searchAllProducts(query, includeSupplierFilter: false);
+    return raw
+        .map((e) {
+          try {
+            return Product.fromJson(e);
+          } catch (_) {
+            return null;
+          }
+        })
+        .whereType<Product>()
+        .toList();
   }
 
   Future<void> applyProductTaxesToRow(SOLineRow row, int productId) async {
