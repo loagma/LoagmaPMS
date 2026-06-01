@@ -519,7 +519,6 @@ class ProductSearchDialog extends StatefulWidget {
 class _ProductSearchDialogState extends State<ProductSearchDialog> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
-  bool _didRequestFocus = false;
   List<Product> _results = [];
   bool _loading = false;
   Timer? _debounce;
@@ -542,18 +541,11 @@ class _ProductSearchDialogState extends State<ProductSearchDialog> {
     super.initState();
     _showAllProducts = widget.supplierToggleValue;
     _runSearch('');
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Guard ensures requestFocus fires exactly once, even if dependencies change later
-    if (!_didRequestFocus) {
-      _didRequestFocus = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _searchFocus.requestFocus();
-      });
-    }
+    // Request focus after the first frame so the TextField is guaranteed to be
+    // attached to the FocusNode before we try to focus it.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _searchFocus.requestFocus();
+    });
   }
 
   @override

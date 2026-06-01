@@ -2,30 +2,39 @@
 setlocal enabledelayedexpansion
 
 :: ============================================================
-::  LoagmaPMS  —  Windows Release Build
-::  Output: release_output\LoagmaPMS_vX.X.X_TIMESTAMP\
-::          release_output\LoagmaPMS_vX.X.X_TIMESTAMP.zip
+::  LoagmaPMS - Windows Release Build
+::  Outputs:
+::    release_output\LoagmaPMS_vX.X.X_TIMESTAMP\   (raw files)
+::    release_output\LoagmaPMS_vX.X.X_TIMESTAMP.zip
+::    installer\output\LoagmaPMS_Setup_vX.X.X.exe
 :: ============================================================
 
 set "PROJECT_ROOT=%~dp0"
 set "CLIENT_DIR=%PROJECT_ROOT%client"
 set "OUTPUT_DIR=%PROJECT_ROOT%release_output"
+set "WIN_BUILD=%CLIENT_DIR%\build\windows\x64\runner\Release"
+set "ISS_FILE=%PROJECT_ROOT%installer\loagmapms_setup.iss"
 
-:: ── Read version from pubspec.yaml ───────────────────────────
+:: --- Read version from pubspec.yaml ---
 set "VERSION=unknown"
-for /f "tokens=2 delims=: " %%V in ('findstr /b "version:" "%CLIENT_DIR%\pubspec.yaml"') do set "VERSION=%%V"
+for /f "usebackq tokens=2 delims=: " %%V in ("%CLIENT_DIR%\pubspec.yaml") do (
+    echo %%V | findstr /b "[0-9]" >nul 2>&1
+    if not errorlevel 1 (
+        if "!VERSION!"=="unknown" set "VERSION=%%V"
+    )
+)
+:: Strip build metadata (+N) from version
 for /f "tokens=1 delims=+" %%V in ("!VERSION!") do set "VERSION=%%V"
+:: Trim any trailing whitespace/CR
+for /f "tokens=* delims= " %%V in ("!VERSION!") do set "VERSION=%%V"
 
-:: ── Timestamp YYYYMMDD_HHMM ──────────────────────────────────
-set "D=%date%"
-set "T=%time%"
-set "YY=!D:~-4!" & set "MM=!D:~3,2!" & set "DD=!D:~0,2!"
-set "HH=!T:~0,2!" & set "MI=!T:~3,2!"
-set "HH=!HH: =0!"
-set "TIMESTAMP=!YY!!MM!!DD!_!HH!!MI!"
+:: --- Timestamp ---
+for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value 2^>nul') do set "DT=%%I"
+set "TIMESTAMP=!DT:~0,4!!DT:~4,2!!DT:~6,2!_!DT:~8,2!!DT:~10,2!"
+
 set "RELEASE_NAME=LoagmaPMS_v!VERSION!_!TIMESTAMP!"
 set "RELEASE_FOLDER=!OUTPUT_DIR!\!RELEASE_NAME!"
-set "WIN_BUILD=!CLIENT_DIR!\build\windows\x64\runner\Release"
+set "ZIP_PATH=!OUTPUT_DIR!\!RELEASE_NAME!.zip"
 
 echo.
 echo ==========================================
@@ -35,42 +44,34 @@ echo   Output  : !RELEASE_FOLDER!
 echo ==========================================
 echo.
 
-:: ── 1. Check Flutter ────────────────────────────────────────
+:: --- Check Flutter ---
 where flutter >nul 2>&1
 if errorlevel 1 (
     echo [ERROR] flutter not found in PATH.
-    echo         Open this bat from the Flutter-enabled terminal,
-    echo         or add Flutter to your system PATH.
-    pause & exit /b 1
+    echo         Add Flutter to your system PATH and retry.
+    goto :fail
 )
 
-cd /d "!CLIENT_DIR!"
+:: --- Go to client dir ---
+cd /d "%CLIENT_DIR%"
 if errorlevel 1 (
-    echo [ERROR] Cannot cd to client directory: !CLIENT_DIR!
-    pause & exit /b 1
+    echo [ERROR] Cannot cd to: %CLIENT_DIR%
+    goto :fail
 )
 
-:: ── 2. Enable Windows desktop support (one-time) ────────────
+:: --- Enable Windows desktop (one-time) ---
 if not exist "windows\" (
     echo [SETUP] Enabling Windows desktop platform...
     flutter config --enable-windows-desktop
-    if errorlevel 1 (
-        echo [ERROR] Could not enable windows desktop config.
-        pause & exit /b 1
-    )
+    if errorlevel 1 ( echo [ERROR] flutter config failed. & goto :fail )
     flutter create --platforms=windows .
-    if errorlevel 1 (
-        echo [ERROR] flutter create --platforms=windows failed.
-        pause & exit /b 1
-    )
-    echo [SETUP] Done. Windows platform added.
+    if errorlevel 1 ( echo [ERROR] flutter create failed. & goto :fail )
+    echo [SETUP] Done.
     echo.
 )
 
-:: ── 3. Fix CMakeLists project name if still "client" ─────────
-::    Flutter generates CMakeLists.txt with project("client") but
-::    our exe should be named LoagmaPMS. Patch it automatically.
-set "CMAKE_FILE=!CLIENT_DIR!\windows\CMakeLists.txt"
+:: --- Patch CMakeLists project name if still "client" ---
+set "CMAKE_FILE=%CLIENT_DIR%\windows\CMakeLists.txt"
 if exist "!CMAKE_FILE!" (
     findstr /c:"project(client" "!CMAKE_FILE!" >nul 2>&1
     if not errorlevel 1 (
@@ -82,54 +83,53 @@ if exist "!CMAKE_FILE!" (
     )
 )
 
-:: ── 4. Clean build cache (important after CMake patch) ───────
-echo [1/3] Cleaning previous build...
+:: --- 1. Clean ---
+echo [1/4] Cleaning previous build...
 flutter clean
-if errorlevel 1 (echo [ERROR] flutter clean failed. & pause & exit /b 1)
+if errorlevel 1 ( echo [ERROR] flutter clean failed. & goto :fail )
 
-:: ── 5. Dependencies ──────────────────────────────────────────
+:: --- 2. Get dependencies ---
 echo.
-echo [2/3] Getting dependencies...
-echo Current dir: %CD%
+echo [2/4] Getting dependencies...
 flutter pub get
-if errorlevel 1 (echo [ERROR] pub get failed. & pause & exit /b 1)
+if errorlevel 1 ( echo [ERROR] flutter pub get failed. & goto :fail )
 
-:: ── 6. Build Windows release ─────────────────────────────────
+:: --- 3. Build ---
 echo.
-echo [3/3] Building Windows EXE...
-flutter build windows --release
+echo [3/4] Building Windows release (production API)...
+flutter build windows --release --dart-define=USE_LOCAL=false
 if errorlevel 1 (
     echo.
     echo [ERROR] flutter build windows --release failed.
-    echo Check the output above for the actual error.
-    pause & exit /b 1
+    goto :fail
 )
 
-:: ── 7. Verify EXE ────────────────────────────────────────────
+:: --- Verify EXE exists ---
 if not exist "!WIN_BUILD!\LoagmaPMS.exe" (
     if not exist "!WIN_BUILD!\client.exe" (
         echo [ERROR] EXE not found in: !WIN_BUILD!
-        pause & exit /b 1
+        goto :fail
     )
 )
 
-:: ── 8. Copy to output folder ──────────────────────────────────
+:: --- Rename client.exe if needed ---
+if exist "!WIN_BUILD!\client.exe" (
+    if not exist "!WIN_BUILD!\LoagmaPMS.exe" (
+        ren "!WIN_BUILD!\client.exe" "LoagmaPMS.exe"
+    )
+)
+
+:: --- 4. Package ---
+echo.
+echo [4/4] Packaging...
 if not exist "!OUTPUT_DIR!" mkdir "!OUTPUT_DIR!"
 if exist "!RELEASE_FOLDER!" rmdir /s /q "!RELEASE_FOLDER!"
 mkdir "!RELEASE_FOLDER!"
 
 xcopy /e /i /q "!WIN_BUILD!\*" "!RELEASE_FOLDER!\" >nul
-if errorlevel 1 (echo [ERROR] Copy failed. & pause & exit /b 1)
+if errorlevel 1 ( echo [ERROR] Copy failed. & goto :fail )
 
-:: Rename client.exe -> LoagmaPMS.exe if needed
-if exist "!RELEASE_FOLDER!\client.exe" (
-    ren "!RELEASE_FOLDER!\client.exe" "LoagmaPMS.exe"
-)
-
-:: ── 9. ZIP the release folder ─────────────────────────────────
-set "ZIP_PATH=!OUTPUT_DIR!\!RELEASE_NAME!.zip"
-echo.
-echo Zipping release folder...
+:: --- ZIP ---
 powershell -NoProfile -Command ^
     "Compress-Archive -Path '!RELEASE_FOLDER!\*' -DestinationPath '!ZIP_PATH!' -Force"
 if errorlevel 1 (
@@ -138,46 +138,48 @@ if errorlevel 1 (
     echo ZIP: !ZIP_PATH!
 )
 
-:: ── 10. Build Installer (Inno Setup) ──────────────────────────
-echo.
-echo [4/4] Building installer...
-set "ISS_FILE=%PROJECT_ROOT%installer\loagmapms_setup.iss"
-set "INSTALLER_OUT=%PROJECT_ROOT%installer\output\LoagmaPMS_Setup_v!VERSION!.exe"
-
-:: Look for Inno Setup in common install locations
+:: --- Installer (Inno Setup) ---
 set "ISCC="
 if exist "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" set "ISCC=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 if exist "C:\Program Files\Inno Setup 6\ISCC.exe"       set "ISCC=C:\Program Files\Inno Setup 6\ISCC.exe"
-if exist "C:\Program Files (x86)\Inno Setup 5\ISCC.exe" set "ISCC=C:\Program Files (x86)\Inno Setup 5\ISCC.exe"
 
 if "!ISCC!"=="" (
-    echo [WARN] Inno Setup not found. Skipping installer build.
-    echo        Install from https://jrsoftware.org/isdl.php and re-run to get the Setup EXE.
+    echo.
+    echo [WARN] Inno Setup not found. Skipping installer.
+    echo        Install from https://jrsoftware.org/isdl.php and re-run.
 ) else (
+    echo.
+    echo Building installer...
     "!ISCC!" /DAppVersion=!VERSION! "!ISS_FILE!"
     if errorlevel 1 (
-        echo [WARN] Inno Setup compile failed - check the .iss script.
+        echo [WARN] Inno Setup compile failed.
     ) else (
-        echo Installer: !INSTALLER_OUT!
-        :: Copy installer into release output folder too
+        set "INSTALLER_OUT=%PROJECT_ROOT%installer\output\LoagmaPMS_Setup_v!VERSION!.exe"
         if exist "!INSTALLER_OUT!" (
             copy /y "!INSTALLER_OUT!" "!RELEASE_FOLDER!\" >nul
+            echo Installer: !INSTALLER_OUT!
         )
     )
 )
 
-:: ── 11. Done ─────────────────────────────────────────────────
+:: --- Done ---
 echo.
 echo ==========================================
 echo   BUILD SUCCESSFUL
-echo ==========================================
-echo   EXE     : !RELEASE_FOLDER!\LoagmaPMS.exe
-if exist "!ZIP_PATH!"       echo   ZIP     : !ZIP_PATH!
-if exist "!INSTALLER_OUT!"  echo   SETUP   : !INSTALLER_OUT!
+echo   Version : !VERSION!
+echo   Folder  : !RELEASE_FOLDER!
+if exist "!ZIP_PATH!"      echo   ZIP     : !ZIP_PATH!
+if exist "!INSTALLER_OUT!" echo   Setup   : !INSTALLER_OUT!
 echo ==========================================
 echo.
-echo Press any key to open release folder...
-pause >nul
-explorer "!RELEASE_FOLDER!"
 
-endlocal
+explorer "!RELEASE_FOLDER!"
+goto :eof
+
+:fail
+echo.
+echo ==========================================
+echo   BUILD FAILED - see errors above
+echo ==========================================
+echo.
+exit /b 1

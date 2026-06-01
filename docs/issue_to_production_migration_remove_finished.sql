@@ -1,6 +1,0 @@
--- DEPRECATED: Use Laravel migration instead.
--- Run: cd server && php artisan migrate
--- See: docs/DB_CHANGELOG.md
---
--- Manual fallback (if Laravel migration fails):
--- See: docs/issue_to_production_migration_remove_finished_v2.sql

@@ -1,0 +1,1119 @@
+<!DOCTYPE html><html><head>
+      <title>SCHEMA_CHANGES_2026_06</title>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      
+      <link rel="stylesheet" href="file:///c:\Users\spars\.vscode\extensions\shd101wyy.markdown-preview-enhanced-0.8.27\crossnote\dependencies\katex\katex.min.css">
+      
+      
+      
+      
+      
+      
+      
+      <style>
+      code[class*=language-],pre[class*=language-]{color:#333;background:0 0;font-family:Consolas,"Liberation Mono",Menlo,Courier,monospace;text-align:left;white-space:pre;word-spacing:normal;word-break:normal;word-wrap:normal;line-height:1.4;-moz-tab-size:8;-o-tab-size:8;tab-size:8;-webkit-hyphens:none;-moz-hyphens:none;-ms-hyphens:none;hyphens:none}pre[class*=language-]{padding:.8em;overflow:auto;border-radius:3px;background:#f5f5f5}:not(pre)>code[class*=language-]{padding:.1em;border-radius:.3em;white-space:normal;background:#f5f5f5}.token.blockquote,.token.comment{color:#969896}.token.cdata{color:#183691}.token.doctype,.token.macro.property,.token.punctuation,.token.variable{color:#333}.token.builtin,.token.important,.token.keyword,.token.operator,.token.rule{color:#a71d5d}.token.attr-value,.token.regex,.token.string,.token.url{color:#183691}.token.atrule,.token.boolean,.token.code,.token.command,.token.constant,.token.entity,.token.number,.token.property,.token.symbol{color:#0086b3}.token.prolog,.token.selector,.token.tag{color:#63a35c}.token.attr-name,.token.class,.token.class-name,.token.function,.token.id,.token.namespace,.token.pseudo-class,.token.pseudo-element,.token.url-reference .token.variable{color:#795da3}.token.entity{cursor:help}.token.title,.token.title .token.punctuation{font-weight:700;color:#1d3e81}.token.list{color:#ed6a43}.token.inserted{background-color:#eaffea;color:#55a532}.token.deleted{background-color:#ffecec;color:#bd2c00}.token.bold{font-weight:700}.token.italic{font-style:italic}.language-json .token.property{color:#183691}.language-markup .token.tag .token.punctuation{color:#333}.language-css .token.function,code.language-css{color:#0086b3}.language-yaml .token.atrule{color:#63a35c}code.language-yaml{color:#183691}.language-ruby .token.function{color:#333}.language-markdown .token.url{color:#795da3}.language-makefile .token.symbol{color:#795da3}.language-makefile .token.variable{color:#183691}.language-makefile .token.builtin{color:#0086b3}.language-bash .token.keyword{color:#0086b3}pre[data-line]{position:relative;padding:1em 0 1em 3em}pre[data-line] .line-highlight-wrapper{position:absolute;top:0;left:0;background-color:transparent;display:block;width:100%}pre[data-line] .line-highlight{position:absolute;left:0;right:0;padding:inherit 0;margin-top:1em;background:hsla(24,20%,50%,.08);background:linear-gradient(to right,hsla(24,20%,50%,.1) 70%,hsla(24,20%,50%,0));pointer-events:none;line-height:inherit;white-space:pre}pre[data-line] .line-highlight:before,pre[data-line] .line-highlight[data-end]:after{content:attr(data-start);position:absolute;top:.4em;left:.6em;min-width:1em;padding:0 .5em;background-color:hsla(24,20%,50%,.4);color:#f4f1ef;font:bold 65%/1.5 sans-serif;text-align:center;vertical-align:.3em;border-radius:999px;text-shadow:none;box-shadow:0 1px #fff}pre[data-line] .line-highlight[data-end]:after{content:attr(data-end);top:auto;bottom:.4em}html body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,freesans,sans-serif;font-size:16px;line-height:1.6;color:#333;background-color:#fff;overflow:initial;box-sizing:border-box;word-wrap:break-word}html body>:first-child{margin-top:0}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{line-height:1.2;margin-top:1em;margin-bottom:16px;color:#000}html body h1{font-size:2.25em;font-weight:300;padding-bottom:.3em}html body h2{font-size:1.75em;font-weight:400;padding-bottom:.3em}html body h3{font-size:1.5em;font-weight:500}html body h4{font-size:1.25em;font-weight:600}html body h5{font-size:1.1em;font-weight:600}html body h6{font-size:1em;font-weight:600}html body h1,html body h2,html body h3,html body h4,html body h5{font-weight:600}html body h5{font-size:1em}html body h6{color:#5c5c5c}html body strong{color:#000}html body del{color:#5c5c5c}html body a:not([href]){color:inherit;text-decoration:none}html body a{color:#08c;text-decoration:none}html body a:hover{color:#00a3f5;text-decoration:none}html body img{max-width:100%}html body>p{margin-top:0;margin-bottom:16px;word-wrap:break-word}html body>ol,html body>ul{margin-bottom:16px}html body ol,html body ul{padding-left:2em}html body ol.no-list,html body ul.no-list{padding:0;list-style-type:none}html body ol ol,html body ol ul,html body ul ol,html body ul ul{margin-top:0;margin-bottom:0}html body li{margin-bottom:0}html body li.task-list-item{list-style:none}html body li>p{margin-top:0;margin-bottom:0}html body .task-list-item-checkbox{margin:0 .2em .25em -1.8em;vertical-align:middle}html body .task-list-item-checkbox:hover{cursor:pointer}html body blockquote{margin:16px 0;font-size:inherit;padding:0 15px;color:#5c5c5c;background-color:#f0f0f0;border-left:4px solid #d6d6d6}html body blockquote>:first-child{margin-top:0}html body blockquote>:last-child{margin-bottom:0}html body hr{height:4px;margin:32px 0;background-color:#d6d6d6;border:0 none}html body table{margin:10px 0 15px 0;border-collapse:collapse;border-spacing:0;display:block;width:100%;overflow:auto;word-break:normal;word-break:keep-all}html body table th{font-weight:700;color:#000}html body table td,html body table th{border:1px solid #d6d6d6;padding:6px 13px}html body dl{padding:0}html body dl dt{padding:0;margin-top:16px;font-size:1em;font-style:italic;font-weight:700}html body dl dd{padding:0 16px;margin-bottom:16px}html body code{font-family:Menlo,Monaco,Consolas,'Courier New',monospace;font-size:.85em;color:#000;background-color:#f0f0f0;border-radius:3px;padding:.2em 0}html body code::after,html body code::before{letter-spacing:-.2em;content:'\00a0'}html body pre>code{padding:0;margin:0;word-break:normal;white-space:pre;background:0 0;border:0}html body .highlight{margin-bottom:16px}html body .highlight pre,html body pre{padding:1em;overflow:auto;line-height:1.45;border:#d6d6d6;border-radius:3px}html body .highlight pre{margin-bottom:0;word-break:normal}html body pre code,html body pre tt{display:inline;max-width:initial;padding:0;margin:0;overflow:initial;line-height:inherit;word-wrap:normal;background-color:transparent;border:0}html body pre code:after,html body pre code:before,html body pre tt:after,html body pre tt:before{content:normal}html body blockquote,html body dl,html body ol,html body p,html body pre,html body ul{margin-top:0;margin-bottom:16px}html body kbd{color:#000;border:1px solid #d6d6d6;border-bottom:2px solid #c7c7c7;padding:2px 4px;background-color:#f0f0f0;border-radius:3px}@media print{html body{background-color:#fff}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{color:#000;page-break-after:avoid}html body blockquote{color:#5c5c5c}html body pre{page-break-inside:avoid}html body table{display:table}html body img{display:block;max-width:100%;max-height:100%}html body code,html body pre{word-wrap:break-word;white-space:pre}}.markdown-preview{width:100%;height:100%;box-sizing:border-box}.markdown-preview ul{list-style:disc}.markdown-preview ul ul{list-style:circle}.markdown-preview ul ul ul{list-style:square}.markdown-preview ol{list-style:decimal}.markdown-preview ol ol,.markdown-preview ul ol{list-style-type:lower-roman}.markdown-preview ol ol ol,.markdown-preview ol ul ol,.markdown-preview ul ol ol,.markdown-preview ul ul ol{list-style-type:lower-alpha}.markdown-preview .newpage,.markdown-preview .pagebreak{page-break-before:always}.markdown-preview pre.line-numbers{position:relative;padding-left:3.8em;counter-reset:linenumber}.markdown-preview pre.line-numbers>code{position:relative}.markdown-preview pre.line-numbers .line-numbers-rows{position:absolute;pointer-events:none;top:1em;font-size:100%;left:0;width:3em;letter-spacing:-1px;border-right:1px solid #999;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.markdown-preview pre.line-numbers .line-numbers-rows>span{pointer-events:none;display:block;counter-increment:linenumber}.markdown-preview pre.line-numbers .line-numbers-rows>span:before{content:counter(linenumber);color:#999;display:block;padding-right:.8em;text-align:right}.markdown-preview .mathjax-exps .MathJax_Display{text-align:center!important}.markdown-preview:not([data-for=preview]) .code-chunk .code-chunk-btn-group{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .status{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .output-div{margin-bottom:16px}.markdown-preview .md-toc{padding:0}.markdown-preview .md-toc .md-toc-details{margin:0;padding:0;border:none}.markdown-preview .md-toc summary.md-toc-link-wrapper{cursor:pointer;list-style-position:outside}.markdown-preview .md-toc summary.md-toc-link-wrapper::marker{font-size:.85em}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link div,.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}.markdown-preview .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}.markdown-preview .md-toc .md-toc-link-wrapper[data-level='0']{margin-left:12px}.markdown-preview .md-toc .md-toc-link-wrapper[data-level='1']{margin-left:28px}.markdown-preview .md-toc .md-toc-link-wrapper[data-level='2']{margin-left:44px}.markdown-preview .md-toc .md-toc-link-wrapper[data-level='3']{margin-left:60px}.markdown-preview .md-toc .md-toc-link-wrapper[data-level='4']{margin-left:76px}.markdown-preview .md-toc .md-toc-link-wrapper[data-level='5']{margin-left:80px}.markdown-preview a.tag,.markdown-preview a.tag:active,.markdown-preview a.tag:link,.markdown-preview a.tag:visited,.markdown-preview span.tag:not(.token){display:inline-block;background-color:var(--vscode-badge-background,rgba(127,127,127,.18));color:var(--vscode-badge-foreground,currentColor);border-radius:2em;font-size:.85em;font-weight:500;padding:.05em .55em;line-height:1.5;white-space:nowrap;text-decoration:none;text-shadow:none;box-shadow:none;transition:background-color .12s ease,opacity .12s ease}.markdown-preview a.tag{cursor:pointer}.markdown-preview a.tag:focus,.markdown-preview a.tag:hover{background-color:var(--vscode-badge-background,rgba(127,127,127,.32));color:var(--vscode-badge-foreground,currentColor);opacity:.85;text-decoration:none;outline:0}.markdown-preview .wikilink-embed-content{border-left:3px solid var(--vscode-textBlockQuote-border,rgba(128,128,128,.3));background:var(--vscode-textBlockQuote-background,rgba(128,128,128,.05));margin:.5em 0;padding:.5em .75em;border-radius:0 3px 3px 0}.markdown-preview .wikilink-embed-content.wikilink-embed-error{border-left-color:var(--vscode-errorForeground,#cf222e);color:var(--vscode-errorForeground,#cf222e);font-style:italic;opacity:.8}.markdown-preview .wikilink-embed-content h1:first-child,.markdown-preview .wikilink-embed-content h2:first-child,.markdown-preview .wikilink-embed-content h3:first-child,.markdown-preview .wikilink-embed-content h4:first-child,.markdown-preview .wikilink-embed-content h5:first-child,.markdown-preview .wikilink-embed-content h6:first-child{margin-top:.25em}.markdown-preview .wikilink-embed-content .wikilink-embed-content{margin:.25em 0;padding:.25em .5em}.markdown-preview .block-id{display:none}.scrollbar-style::-webkit-scrollbar{width:8px}.scrollbar-style::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}.scrollbar-style::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode]){position:relative;width:100%;height:100%;top:0;left:0;margin:0;padding:0;overflow:auto}html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{position:relative;top:0;min-height:100vh}@media screen and (min-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em calc(50% - 457px + 2em)}}@media screen and (max-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{font-size:14px!important;padding:1em}}@media print{html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{display:none}}html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{position:fixed;bottom:8px;left:8px;font-size:28px;cursor:pointer;color:inherit;z-index:99;width:32px;text-align:center;opacity:.4}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] #sidebar-toc-btn{opacity:1}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc{position:fixed;top:0;left:0;width:300px;height:100%;padding:32px 0 48px 0;font-size:14px;box-shadow:0 0 4px rgba(150,150,150,.33);box-sizing:border-box;overflow:auto;background-color:inherit}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar{width:8px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc a{text-decoration:none}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc{padding:0 16px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-details{margin:0;padding:0;border:none}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link div,html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper[data-level='0']{padding-left:0}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper[data-level='1']{padding-left:16px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper[data-level='2']{padding-left:32px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper[data-level='3']{padding-left:48px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper[data-level='4']{padding-left:64px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper[data-level='5']{padding-left:80px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{left:300px;width:calc(100% - 300px);padding:2em calc(50% - 457px - 300px / 2);margin:0;box-sizing:border-box}@media screen and (max-width:1274px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{width:100%}}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .markdown-preview{left:50%;transform:translateX(-50%)}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .md-sidebar-toc{display:none}
+/* Please visit the URL below for more information: */
+/*   https://shd101wyy.github.io/markdown-preview-enhanced/#/customize-css */
+
+      </style>
+      <script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+    </head>
+    <body for="html-export">
+      <div class="crossnote markdown-preview  ">
+      
+<h1 id="schema-changes--june-2026">Schema Changes — June 2026 </h1>
+<blockquote>
+<p><strong>Source:</strong> <code>changes.sql</code><br>
+<strong>Database:</strong> <code>loagma_new</code><br>
+<strong>Compared against:</strong> <code>loagma_database_schema (1).sql</code> (Feb 2026 baseline)</p>
+</blockquote>
+<hr>
+<h2 id="overview">Overview </h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Area</th>
+<th>Type</th>
+<th>Tables / Columns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>BOM</td>
+<td>New tables</td>
+<td><code>bom_master</code>, <code>bom_items</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Suppliers</td>
+<td>New tables</td>
+<td><code>suppliers</code>, <code>supplier_products</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Purchase Orders</td>
+<td>New tables</td>
+<td><code>purchase_orders</code>, <code>purchase_order_items</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Taxes &amp; HSN</td>
+<td>New tables</td>
+<td><code>taxes</code>, <code>product_taxes</code>, <code>hsn_codes</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Units</td>
+<td>New table + seed</td>
+<td><code>units_master</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Finance</td>
+<td>New tables</td>
+<td><code>general_account</code>, <code>fa_cash_main</code>, <code>fa_cash_line</code>, <code>fa_main_line</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Purchase Vouchers</td>
+<td>New tables</td>
+<td><code>purchase_vouchers</code>, <code>purchase_voucher_items</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>Purchase Returns</td>
+<td>New tables</td>
+<td><code>purchase_returns</code>, <code>purchase_return_items</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>Sales Invoices</td>
+<td>New tables</td>
+<td><code>sales_invoices</code>, <code>sales_invoice_items</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td>Stock Vouchers</td>
+<td>New tables</td>
+<td><code>stock_voucher</code>, <code>stock_voucher_items</code></td>
+</tr>
+<tr>
+<td>11</td>
+<td>Production</td>
+<td>New tables</td>
+<td><code>issue_to_production</code>, <code>issue_to_production_items</code>, <code>receive_from_production</code>, <code>receive_from_production_items</code></td>
+</tr>
+<tr>
+<td>12</td>
+<td>Masters</td>
+<td>New tables</td>
+<td><code>pincode_masters</code>, <code>product_sales_daily</code>, <code>business_types</code>, <code>departments</code>, <code>BusinessType</code>, <code>Department</code></td>
+</tr>
+<tr>
+<td>13</td>
+<td>Users &amp; Roles</td>
+<td>New tables</td>
+<td><code>roles</code>, <code>users</code></td>
+</tr>
+<tr>
+<td>14</td>
+<td>Trip / Delivery</td>
+<td>New tables</td>
+<td><code>vehicles</code>, <code>trip_cards</code>, <code>trip_card_pincode</code>, <code>zone_vehicles</code>, <code>trip_audit_log</code>, <code>order_zone_overrides</code></td>
+</tr>
+<tr>
+<td>15</td>
+<td>Stock Management</td>
+<td>New tables</td>
+<td><code>stock_audit_log</code>, <code>stock_notify</code>, <code>stock_count_master_session</code>, <code>stock_count_assignments</code>, <code>stock_count</code></td>
+</tr>
+<tr>
+<td>16</td>
+<td>Misc</td>
+<td>New tables</td>
+<td><code>product_purchase</code>, <code>vendor_area_categories</code></td>
+</tr>
+<tr>
+<td>17</td>
+<td>Existing tables</td>
+<td>Column additions</td>
+<td><code>orders</code>, <code>product</code>, <code>admin</code>, <code>deli_staff</code>, <code>otp</code>, <code>user</code>, <code>purchase_orders</code>, <code>purchase_order_items</code></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="1--bill-of-materials-bom">1 — Bill of Materials (BOM) </h2>
+<p><strong>Why:</strong> Products are manufactured from raw materials. BOM defines what and how much raw material goes into one unit of a finished product. This is the foundation for production planning, raw material consumption tracking, and cost calculation.</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Column</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bom_master</code></td>
+<td><code>bom_id</code></td>
+<td>BIGINT PK</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>product_id</code></td>
+<td>BIGINT</td>
+<td>Finished product</td>
+</tr>
+<tr>
+<td></td>
+<td><code>bom_version</code></td>
+<td>VARCHAR(20)</td>
+<td>Multiple versions per product</td>
+</tr>
+<tr>
+<td></td>
+<td><code>status</code></td>
+<td>ENUM</td>
+<td>DRAFT / APPROVED / LOCKED</td>
+</tr>
+<tr>
+<td></td>
+<td><code>created_by</code>, <code>approved_by</code></td>
+<td>BIGINT</td>
+<td>Staff references</td>
+</tr>
+<tr>
+<td><code>bom_items</code></td>
+<td><code>bom_item_id</code></td>
+<td>BIGINT PK</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>bom_id</code></td>
+<td>BIGINT FK</td>
+<td>→ <code>bom_master</code></td>
+</tr>
+<tr>
+<td></td>
+<td><code>raw_material_id</code></td>
+<td>BIGINT FK</td>
+<td>→ <code>product</code></td>
+</tr>
+<tr>
+<td></td>
+<td><code>quantity_per_unit</code></td>
+<td>DECIMAL(10,3)</td>
+<td>Qty of raw material per finished unit</td>
+</tr>
+<tr>
+<td></td>
+<td><code>unit_type</code></td>
+<td>VARCHAR(20)</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>wastage_percent</code></td>
+<td>DECIMAL(5,2)</td>
+<td>Default 0</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="2--suppliers">2 — Suppliers </h2>
+<p><strong>Why:</strong> Previously the system had no supplier master. All purchasing was informal. A proper supplier registry enables PO workflows, rate tracking, credit limits, and compliance fields (GST, PAN, FSSAI).</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Column</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>suppliers</code></td>
+<td><code>id</code></td>
+<td>BIGINT PK</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>supplier_code</code></td>
+<td>VARCHAR(50)</td>
+<td>Unique</td>
+</tr>
+<tr>
+<td></td>
+<td><code>supplier_name</code></td>
+<td>VARCHAR(255)</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>gst_no</code>, <code>pan_no</code>, <code>fssai_no</code></td>
+<td>VARCHAR</td>
+<td>Compliance</td>
+</tr>
+<tr>
+<td></td>
+<td><code>contact_person</code>, <code>email</code>, <code>phone</code></td>
+<td>VARCHAR</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>bank_account_number</code>, <code>ifsc_code</code></td>
+<td>VARCHAR</td>
+<td>Payment</td>
+</tr>
+<tr>
+<td></td>
+<td><code>payment_terms_days</code>, <code>credit_limit</code></td>
+<td>SMALLINT / DECIMAL</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>status</code></td>
+<td>ENUM</td>
+<td>ACTIVE / INACTIVE / SUSPENDED</td>
+</tr>
+<tr>
+<td><code>supplier_products</code></td>
+<td><code>id</code></td>
+<td>BIGINT PK</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>supplier_id</code></td>
+<td>BIGINT FK</td>
+<td>→ <code>suppliers</code></td>
+</tr>
+<tr>
+<td></td>
+<td><code>product_id</code></td>
+<td>BIGINT FK</td>
+<td>→ <code>product</code></td>
+</tr>
+<tr>
+<td></td>
+<td><code>supplier_sku</code>, <code>price</code>, <code>tax_percent</code></td>
+<td>—</td>
+<td>Supplier-specific pricing</td>
+</tr>
+<tr>
+<td></td>
+<td><code>lead_time_days</code>, <code>last_purchase_price</code></td>
+<td>—</td>
+<td>Procurement data</td>
+</tr>
+<tr>
+<td></td>
+<td>UNIQUE</td>
+<td><code>(supplier_id, product_id)</code></td>
+<td>One product once per supplier</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="3--purchase-orders">3 — Purchase Orders </h2>
+<p><strong>Why:</strong> Formalises procurement. Before this, purchases were ad-hoc with no approval trail. POs enable quantity tracking, partial receipt, and linkage to purchase invoices.</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Column</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>purchase_orders</code></td>
+<td><code>id</code></td>
+<td>BIGINT PK</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>po_number</code></td>
+<td>VARCHAR(50)</td>
+<td>Unique</td>
+</tr>
+<tr>
+<td></td>
+<td><code>supplier_id</code></td>
+<td>BIGINT FK</td>
+<td>→ <code>suppliers</code></td>
+</tr>
+<tr>
+<td></td>
+<td><code>status</code></td>
+<td>ENUM</td>
+<td>DRAFT / SENT / PARTIALLY_RECEIVED / CLOSED / CANCELLED</td>
+</tr>
+<tr>
+<td></td>
+<td><code>total_amount</code></td>
+<td>DECIMAL(14,2)</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>charges_total</code>, <code>charges_json</code>, <code>total_with_charges</code></td>
+<td>—</td>
+<td>Added later for extra charges</td>
+</tr>
+<tr>
+<td></td>
+<td><code>salesman_id</code>, <code>department_id</code></td>
+<td>VARCHAR</td>
+<td>Who raised / which dept</td>
+</tr>
+<tr>
+<td><code>purchase_order_items</code></td>
+<td><code>id</code></td>
+<td>BIGINT PK</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>purchase_order_id</code></td>
+<td>BIGINT FK</td>
+<td>→ <code>purchase_orders</code></td>
+</tr>
+<tr>
+<td></td>
+<td><code>product_id</code></td>
+<td>BIGINT FK</td>
+<td>→ <code>product</code></td>
+</tr>
+<tr>
+<td></td>
+<td><code>quantity</code>, <code>price</code>, <code>line_total</code></td>
+<td>DECIMAL</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>hsn_code</code></td>
+<td>VARCHAR(50)</td>
+<td>Added for GST reporting</td>
+</tr>
+<tr>
+<td></td>
+<td><code>consumed_quantity</code></td>
+<td>DECIMAL(12,3)</td>
+<td>Qty used in production</td>
+</tr>
+<tr>
+<td></td>
+<td><code>written_off_quantity</code></td>
+<td>DECIMAL(12,3)</td>
+<td>Qty damaged / expired</td>
+</tr>
+<tr>
+<td></td>
+<td><code>remaining_quantity</code></td>
+<td>DECIMAL(12,3)</td>
+<td>qty − consumed − written off</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="4--taxes--hsn-codes">4 — Taxes &amp; HSN Codes </h2>
+<p><strong>Why:</strong> GST compliance requires HSN codes and tax rates per product. Hard-coded tax values were error-prone; a master table lets rates be managed centrally and linked to products.</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Column</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>taxes</code></td>
+<td><code>id</code></td>
+<td>BIGINT PK</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>tax_category</code>, <code>tax_sub_category</code></td>
+<td>VARCHAR</td>
+<td>e.g. GST / SGST</td>
+</tr>
+<tr>
+<td></td>
+<td><code>tax_name</code></td>
+<td>VARCHAR(150)</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>is_active</code></td>
+<td>TINYINT</td>
+<td></td>
+</tr>
+<tr>
+<td><code>product_taxes</code></td>
+<td><code>id</code></td>
+<td>BIGINT PK</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>product_id</code></td>
+<td>BIGINT FK</td>
+<td>→ <code>product</code></td>
+</tr>
+<tr>
+<td></td>
+<td><code>tax_id</code></td>
+<td>BIGINT FK</td>
+<td>→ <code>taxes</code></td>
+</tr>
+<tr>
+<td></td>
+<td><code>tax_percent</code></td>
+<td>DECIMAL(5,2)</td>
+<td>Rate applied to this product</td>
+</tr>
+<tr>
+<td></td>
+<td>UNIQUE</td>
+<td><code>(product_id, tax_id)</code></td>
+<td>One tax type once per product</td>
+</tr>
+<tr>
+<td><code>hsn_codes</code></td>
+<td><code>id</code></td>
+<td>BIGINT PK</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>hsn_code</code></td>
+<td>VARCHAR(50)</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>is_active</code></td>
+<td>TINYINT</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="5--units-master">5 — Units Master </h2>
+<p><strong>Why:</strong> Unit dropdowns (KG, LTR, PCS, etc.) were hardcoded in multiple places — BOM, purchase orders, stock vouchers, sales invoices. A single table eliminates inconsistency and lets admin add new units without code changes.</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Column</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>units_master</code></td>
+<td><code>unit_id</code></td>
+<td>INT PK</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>unit_name</code></td>
+<td>VARCHAR(100)</td>
+<td>KG, GM, LTR, PCS …</td>
+</tr>
+<tr>
+<td></td>
+<td><code>serial_no</code></td>
+<td>INT</td>
+<td>Display order</td>
+</tr>
+<tr>
+<td></td>
+<td><code>conversion_rate</code></td>
+<td>DECIMAL(10,4)</td>
+<td>Relative to base unit (KG=1, GM=0.001)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Seeded with 20 units:</strong> KG, GM, LTR, ML, NOS, PCS, BOX, PKT, BAG, DOZEN, BUNCH, MTR, CM, TIN, JAR, BTL, POUCH, STRIP, ROLL, SET.</p>
+<hr>
+<h2 id="6--finance--accounts">6 — Finance / Accounts </h2>
+<p><strong>Why:</strong> Cash receipt vouchers and a unified journal ledger are needed to record payments against invoices and maintain a basic chart of accounts for reporting.</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>general_account</code></td>
+<td>Chart of accounts — account number, name, type</td>
+</tr>
+<tr>
+<td><code>fa_cash_main</code></td>
+<td>Cash receipt voucher header (doc_no, receipt_mode, book account)</td>
+</tr>
+<tr>
+<td><code>fa_cash_line</code></td>
+<td>Line items per cash receipt (account, amount, bill reference)</td>
+</tr>
+<tr>
+<td><code>fa_main_line</code></td>
+<td>Unified ledger — all voucher types write here (DR/CR, account, date)</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="7--8--purchase-vouchers--returns">7 &amp; 8 — Purchase Vouchers &amp; Returns </h2>
+<p><strong>Why:</strong> A purchase invoice (GRN) records what was actually received against a PO, captures tax values (SGST/CGST/IGST), and updates inventory. Purchase returns (debit notes) reverse this when goods are sent back.</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Key Columns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>purchase_vouchers</code></td>
+<td><code>doc_no</code>, <code>vendor_id</code>, <code>purchase_order_id</code>, <code>bill_no</code>, <code>status</code> (DRAFT/POSTED/CANCELLED), <code>items_total</code>, <code>net_total</code></td>
+</tr>
+<tr>
+<td><code>purchase_voucher_items</code></td>
+<td><code>product_id</code>, <code>quantity</code>, <code>unit_price</code>, <code>sgst</code>, <code>cgst</code>, <code>igst</code>, <code>cess</code>, <code>value</code>, <code>overrun_qty</code>, <code>writeoff_qty</code></td>
+</tr>
+<tr>
+<td><code>purchase_returns</code></td>
+<td><code>source_purchase_voucher_id</code>, <code>vendor_id</code>, <code>doc_date</code>, <code>reason</code>, <code>status</code></td>
+</tr>
+<tr>
+<td><code>purchase_return_items</code></td>
+<td><code>original_quantity</code>, <code>returned_quantity</code>, <code>sgst</code>, <code>cgst</code>, <code>igst</code>, <code>value</code></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="9--sales-invoices">9 — Sales Invoices </h2>
+<p><strong>Why:</strong> Sales invoices are a separate module from delivery orders. They capture formal GST-compliant billing with HSN codes, tax breakdowns, and linkage back to the original sales order.</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Key Columns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sales_invoices</code></td>
+<td><code>doc_no</code> (unique), <code>customer_id</code>, <code>doc_date</code>, <code>status</code> (DRAFT/POSTED/CANCELLED), <code>items_total</code>, <code>net_total</code></td>
+</tr>
+<tr>
+<td><code>sales_invoice_items</code></td>
+<td><code>product_id</code>, <code>quantity</code>, <code>unit_price</code>, <code>sgst</code>, <code>cgst</code>, <code>igst</code>, <code>hsn_code</code>, <code>source_sales_order_id</code></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="10--stock-vouchers">10 — Stock Vouchers </h2>
+<p><strong>Why:</strong> Manual stock adjustments (inbound/outbound corrections, damage write-offs) need an auditable voucher rather than direct table edits.</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Key Columns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>stock_voucher</code></td>
+<td><code>voucher_type</code> (IN/OUT), <code>status</code> (DRAFT/POSTED), <code>voucher_date</code>, <code>remarks</code></td>
+</tr>
+<tr>
+<td><code>stock_voucher_items</code></td>
+<td><code>product_id</code>, <code>quantity</code>, <code>unit_type</code></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="11--production-flow">11 — Production Flow </h2>
+<p><strong>Why:</strong> Raw materials are issued to the factory floor and finished goods come back. These two vouchers track that movement so inventory stays accurate on both sides.</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Key Columns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>issue_to_production</code></td>
+<td><code>status</code> (DRAFT/ISSUED/COMPLETED/CANCELLED), <code>issued_by</code>, <code>issued_at</code></td>
+</tr>
+<tr>
+<td><code>issue_to_production_items</code></td>
+<td><code>raw_material_id</code>, <code>quantity</code>, <code>unit_type</code></td>
+</tr>
+<tr>
+<td><code>receive_from_production</code></td>
+<td><code>status</code> (DRAFT/RECEIVED), <code>received_at</code></td>
+</tr>
+<tr>
+<td><code>receive_from_production_items</code></td>
+<td><code>finished_product_id</code>, <code>quantity</code>, <code>unit_type</code></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="12--master--lookup-tables">12 — Master / Lookup Tables </h2>
+<p><strong>Why:</strong> Multiple dropdowns and lookups were previously hardcoded. Centralising them allows admin to manage values without deployments.</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pincode_masters</code></td>
+<td>Pincode → city / state / district lookup used for auto-fill</td>
+</tr>
+<tr>
+<td><code>product_sales_daily</code></td>
+<td>Daily aggregated sales per product for dashboards</td>
+</tr>
+<tr>
+<td><code>business_types</code></td>
+<td>Dropdown for supplier/customer business type</td>
+</tr>
+<tr>
+<td><code>departments</code></td>
+<td>PMS department master (separate from CRM departments)</td>
+</tr>
+<tr>
+<td><code>BusinessType</code></td>
+<td>Legacy CRM-side business type (kept for backward compat)</td>
+</tr>
+<tr>
+<td><code>Department</code></td>
+<td>Legacy CRM-side department (kept for backward compat)</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="13--users--roles-pms">13 — Users &amp; Roles (PMS) </h2>
+<p><strong>Why:</strong> The PMS previously reused the CRM's <code>LoginUser_crm</code> table. A dedicated <code>users</code> + <code>roles</code> table gives PMS its own auth with OTP login, attendance grace rules, and department linkage.</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Key Columns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>roles</code></td>
+<td><code>id</code> (R001…), <code>name</code> — seeded: Admin, Employee, Manager, Telecaller, Developer</td>
+</tr>
+<tr>
+<td><code>users</code></td>
+<td><code>contactNumber</code> (login), <code>roleId</code>, <code>departmentId</code>, <code>otp</code>, <code>otpExpiry</code>, <code>workStartTime</code>, <code>workEndTime</code>, <code>latePunchInGraceMinutes</code></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="14--trip--delivery-module">14 — Trip / Delivery Module </h2>
+<p><strong>Why:</strong> Deliveries are organised into zones (trip cards) with assigned vehicles and drivers. The audit log captures discrepancies between what was loaded, claimed delivered, and verified — making drivers accountable for stock.</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vehicles</code></td>
+<td>Vehicle master with capacity</td>
+</tr>
+<tr>
+<td><code>trip_cards</code></td>
+<td>Delivery zone master — each zone maps to a route</td>
+</tr>
+<tr>
+<td><code>trip_card_pincode</code></td>
+<td>Pincodes served by each zone</td>
+</tr>
+<tr>
+<td><code>zone_vehicles</code></td>
+<td>Which vehicle is assigned to which zone</td>
+</tr>
+<tr>
+<td><code>trip_audit_log</code></td>
+<td>Loaded vs delivered vs returned qty per item; discrepancy auto-calculated via generated columns</td>
+</tr>
+<tr>
+<td><code>order_zone_overrides</code></td>
+<td>Manual override when an order's zone doesn't match its pincode</td>
+</tr>
+</tbody>
+</table>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>vehicles ──────────────────┐
+                           ↓
+trip_cards ◄── zone_vehicles
+    │
+    ├── trip_card_pincode  (pincodes served)
+    │
+    └── trip_audit_log     (per order/item accountability)
+
+orders ── order_zone_overrides  (zone correction)
+</code></pre><hr>
+<h2 id="15--stock-management">15 — Stock Management </h2>
+<p><strong>Why:</strong> Stock counts, mutation logs, and restock alerts were missing, making it impossible to audit discrepancies or run periodic physical stock counts.</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>stock_audit_log</code></td>
+<td>Every stock mutation logged with pack-level JSON detail and reason</td>
+</tr>
+<tr>
+<td><code>stock_notify</code></td>
+<td>Users who want an alert when a product comes back in stock</td>
+</tr>
+<tr>
+<td><code>stock_count_master_session</code></td>
+<td>Supervisor creates a count session across all categories</td>
+</tr>
+<tr>
+<td><code>stock_count_assignments</code></td>
+<td>Each category assigned to a counter with status tracking</td>
+</tr>
+<tr>
+<td><code>stock_count</code></td>
+<td>Individual product counts submitted per assignment</td>
+</tr>
+</tbody>
+</table>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>stock_count_master_session
+    └── stock_count_assignments  (per category)
+            └── stock_count      (per product)
+</code></pre><hr>
+<h2 id="16--miscellaneous">16 — Miscellaneous </h2>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Purpose</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>product_purchase</code></td>
+<td>Historical purchase cost per product per day</td>
+<td>Used for COGS / cost analysis</td>
+</tr>
+<tr>
+<td><code>vendor_area_categories</code></td>
+<td>Maps admin to area + category combos with commission</td>
+<td>Controls what products show in which delivery areas</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="17--column-additions-to-existing-tables">17 — Column Additions to Existing Tables </h2>
+<p><strong>Why:</strong> Rather than creating new tables, these columns extend existing records to avoid JOINs and keep related data together.</p>
+<h3 id="orders"><code>orders</code> </h3>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Why Added</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bill_no</code></td>
+<td>VARCHAR(100)</td>
+<td>Short bill number alias for display</td>
+</tr>
+<tr>
+<td><code>Bill_Dt</code></td>
+<td>DATE</td>
+<td>Invoice date on the order</td>
+</tr>
+<tr>
+<td><code>Department</code></td>
+<td>VARCHAR(100)</td>
+<td>Department that raised the order</td>
+</tr>
+<tr>
+<td><code>Bill_Narration</code>, <code>Bill_Vehicle</code>, <code>Bill_Statement</code></td>
+<td>TEXT/VARCHAR</td>
+<td>Invoice metadata</td>
+</tr>
+<tr>
+<td><code>bill_roff</code></td>
+<td>DECIMAL(10,2)</td>
+<td>Round-off amount on bill</td>
+</tr>
+<tr>
+<td><code>Doc_Year</code></td>
+<td>VARCHAR(20)</td>
+<td>Financial year of document</td>
+</tr>
+<tr>
+<td><code>salesman_id</code></td>
+<td>VARCHAR(191)</td>
+<td>Salesman who created the order</td>
+</tr>
+<tr>
+<td><code>order_wt</code></td>
+<td>DECIMAL(10,3)</td>
+<td>Total order weight (default 25 kg)</td>
+</tr>
+<tr>
+<td><code>trip_pending</code></td>
+<td>TINYINT</td>
+<td>Flags order as pending trip assignment</td>
+</tr>
+<tr>
+<td><code>pending_date</code></td>
+<td>DATE</td>
+<td>Date order became trip-pending</td>
+</tr>
+<tr>
+<td><code>Sales_Return_VoucherNo</code></td>
+<td>VARCHAR(100)</td>
+<td>Return voucher number</td>
+</tr>
+<tr>
+<td><code>Sales_Return_Dt</code></td>
+<td>DATE</td>
+<td>Return date</td>
+</tr>
+<tr>
+<td><code>Sales_Return_Reason</code></td>
+<td>TEXT</td>
+<td>Reason for return</td>
+</tr>
+</tbody>
+</table>
+<h3 id="product"><code>product</code> </h3>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Why Added</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>order_limit</code></td>
+<td>INT</td>
+<td>Max orderable qty per order</td>
+</tr>
+<tr>
+<td><code>buffer_limit</code></td>
+<td>INT</td>
+<td>Safety stock threshold</td>
+</tr>
+<tr>
+<td><code>product_pack_count</code></td>
+<td>INT</td>
+<td>Number of packs in a product unit</td>
+</tr>
+<tr>
+<td><code>nop</code></td>
+<td>INT</td>
+<td>Number of pieces per pack</td>
+</tr>
+<tr>
+<td><code>pack_prd_wt</code></td>
+<td>DECIMAL(12,3)</td>
+<td>Weight of product in the pack</td>
+</tr>
+<tr>
+<td><code>gross_wt_of_pack</code></td>
+<td>DECIMAL(12,3)</td>
+<td>Gross weight including packaging</td>
+</tr>
+<tr>
+<td><code>gst_tax_type</code></td>
+<td>VARCHAR(50)</td>
+<td>GST applicability type</td>
+</tr>
+</tbody>
+</table>
+<h3 id="admin"><code>admin</code> </h3>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Why Added</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fssai_no</code>, <code>gst_no</code></td>
+<td>Compliance / licence numbers on invoices</td>
+</tr>
+<tr>
+<td><code>licence_1</code>, <code>licence_2</code></td>
+<td>Additional licences</td>
+</tr>
+<tr>
+<td><code>bank_name</code>, <code>bank_branch</code>, <code>account_number</code>, <code>ifsc_code</code>, <code>account_type</code></td>
+<td>Bank details for payment QR / transfer</td>
+</tr>
+<tr>
+<td><code>scanner_qr</code>, <code>phonepe_no</code>, <code>gpay_no</code></td>
+<td>UPI payment options on invoices</td>
+</tr>
+</tbody>
+</table>
+<h3 id="deli_staff"><code>deli_staff</code> </h3>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Why Added</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>otp</code>, <code>otp_expires_at</code></td>
+<td>OTP-based login for delivery app</td>
+</tr>
+<tr>
+<td><code>pincode</code>, <code>city</code>, <code>state</code></td>
+<td>Location enrichment from GPS</td>
+</tr>
+</tbody>
+</table>
+<h3 id="otp"><code>otp</code> </h3>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Why Added</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>otp_num</code></td>
+<td>Store actual OTP value directly on the row</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user"><code>user</code> </h3>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Why Added</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pincode</code>, <code>city</code>, <code>state</code></td>
+<td>Auto-filled from pincode master for address accuracy</td>
+</tr>
+</tbody>
+</table>
+<h3 id="purchase_orders"><code>purchase_orders</code> </h3>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Why Added</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>salesman_id</code></td>
+<td>Who raised the PO</td>
+</tr>
+<tr>
+<td><code>department_id</code></td>
+<td>Which department the PO belongs to</td>
+</tr>
+<tr>
+<td><code>charges_total</code>, <code>charges_json</code>, <code>total_with_charges</code></td>
+<td>Extra charges (freight, handling) broken out separately</td>
+</tr>
+</tbody>
+</table>
+<h3 id="purchase_order_items"><code>purchase_order_items</code> </h3>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Why Added</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hsn_code</code></td>
+<td>Required on purchase invoices for GST</td>
+</tr>
+<tr>
+<td><code>consumed_quantity</code></td>
+<td>Tracks how much of received qty was used in production</td>
+</tr>
+<tr>
+<td><code>written_off_quantity</code></td>
+<td>Tracks damage/expiry write-offs</td>
+</tr>
+<tr>
+<td><code>remaining_quantity</code></td>
+<td>Derived: qty − consumed − written off</td>
+</tr>
+</tbody>
+</table>
+
+      </div>
+      
+      
+    
+    
+    
+    
+    
+    
+  
+    </body></html>

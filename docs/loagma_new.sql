@@ -960,7 +960,7 @@ CREATE TABLE `area_assign_crm` (
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`) /*T![clustered_index] CLUSTERED */,
   UNIQUE KEY `area_assign_crm_employee_id_unique` (`employee_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=30001;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=60001;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -977,6 +977,41 @@ CREATE TABLE `area_crm` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`) /*T![clustered_index] CLUSTERED */
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=30001;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `attendance_crm`
+--
+
+DROP TABLE IF EXISTS `attendance_crm`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `attendance_crm` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `employee_mobile` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `date` date NOT NULL,
+  `punch_in_time` datetime DEFAULT NULL,
+  `punch_in_photo` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `punch_in_location` json DEFAULT NULL,
+  `punch_out_time` datetime DEFAULT NULL,
+  `punch_out_photo` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `punch_out_location` json DEFAULT NULL,
+  `break_details` json DEFAULT NULL,
+  `total_work_minutes` int DEFAULT NULL,
+  `total_break_minutes` int DEFAULT NULL,
+  `is_late` tinyint(1) NOT NULL DEFAULT '0',
+  `is_early_out` tinyint(1) NOT NULL DEFAULT '0',
+  `late_reason` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `early_out_reason` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` enum('on_time','pending','approved','rejected') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'on_time',
+  `admin_notes` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `approved_by` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `approved_at` datetime DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`) /*T![clustered_index] CLUSTERED */,
+  UNIQUE KEY `attendance_crm_employee_mobile_date_unique` (`employee_mobile`,`date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=30001;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1234,9 +1269,13 @@ CREATE TABLE `deli_staff` (
   `state` varchar(100) DEFAULT NULL,
   `location_last_updated` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `is_locked` tinyint unsigned NOT NULL DEFAULT '0',
+  `punch_in_time` time DEFAULT '09:00:00',
+  `punch_out_time` time DEFAULT '18:00:00',
+  `grace_minutes` int NOT NULL DEFAULT '15',
+  `approval_required` tinyint(1) NOT NULL DEFAULT '1',
   PRIMARY KEY (`deli_id`) /*T![clustered_index] CLUSTERED */,
   UNIQUE KEY `mobile` (`mobile`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_bin AUTO_INCREMENT=60243;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_bin AUTO_INCREMENT=120243;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1272,6 +1311,28 @@ CREATE TABLE `departments` (
   PRIMARY KEY (`id`) /*T![clustered_index] CLUSTERED */,
   UNIQUE KEY `departments_name_unique` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `document_series`
+--
+
+DROP TABLE IF EXISTS `document_series`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `document_series` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `doc_type` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `scope_key` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `prefix` varchar(80) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `current_no` bigint unsigned NOT NULL DEFAULT '0',
+  `step` smallint unsigned NOT NULL DEFAULT '1',
+  `label` varchar(120) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`) /*T![clustered_index] CLUSTERED */,
+  UNIQUE KEY `doc_series_unique` (`doc_type`,`scope_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=30001;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1364,7 +1425,7 @@ CREATE TABLE `fa_cash_line` (
   PRIMARY KEY (`id`) /*T![clustered_index] CLUSTERED */,
   KEY `fa_cash_line_cash_receipt_id_foreign` (`cash_receipt_id`),
   CONSTRAINT `fa_cash_line_cash_receipt_id_foreign` FOREIGN KEY (`cash_receipt_id`) REFERENCES `fa_cash_main` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=30001;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=90001;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1388,7 +1449,7 @@ CREATE TABLE `fa_cash_main` (
   KEY `fa_cash_main_book_account_id_foreign` (`book_account_id`),
   UNIQUE KEY `fa_cash_main_doc_no_unique` (`doc_no`),
   CONSTRAINT `fa_cash_main_book_account_id_foreign` FOREIGN KEY (`book_account_id`) REFERENCES `general_account` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=30001;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=60001;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1477,6 +1538,25 @@ CREATE TABLE `hsn_codes` (
   KEY `idx_hsn_code` (`hsn_code`),
   KEY `idx_hsn_is_active` (`is_active`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=270216;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `incharge_assign_crm`
+--
+
+DROP TABLE IF EXISTS `incharge_assign_crm`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `incharge_assign_crm` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `head_incharge_id` bigint unsigned NOT NULL,
+  `incharge_ids` json NOT NULL,
+  `incharge_names` json NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`) /*T![clustered_index] CLUSTERED */,
+  UNIQUE KEY `incharge_assign_crm_head_incharge_id_unique` (`head_incharge_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=30001;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1664,7 +1744,7 @@ CREATE TABLE `migrations` (
   `migration` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `batch` int NOT NULL,
   PRIMARY KEY (`id`) /*T![clustered_index] CLUSTERED */
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=1103353;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=1133353;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1767,7 +1847,10 @@ CREATE TABLE `orders` (
   `deli_id` int DEFAULT NULL,
   `order_wt` decimal(10,3) DEFAULT '25.000',
   `trip_pending` tinyint(1) NOT NULL DEFAULT '0',
-  `pending_date` date DEFAULT NULL
+  `pending_date` date DEFAULT NULL,
+  `Sales_Return_VoucherNo` varchar(100) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `Sales_Return_Dt` date DEFAULT NULL,
+  `Sales_Return_Reason` text COLLATE utf8mb4_general_ci DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2472,6 +2555,23 @@ CREATE TABLE `receive_from_production_items` (
   CONSTRAINT `receive_from_production_items_finished_product_id_foreign` FOREIGN KEY (`finished_product_id`) REFERENCES `product_old` (`product_id`),
   CONSTRAINT `receive_from_production_items_receive_id_foreign` FOREIGN KEY (`receive_id`) REFERENCES `receive_from_production` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=30003;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `role_crm`
+--
+
+DROP TABLE IF EXISTS `role_crm`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `role_crm` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `role_name` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`) /*T![clustered_index] CLUSTERED */,
+  UNIQUE KEY `role_crm_role_name_unique` (`role_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=480949;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -3394,4 +3494,4 @@ CREATE TABLE `zone_vehicles` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-05-25 10:59:51
+-- Dump completed on 2026-06-01 12:03:54

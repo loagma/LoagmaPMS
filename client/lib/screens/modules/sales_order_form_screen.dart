@@ -90,6 +90,7 @@ class _SalesOrderFormScreenState extends State<SalesOrderFormScreen> {
   late final String _tag;
   late final SalesOrderFormController controller;
   bool _showAllProducts = false;
+  bool _isAddingProduct = false;
 
   @override
   void initState() {
@@ -112,47 +113,53 @@ class _SalesOrderFormScreenState extends State<SalesOrderFormScreen> {
   }
 
   Future<void> _addAndSearchProduct() async {
-    final hasSupplierFilter =
-        controller.salesmanId.value != null && controller.salesmanId.value!.isNotEmpty;
-    controller.addItem();
-    final newRow = controller.items.last;
-    final selections = await showDialog<List<ProductSelection>>(
-      context: context,
-      useRootNavigator: true,
-      builder: (ctx) => ProductSearchDialog(
-        title: 'Select Products',
-        searchFn: controller.searchProductsAsModels,
-        allProductsSearchFn: hasSupplierFilter ? controller.searchAllProductsUnfiltered : null,
-        allowMultiSelect: true,
-        showSupplierToggle: hasSupplierFilter,
-        supplierToggleValue: _showAllProducts,
-        onSupplierToggle: (v) => setState(() => _showAllProducts = v),
-      ),
-    );
-    if (selections == null || selections.isEmpty) {
-      controller.removeItem(controller.items.length - 1);
-      return;
-    }
-    for (int i = 0; i < selections.length; i++) {
-      final sel = selections[i];
-      SOLineRow r;
-      if (i == 0) {
-        r = newRow;
-      } else {
-        controller.addItem();
-        r = controller.items.last;
+    if (_isAddingProduct) return;
+    _isAddingProduct = true;
+    try {
+      final hasSupplierFilter =
+          controller.salesmanId.value != null && controller.salesmanId.value!.isNotEmpty;
+      controller.addItem();
+      final newRow = controller.items.last;
+      final selections = await showDialog<List<ProductSelection>>(
+        context: context,
+        useRootNavigator: true,
+        builder: (ctx) => ProductSearchDialog(
+          title: 'Select Products',
+          searchFn: controller.searchProductsAsModels,
+          allProductsSearchFn: hasSupplierFilter ? controller.searchAllProductsUnfiltered : null,
+          allowMultiSelect: true,
+          showSupplierToggle: hasSupplierFilter,
+          supplierToggleValue: _showAllProducts,
+          onSupplierToggle: (v) => setState(() => _showAllProducts = v),
+        ),
+      );
+      if (selections == null || selections.isEmpty) {
+        controller.items.remove(newRow);
+        return;
       }
-      r.productId.value = sel.product.id;
-      r.productName.value = sel.product.name;
-      r.hsnCode.value = sel.product.hsnCode ?? '';
-      r.quantity.value = sel.quantity.toString();
-      if (sel.selectedPack != null) {
-        r.selectedPackId.value = sel.selectedPack!.id;
-        r.selectedPackLabel.value = sel.selectedPack!.label;
-        if (sel.selectedPack!.unit != null) r.unit.value = sel.selectedPack!.unit!;
-        if (sel.selectedPack!.price != null) r.price.value = sel.selectedPack!.price!.toString();
+      for (int i = 0; i < selections.length; i++) {
+        final sel = selections[i];
+        SOLineRow r;
+        if (i == 0) {
+          r = newRow;
+        } else {
+          controller.addItem();
+          r = controller.items.last;
+        }
+        r.productId.value = sel.product.id;
+        r.productName.value = sel.product.name;
+        r.hsnCode.value = sel.product.hsnCode ?? '';
+        r.quantity.value = sel.quantity.toString();
+        if (sel.selectedPack != null) {
+          r.selectedPackId.value = sel.selectedPack!.id;
+          r.selectedPackLabel.value = sel.selectedPack!.label;
+          if (sel.selectedPack!.unit != null) r.unit.value = sel.selectedPack!.unit!;
+          if (sel.selectedPack!.price != null) r.price.value = sel.selectedPack!.price!.toString();
+        }
+        await controller.applyProductTaxesToRow(r, sel.product.id);
       }
-      await controller.applyProductTaxesToRow(r, sel.product.id);
+    } finally {
+      _isAddingProduct = false;
     }
   }
 
@@ -1720,6 +1727,7 @@ class _ProductPicker extends StatefulWidget {
 
 class _ProductPickerState extends State<_ProductPicker> {
   bool _showAllProducts = false;
+  bool _isPickingProduct = false;
 
   @override
   Widget build(BuildContext context) {
@@ -1741,47 +1749,53 @@ class _ProductPickerState extends State<_ProductPicker> {
               onTap: readOnly
                   ? null
                   : () async {
-                      final selections = await showDialog<List<ProductSelection>>(
-                        context: context,
-                        useRootNavigator: true,
-                        builder: (ctx) => ProductSearchDialog(
-                          title: 'Select Products',
-                          searchFn: controller.searchProductsAsModels,
-                          allProductsSearchFn: hasSupplierFilter
-                              ? controller.searchAllProductsUnfiltered
-                              : null,
-                          allowMultiSelect: true,
-                          showSupplierToggle: hasSupplierFilter,
-                          supplierToggleValue: _showAllProducts,
-                          onSupplierToggle: (v) => setState(() => _showAllProducts = v),
-                        ),
-                      );
-                      if (selections == null || selections.isEmpty) return;
+                      if (_isPickingProduct) return;
+                      _isPickingProduct = true;
+                      try {
+                        final selections = await showDialog<List<ProductSelection>>(
+                          context: context,
+                          useRootNavigator: true,
+                          builder: (ctx) => ProductSearchDialog(
+                            title: 'Select Products',
+                            searchFn: controller.searchProductsAsModels,
+                            allProductsSearchFn: hasSupplierFilter
+                                ? controller.searchAllProductsUnfiltered
+                                : null,
+                            allowMultiSelect: true,
+                            showSupplierToggle: hasSupplierFilter,
+                            supplierToggleValue: _showAllProducts,
+                            onSupplierToggle: (v) => setState(() => _showAllProducts = v),
+                          ),
+                        );
+                        if (selections == null || selections.isEmpty) return;
 
-                      for (int i = 0; i < selections.length; i++) {
-                        final sel = selections[i];
-                        SOLineRow r;
-                        if (i == 0) {
-                          r = row;
-                        } else {
-                          controller.addItem();
-                          r = controller.items.last;
+                        for (int i = 0; i < selections.length; i++) {
+                          final sel = selections[i];
+                          SOLineRow r;
+                          if (i == 0) {
+                            r = row;
+                          } else {
+                            controller.addItem();
+                            r = controller.items.last;
+                          }
+                          r.productId.value = sel.product.id;
+                          r.productName.value = sel.product.name;
+                          r.hsnCode.value = sel.product.hsnCode ?? '';
+                          r.quantity.value = sel.quantity.toString();
+                          if (sel.selectedPack != null) {
+                            r.selectedPackId.value = sel.selectedPack!.id;
+                            r.selectedPackLabel.value = sel.selectedPack!.label;
+                            if (sel.selectedPack!.unit != null) r.unit.value = sel.selectedPack!.unit!;
+                            if (sel.selectedPack!.price != null) r.price.value = sel.selectedPack!.price!.toString();
+                          }
+                          await controller.applyProductTaxesToRow(r, sel.product.id);
+                          if (i == 0) {
+                            state.didChange(sel.product.id);
+                            state.validate();
+                          }
                         }
-                        r.productId.value = sel.product.id;
-                        r.productName.value = sel.product.name;
-                        r.hsnCode.value = sel.product.hsnCode ?? '';
-                        r.quantity.value = sel.quantity.toString();
-                        if (sel.selectedPack != null) {
-                          r.selectedPackId.value = sel.selectedPack!.id;
-                          r.selectedPackLabel.value = sel.selectedPack!.label;
-                          if (sel.selectedPack!.unit != null) r.unit.value = sel.selectedPack!.unit!;
-                          if (sel.selectedPack!.price != null) r.price.value = sel.selectedPack!.price!.toString();
-                        }
-                        await controller.applyProductTaxesToRow(r, sel.product.id);
-                        if (i == 0) {
-                          state.didChange(sel.product.id);
-                          state.validate();
-                        }
+                      } finally {
+                        _isPickingProduct = false;
                       }
                     },
               child: InputDecorator(

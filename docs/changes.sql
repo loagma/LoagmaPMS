@@ -889,3 +889,195 @@ CREATE TABLE IF NOT EXISTS `departments` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `departments_name_unique` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- 2026-06-01: Trip / vehicle module tables
+-- vehicles: vehicle master
+CREATE TABLE IF NOT EXISTS `vehicles` (
+    `vehicle_id`     int NOT NULL AUTO_INCREMENT,
+    `vehicle_number` varchar(50) NOT NULL,
+    `capacity_kg`    decimal(10,2) NOT NULL,
+    `is_active`      tinyint(1) DEFAULT 1,
+    `created_at`     datetime DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`vehicle_id`),
+    UNIQUE KEY `vehicle_number` (`vehicle_number`),
+    KEY `idx_vehicle_capacity` (`capacity_kg`, `is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- trip_cards: zone/card master for delivery trips
+CREATE TABLE IF NOT EXISTS `trip_cards` (
+    `zone_id`    int NOT NULL AUTO_INCREMENT,
+    `zone_name`  varchar(100) NOT NULL,
+    `vehicle_id` int DEFAULT NULL,
+    `status`     varchar(20) DEFAULT 'IDLE',
+    `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`zone_id`),
+    UNIQUE KEY `zone_name` (`zone_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- trip_card_pincode: pincodes served by each trip zone
+CREATE TABLE IF NOT EXISTS `trip_card_pincode` (
+    `id`         int NOT NULL AUTO_INCREMENT,
+    `zone_id`    int NOT NULL,
+    `pincode`    varchar(10) NOT NULL,
+    `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `zone_id` (`zone_id`),
+    CONSTRAINT `trip_card_pincode_ibfk_1`
+        FOREIGN KEY (`zone_id`) REFERENCES `trip_cards` (`zone_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- zone_vehicles: vehicle-to-zone assignments
+CREATE TABLE IF NOT EXISTS `zone_vehicles` (
+    `id`          int NOT NULL AUTO_INCREMENT,
+    `zone_id`     int NOT NULL,
+    `vehicle_id`  int NOT NULL,
+    `assigned_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+    `is_active`   tinyint(1) DEFAULT 1,
+    PRIMARY KEY (`id`),
+    KEY `zone_id` (`zone_id`),
+    KEY `vehicle_id` (`vehicle_id`),
+    KEY `is_active` (`is_active`),
+    CONSTRAINT `zone_vehicles_ibfk_1`
+        FOREIGN KEY (`zone_id`) REFERENCES `trip_cards` (`zone_id`) ON DELETE CASCADE,
+    CONSTRAINT `zone_vehicles_ibfk_2`
+        FOREIGN KEY (`vehicle_id`) REFERENCES `vehicles` (`vehicle_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- trip_audit_log: driver trip accountability and discrepancy tracking
+CREATE TABLE IF NOT EXISTS `trip_audit_log` (
+    `id`                      int NOT NULL AUTO_INCREMENT,
+    `trip_id`                 int NOT NULL,
+    `order_id`                int NOT NULL,
+    `item_id`                 int NOT NULL,
+    `vendor_product_id`       int NOT NULL,
+    `product_id`              int NOT NULL,
+    `qty_loaded`              int NOT NULL,
+    `qty_claimed_delivered`   int NOT NULL,
+    `qty_claimed_returned`    int NOT NULL,
+    `qty_verified_delivered`  int NOT NULL,
+    `qty_verified_returned`   int NOT NULL,
+    `discrepancy_delivered`   int GENERATED ALWAYS AS (`qty_verified_delivered` - `qty_claimed_delivered`) STORED,
+    `discrepancy_returned`    int GENERATED ALWAYS AS (`qty_verified_returned` - `qty_claimed_returned`) STORED,
+    `auditor_deli_id`         int NOT NULL,
+    `audited_at`              datetime NOT NULL,
+    `investigation_status`    enum('pending','resolved') DEFAULT 'pending',
+    `investigator_deli_id`    int DEFAULT NULL,
+    `investigated_at`         datetime DEFAULT NULL,
+    `resolution_outcome`      enum('stock_loss','stock_recovered') DEFAULT NULL,
+    `resolution_notes`        text DEFAULT NULL,
+    `qty_recovered_returned`  int DEFAULT NULL,
+    `driver_liable`           tinyint(1) DEFAULT 0,
+    `liability_amount`        decimal(10,2) DEFAULT 0.00,
+    `created_at`              datetime DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`              datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- order_zone_overrides: override the delivery zone assigned to an order
+CREATE TABLE IF NOT EXISTS `order_zone_overrides` (
+    `order_id`       bigint NOT NULL,
+    `zone_id`        int NOT NULL,
+    `source_zone_id` int DEFAULT NULL,
+    `created_at`     datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`     datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`order_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+
+-- 2026-06-01: Stock management supporting tables
+
+-- stock_audit_log: tracks every stock mutation with pack-level detail
+CREATE TABLE IF NOT EXISTS `stock_audit_log` (
+    `id`                bigint unsigned NOT NULL AUTO_INCREMENT,
+    `vendor_product_id` int NOT NULL,
+    `trigger_pack_id`   varchar(255) NOT NULL,
+    `pack_updates`      json NOT NULL,
+    `reason`            varchar(500) NOT NULL,
+    `user_id`           int DEFAULT NULL,
+    `created_at`        timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `stock_audit_log_created_at_index` (`created_at`),
+    KEY `stock_audit_log_vendor_product_id_created_at_index` (`vendor_product_id`, `created_at`),
+    KEY `stock_audit_log_vendor_product_id_index` (`vendor_product_id`),
+    KEY `stock_audit_log_trigger_pack_id_index` (`trigger_pack_id`),
+    KEY `stock_audit_log_user_id_index` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- stock_notify: users subscribed to back-in-stock alerts (vendor_product_id)
+CREATE TABLE IF NOT EXISTS `stock_notify` (
+    `userid`     bigint unsigned NOT NULL,
+    `product_id` bigint unsigned NOT NULL,
+    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY `userid` (`userid`, `product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_bin;
+
+-- stock_count_master_session: supervisor-level stock count session
+CREATE TABLE IF NOT EXISTS `stock_count_master_session` (
+    `id`                    int NOT NULL AUTO_INCREMENT,
+    `supervisor_id`         int NOT NULL,
+    `status`                enum('planning','in_progress','completed','cancelled') DEFAULT 'planning',
+    `total_categories`      int DEFAULT 0,
+    `completed_categories`  int DEFAULT 0,
+    `created_at`            timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `completed_at`          timestamp NULL DEFAULT NULL,
+    `notes`                 text DEFAULT NULL,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_bin;
+
+-- stock_count_assignments: per-category counting tasks within a session
+CREATE TABLE IF NOT EXISTS `stock_count_assignments` (
+    `id`                int NOT NULL AUTO_INCREMENT,
+    `master_session_id` int NOT NULL,
+    `counter_user_id`   int NOT NULL,
+    `category_id`       int NOT NULL,
+    `status`            enum('assigned','in_progress','completed','paused') DEFAULT 'assigned',
+    `assigned_at`       timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `started_at`        timestamp NULL DEFAULT NULL,
+    `completed_at`      timestamp NULL DEFAULT NULL,
+    `notes`             text DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `unique_session_category` (`master_session_id`, `category_id`),
+    KEY `idx_counter_user` (`counter_user_id`),
+    KEY `idx_master_session` (`master_session_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_bin;
+
+-- stock_count: individual product counts submitted against an assignment
+CREATE TABLE IF NOT EXISTS `stock_count` (
+    `id`                      int NOT NULL AUTO_INCREMENT,
+    `assignment_id`           int NOT NULL,
+    `vendor_product_id`       int NOT NULL,
+    `counted_quantity`        double NOT NULL,
+    `count_unit`              varchar(12) NOT NULL,
+    `standard_unit_quantity`  decimal(10,2) DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_assignment` (`assignment_id`),
+    KEY `idx_vendor_product` (`vendor_product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_bin;
+
+
+-- 2026-06-01: Miscellaneous tables present in loagma_new but previously undocumented
+
+-- product_purchase: historical product purchase cost log
+CREATE TABLE IF NOT EXISTS `product_purchase` (
+    `item_id`    bigint unsigned NOT NULL AUTO_INCREMENT,
+    `day_id`     varchar(20) NOT NULL DEFAULT '01-01-2018',
+    `product_id` bigint unsigned NOT NULL DEFAULT 0,
+    `quantity`   decimal(10,2) unsigned NOT NULL DEFAULT 0.00,
+    `unit_id`    text NOT NULL,
+    `cost`       decimal(10,2) NOT NULL DEFAULT 0.00,
+    `post_date`  int unsigned NOT NULL DEFAULT 0,
+    PRIMARY KEY (`item_id`),
+    UNIQUE KEY `day_id` (`day_id`, `product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_bin;
+
+-- vendor_area_categories: maps vendor/admin to area+category combos with commission
+CREATE TABLE IF NOT EXISTS `vendor_area_categories` (
+    `id`          int NOT NULL AUTO_INCREMENT,
+    `admin_id`    int NOT NULL,
+    `city_id`     varchar(255) NOT NULL DEFAULT '',
+    `area_id`     varchar(255) NOT NULL,
+    `category_id` varchar(255) NOT NULL,
+    `commisson`   int NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_bin;
