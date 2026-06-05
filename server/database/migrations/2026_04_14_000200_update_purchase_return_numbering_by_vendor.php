@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('purchase_returns', function (Blueprint $table): void {
             $table->dropUnique('purchase_returns_doc_no_prefix_doc_no_number_unique');
-            $table->unique(['vendor_id', 'doc_no_prefix', 'doc_no_number']);
+            $table->unique(['supplier_id', 'doc_no_prefix', 'doc_no_number']);
         });
     }
 
@@ -23,7 +23,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('purchase_returns', function (Blueprint $table): void {
-            $table->dropUnique('purchase_returns_vendor_id_doc_no_prefix_doc_no_number_unique');
+            $table->dropUnique('purchase_returns_supplier_id_doc_no_prefix_doc_no_number_unique');
             $table->unique(['doc_no_prefix', 'doc_no_number']);
         });
     }

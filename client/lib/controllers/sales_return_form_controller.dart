@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'auth_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
@@ -103,7 +104,7 @@ class SalesReturnFormController extends GetxController {
   Future<void> _fetchSeriesNumber() async {
     try {
       final response = await http
-          .get(Uri.parse(ApiConfig.salesReturnSeries), headers: {'Accept': 'application/json'})
+          .get(Uri.parse(ApiConfig.salesReturnSeries), headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -251,7 +252,7 @@ class SalesReturnFormController extends GetxController {
   Future<void> _loadUnitTypes() async {
     try {
       final response = await http
-          .get(Uri.parse(ApiConfig.unitTypes), headers: {'Accept': 'application/json'})
+          .get(Uri.parse(ApiConfig.unitTypes), headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -268,7 +269,7 @@ class SalesReturnFormController extends GetxController {
   Future<void> _loadNextDocNoNumberForCustomer(int cId) async {
     try {
       final response = await http
-          .get(Uri.parse(ApiConfig.salesReturnSeries), headers: {'Accept': 'application/json'})
+          .get(Uri.parse(ApiConfig.salesReturnSeries), headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -293,7 +294,7 @@ class SalesReturnFormController extends GetxController {
         },
       );
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -321,7 +322,7 @@ class SalesReturnFormController extends GetxController {
       sourceSiIdSelected.value = siId;
 
       final response = await http
-          .get(Uri.parse('${ApiConfig.salesOrders}/$siId'), headers: {'Accept': 'application/json'})
+          .get(Uri.parse('${ApiConfig.salesOrders}/$siId'), headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
@@ -390,7 +391,7 @@ class SalesReturnFormController extends GetxController {
     try {
       isLoading.value = true;
       final response = await http
-          .get(Uri.parse('${ApiConfig.salesReturns}/$targetId'), headers: {'Accept': 'application/json'})
+          .get(Uri.parse('${ApiConfig.salesReturns}/$targetId'), headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
@@ -519,7 +520,7 @@ class SalesReturnFormController extends GetxController {
           queryParameters: {'limit': pageSize.toString(), 'page': page.toString()},
         );
         final response = await http
-            .get(uri, headers: {'Accept': 'application/json'})
+            .get(uri, headers: AuthController.getHeaders)
             .timeout(const Duration(seconds: 15));
         if (response.statusCode != 200) return null;
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -661,7 +662,7 @@ class SalesReturnFormController extends GetxController {
       final uri = Uri.parse(
         returnId == null ? ApiConfig.createSalesReturn : '${ApiConfig.salesReturns}/$returnId',
       );
-      final headers = {'Accept': 'application/json', 'Content-Type': 'application/json'};
+      final headers = AuthController.jsonHeaders;
 
       final response = returnId == null
           ? await http.post(uri, headers: headers, body: jsonEncode(payload)).timeout(const Duration(seconds: 30))
@@ -691,7 +692,7 @@ class SalesReturnFormController extends GetxController {
     try {
       isSaving.value = true;
       final response = await http
-          .delete(Uri.parse('${ApiConfig.salesReturns}/$returnId'), headers: {'Accept': 'application/json'})
+          .delete(Uri.parse('${ApiConfig.salesReturns}/$returnId'), headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode == 200 && data['success'] == true) {

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'auth_controller.dart';
 
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter/material.dart';
@@ -82,7 +83,7 @@ class PurchaseOrderFormController extends GetxController {
         },
       );
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) return [];
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -130,7 +131,7 @@ class PurchaseOrderFormController extends GetxController {
           },
         );
         final response = await http
-            .get(uri, headers: {'Accept': 'application/json'})
+            .get(uri, headers: AuthController.getHeaders)
             .timeout(const Duration(seconds: 15));
         if (response.statusCode != 200) return [];
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -288,7 +289,7 @@ class PurchaseOrderFormController extends GetxController {
       queryParameters: {'product_id': productId.toString(), 'limit': '100'},
     );
     final response = await http
-        .get(uri, headers: {'Accept': 'application/json'})
+        .get(uri, headers: AuthController.getHeaders)
         .timeout(const Duration(seconds: 10));
     if (response.statusCode != 200) return [];
     final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -325,7 +326,7 @@ class PurchaseOrderFormController extends GetxController {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.suppliers),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -351,7 +352,7 @@ class PurchaseOrderFormController extends GetxController {
         'limit': '50',
         if (query.trim().isNotEmpty) 'search': query.trim(),
       });
-      final response = await http.get(uri, headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 15));
+      final response = await http.get(uri, headers: AuthController.getHeaders).timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) return [];
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       if (data['success'] != true) return [];
@@ -375,7 +376,7 @@ class PurchaseOrderFormController extends GetxController {
       Future<List<Map<String, dynamic>>> fetch(Uri uri) async {
         final response = await http.get(
           uri,
-          headers: {'Accept': 'application/json'},
+          headers: AuthController.getHeaders,
         );
         if (response.statusCode != 200) return [];
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -408,7 +409,7 @@ class PurchaseOrderFormController extends GetxController {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.departments),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -432,7 +433,7 @@ class PurchaseOrderFormController extends GetxController {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.unitTypes),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -456,7 +457,7 @@ class PurchaseOrderFormController extends GetxController {
         },
       );
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) return;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -514,7 +515,7 @@ class PurchaseOrderFormController extends GetxController {
         },
       );
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) return null;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -605,7 +606,7 @@ class PurchaseOrderFormController extends GetxController {
         },
       );
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) {
         await _resetToNewForm();
@@ -632,7 +633,7 @@ class PurchaseOrderFormController extends GetxController {
       // Fetch full details for that purchase order.
       final detailResp = await http.get(
         Uri.parse('${ApiConfig.purchaseOrders}/$id'),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (detailResp.statusCode != 200) {
         await _resetToNewForm();
@@ -681,7 +682,7 @@ class PurchaseOrderFormController extends GetxController {
       isLoading.value = true;
       final response = await http.get(
         Uri.parse('${ApiConfig.purchaseOrders}/$poId'),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -893,18 +894,12 @@ class PurchaseOrderFormController extends GetxController {
       final response = isCreate
           ? await http.post(
               Uri.parse(url),
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              },
+              headers: AuthController.jsonHeaders,
               body: jsonEncode(payload),
             )
           : await http.put(
               Uri.parse(url),
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              },
+              headers: AuthController.jsonHeaders,
               body: jsonEncode(payload),
             );
 

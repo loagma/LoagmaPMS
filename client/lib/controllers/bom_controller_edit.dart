@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'auth_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -46,7 +47,7 @@ class BomController extends GetxController {
 
       final response = await http.get(
         Uri.parse('${ApiConfig.boms}/$bomId'),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
 
       if (response.statusCode == 200) {
@@ -99,7 +100,7 @@ class BomController extends GetxController {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.unitTypes),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
 
       if (response.statusCode == 200) {
@@ -130,7 +131,7 @@ class BomController extends GetxController {
       debugPrint('[BOM] Fetching: $url');
 
       final response = await http
-          .get(Uri.parse(url), headers: {'Accept': 'application/json'})
+          .get(Uri.parse(url), headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 30));
 
       if (response.statusCode != 200) {
@@ -245,18 +246,12 @@ class BomController extends GetxController {
       final response = isEdit
           ? await http.put(
               Uri.parse(url),
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              },
+              headers: AuthController.jsonHeaders,
               body: jsonEncode(bomData),
             )
           : await http.post(
               Uri.parse(url),
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              },
+              headers: AuthController.jsonHeaders,
               body: jsonEncode(bomData),
             );
 

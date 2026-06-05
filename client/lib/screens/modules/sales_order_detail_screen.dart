@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../controllers/auth_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -56,7 +57,7 @@ class _SalesOrderDetailScreenState extends State<SalesOrderDetailScreen> {
     try {
       final res = await http
           .get(Uri.parse('${ApiConfig.salesOrders}/$_currentId'),
-              headers: {'Accept': 'application/json'})
+              headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
       if (!mounted) return;
       final body = jsonDecode(res.body) as Map<String, dynamic>;

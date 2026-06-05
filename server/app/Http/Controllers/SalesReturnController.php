@@ -211,12 +211,10 @@ class SalesReturnController extends Controller
                     $returnedQty = (float) ($item['returned_quantity'] ?? $item['return_qty'] ?? 0);
 
                     if ($orderItemId > 0 && $returnedQty > 0) {
-                        DB::table(self::ITEMS_TABLE)
-                            ->where('item_id', $orderItemId)
-                            ->where('order_id', $sourceOrderId)
-                            ->update([
-                                'qty_returned' => DB::raw("COALESCE(qty_returned, 0) + {$returnedQty}"),
-                            ]);
+                        DB::update(
+                            'UPDATE ' . self::ITEMS_TABLE . ' SET qty_returned = COALESCE(qty_returned, 0) + ? WHERE item_id = ? AND order_id = ?',
+                            [$returnedQty, $orderItemId, $sourceOrderId]
+                        );
                     }
                 }
             });
@@ -245,10 +243,9 @@ class SalesReturnController extends Controller
 
             DB::transaction(function () use ($id, $docDate, $reason, $status, $items) {
                 if (!empty($items)) {
-                    // Reset all returned quantities to 0 first (avoids negative drift)
+                    // Reset all items to 0 then set each to the exact value supplied (PUT semantics)
                     DB::table(self::ITEMS_TABLE)->where('order_id', $id)->update(['qty_returned' => 0]);
 
-                    // Re-apply from new payload
                     foreach ($items as $item) {
                         $orderItemId = (int) (
                             $item['source_sales_invoice_item_id']
@@ -258,13 +255,11 @@ class SalesReturnController extends Controller
                         );
                         $returnedQty = (float) ($item['returned_quantity'] ?? $item['return_qty'] ?? 0);
 
-                        if ($orderItemId > 0 && $returnedQty > 0) {
+                        if ($orderItemId > 0 && $returnedQty >= 0) {
                             DB::table(self::ITEMS_TABLE)
                                 ->where('item_id', $orderItemId)
                                 ->where('order_id', $id)
-                                ->update([
-                                    'qty_returned' => DB::raw("COALESCE(qty_returned, 0) + {$returnedQty}"),
-                                ]);
+                                ->update(['qty_returned' => $returnedQty]);
                         }
                     }
                 }

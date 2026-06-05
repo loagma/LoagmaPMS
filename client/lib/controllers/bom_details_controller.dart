@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'auth_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -30,7 +31,7 @@ class BomDetailsController extends GetxController {
 
       final response = await http.get(
         uri,
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
 
       debugPrint('[BOM DETAILS] Response status: ${response.statusCode}');

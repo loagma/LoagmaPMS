@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'auth_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -28,7 +29,7 @@ class SupplierListForProductsController extends GetxController {
       final response = await http
           .get(
             Uri.parse('${ApiConfig.suppliers}?limit=500&status=ACTIVE'),
-            headers: {'Accept': 'application/json'},
+            headers: AuthController.getHeaders,
           )
           .timeout(const Duration(seconds: 30));
 
@@ -62,7 +63,7 @@ class SupplierListForProductsController extends GetxController {
           .get(
             Uri.parse(
                 '${ApiConfig.apiBaseUrl}/supplier-products?limit=2000'),
-            headers: {'Accept': 'application/json'},
+            headers: AuthController.getHeaders,
           )
           .timeout(const Duration(seconds: 30));
 

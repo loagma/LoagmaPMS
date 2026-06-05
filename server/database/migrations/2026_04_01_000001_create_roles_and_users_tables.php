@@ -23,12 +23,7 @@ return new class extends Migration
             $table->dateTime('createdAt')->useCurrent();
         });
 
-        $departmentTable = null;
-        if (Schema::hasTable('departments')) {
-            $departmentTable = 'departments';
-        } elseif (Schema::hasTable('Department')) {
-            $departmentTable = 'Department';
-        }
+        $departmentTable = Schema::hasTable('department_crm') ? 'department_crm' : null;
 
         $departmentColumn = null;
         if ($departmentTable !== null) {

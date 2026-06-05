@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'auth_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -42,7 +43,7 @@ class StockVoucherListController extends GetxController {
       final response = await http
           .get(
             Uri.parse(ApiConfig.stockVouchers),
-            headers: {'Accept': 'application/json'},
+            headers: AuthController.getHeaders,
           )
           .timeout(const Duration(seconds: 30));
 

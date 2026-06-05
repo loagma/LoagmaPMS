@@ -21,8 +21,33 @@ class AuthController extends GetxController {
   static const _keyName     = 'deli_staff_name';
   static const _keyMobile   = 'deli_staff_mobile';
   static const _keyState    = 'deli_staff_state';
+  static const _keyToken    = 'auth_token';
+
+  // In-memory token cache loaded at startup by loadSession()
+  static String? _cachedToken;
+
+  // ── Header helpers ────────────────────────────────────────────────────────
+
+  /// Headers for GET requests (Accept + Authorization).
+  static Map<String, String> get getHeaders => {
+    'Accept': 'application/json',
+    if (_cachedToken != null) 'Authorization': 'Bearer $_cachedToken',
+  };
+
+  /// Headers for POST/PUT requests (Accept + Content-Type + Authorization).
+  static Map<String, String> get jsonHeaders => {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+    if (_cachedToken != null) 'Authorization': 'Bearer $_cachedToken',
+  };
 
   // ── Persistence helpers ──────────────────────────────────────────────────
+
+  /// Load token into memory cache — call once at app startup (e.g. in main.dart).
+  static Future<void> loadSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    _cachedToken = prefs.getString(_keyToken);
+  }
 
   static Future<bool> isLoggedIn() async {
     final prefs = await SharedPreferences.getInstance();
@@ -41,6 +66,7 @@ class AuthController extends GetxController {
     required String name,
     required String mobile,
     required String state,
+    required String token,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_keyDeliId, deliId);
@@ -49,7 +75,9 @@ class AuthController extends GetxController {
     await prefs.setString(_keyName, name);
     await prefs.setString(_keyMobile, mobile);
     await prefs.setString(_keyState, state);
+    await prefs.setString(_keyToken, token);
     await prefs.setBool(_keyLoggedIn, true);
+    _cachedToken = token;
   }
 
   static Future<void> clearSession() async {
@@ -61,6 +89,8 @@ class AuthController extends GetxController {
     await prefs.remove(_keyName);
     await prefs.remove(_keyMobile);
     await prefs.remove(_keyState);
+    await prefs.remove(_keyToken);
+    _cachedToken = null;
   }
 
   // ── Stored session getters ────────────────────────────────────────────────
@@ -101,7 +131,7 @@ class AuthController extends GetxController {
       final adminId = await getAdminId();
       if (adminId == null) return null;
       final uri = Uri.parse(ApiConfig.adminInfo).replace(queryParameters: {'admin_id': adminId.toString()});
-      final response = await http.get(uri, headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 10));
+      final response = await http.get(uri, headers: getHeaders).timeout(const Duration(seconds: 10));
       if (response.statusCode != 200) return null;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       if (data['success'] != true) return null;
@@ -133,6 +163,7 @@ class AuthController extends GetxController {
 
       if (response.statusCode == 200 && body['success'] == true) {
         final data = body['data'] as Map<String, dynamic>;
+        final token = body['token']?.toString() ?? '';
         await _saveStaffData(
           deliId:  (data['deli_id']  as num).toInt(),
           adminId: (data['admin_id'] as num).toInt(),
@@ -140,6 +171,7 @@ class AuthController extends GetxController {
           name:    data['name']?.toString()   ?? '',
           mobile:  data['mobile']?.toString() ?? mobile.value,
           state:   data['state']?.toString()  ?? '',
+          token:   token,
         );
         return null; // success
       }

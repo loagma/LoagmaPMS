@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../controllers/auth_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -136,7 +137,7 @@ Future<List<Product>> _fetchProductsForDialog(String query) async {
         if (query.trim().isNotEmpty) 'search': query.trim(),
       },
     );
-    final response = await http.get(uri, headers: {'Accept': 'application/json'});
+    final response = await http.get(uri, headers: AuthController.getHeaders);
     if (response.statusCode != 200) return [];
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     if (data['success'] != true) return [];

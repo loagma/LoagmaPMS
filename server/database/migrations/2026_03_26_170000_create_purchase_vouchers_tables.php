@@ -18,7 +18,7 @@ return new class extends Migration
             $table->unsignedBigInteger('doc_no_number');
             $table->string('doc_no', 80)->nullable()->index();
 
-            $table->unsignedBigInteger('vendor_id');
+            $table->unsignedBigInteger('supplier_id');
             $table->unsignedBigInteger('purchase_order_id')->nullable();
 
             $table->date('doc_date');
@@ -44,11 +44,11 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->foreign('vendor_id')->references('id')->on('suppliers');
+            $table->foreign('supplier_id')->references('id')->on('suppliers');
             $table->foreign('purchase_order_id')->references('id')->on('purchase_orders')->nullOnDelete();
 
             $table->unique(['doc_no_prefix', 'doc_no_number']);
-            $table->index('vendor_id');
+            $table->index('supplier_id');
             $table->index('doc_date');
         });
 

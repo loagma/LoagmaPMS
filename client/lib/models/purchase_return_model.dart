@@ -20,7 +20,7 @@ class PurchaseReturnHeader {
   final String docNoNumber;
   final int? sourcePurchaseVoucherId;
   final String? sourcePvNumber;
-  final int? vendorId;
+  final int? supplierId;
   final String? vendorName;
   final String docDate;
   final String? reason; // Specific reason for return
@@ -33,7 +33,7 @@ class PurchaseReturnHeader {
     this.docNoNumber = '',
     this.sourcePurchaseVoucherId,
     this.sourcePvNumber,
-    this.vendorId,
+    this.supplierId,
     this.vendorName,
     this.docDate = '',
     this.reason,
@@ -48,7 +48,7 @@ class PurchaseReturnHeader {
       docNoNumber: json['doc_no_number']?.toString() ?? '',
       sourcePurchaseVoucherId: _prIntOrNull(json['source_purchase_voucher_id']),
       sourcePvNumber: json['source_pv_number']?.toString(),
-      vendorId: _prIntOrNull(json['vendor_id'] ?? json['supplier_id']),
+      supplierId: _prIntOrNull(json['supplier_id'] ?? json['vendor_id']),
       vendorName:
           json['vendor_name']?.toString() ?? json['supplier_name']?.toString(),
       docDate: json['doc_date']?.toString() ?? '',
@@ -66,7 +66,7 @@ class PurchaseReturnHeader {
       if (sourcePurchaseVoucherId != null)
         'source_purchase_voucher_id': sourcePurchaseVoucherId,
       if (sourcePvNumber != null) 'source_pv_number': sourcePvNumber,
-      if (vendorId != null) 'vendor_id': vendorId,
+      if (supplierId != null) 'supplier_id': supplierId,
       if (vendorName != null) 'vendor_name': vendorName,
       'doc_date': docDate,
       if (reason != null && reason!.isNotEmpty) 'reason': reason,

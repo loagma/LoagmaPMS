@@ -12,7 +12,7 @@ class UserController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $table = DB::getSchemaBuilder()->hasTable('users') ? 'users' : 'LoginUser_crm';
+            $table = 'LoginUser_crm';
             $query = DB::table($table)->select(
                 'id',
                 'name',

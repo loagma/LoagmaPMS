@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 
 import '../api_config.dart';
 import '../constants/charge_constants.dart';
-import '../controllers/auth_controller.dart';
+import 'auth_controller.dart';
 import '../models/party_result.dart';
 import '../models/product_model.dart';
 import '../models/sales_order_model.dart';
@@ -309,7 +309,7 @@ class SalesInvoiceFormController extends GetxController {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.departments),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -339,7 +339,7 @@ class SalesInvoiceFormController extends GetxController {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.salesmen).replace(queryParameters: {'role': 'salesman', 'limit': '500'}),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode != 200) return;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -358,7 +358,7 @@ class SalesInvoiceFormController extends GetxController {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.unitTypes),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -375,7 +375,7 @@ class SalesInvoiceFormController extends GetxController {
   Future<void> _fetchNextInvoiceNumber() async {
     try {
       final response = await http
-          .get(Uri.parse(ApiConfig.salesInvoiceSeries), headers: {'Accept': 'application/json'})
+          .get(Uri.parse(ApiConfig.salesInvoiceSeries), headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 10));
       if (response.statusCode != 200) return;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -575,7 +575,7 @@ class SalesInvoiceFormController extends GetxController {
       };
       final uri = Uri.parse(ApiConfig.vendorProducts).replace(queryParameters: params);
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) return [];
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -628,7 +628,7 @@ class SalesInvoiceFormController extends GetxController {
       };
       final uri = Uri.parse(ApiConfig.salesOrders).replace(queryParameters: params);
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) return [];
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -654,7 +654,7 @@ class SalesInvoiceFormController extends GetxController {
     try {
       isLoading.value = true;
       final response = await http
-          .get(Uri.parse('${ApiConfig.salesOrders}/$orderId'), headers: {'Accept': 'application/json'})
+          .get(Uri.parse('${ApiConfig.salesOrders}/$orderId'), headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 20));
       if (response.statusCode != 200) return;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -689,7 +689,7 @@ class SalesInvoiceFormController extends GetxController {
     try {
       isLoading.value = true;
       final response = await http
-          .get(Uri.parse('${ApiConfig.salesOrders}/$orderId'), headers: {'Accept': 'application/json'})
+          .get(Uri.parse('${ApiConfig.salesOrders}/$orderId'), headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 20));
       if (response.statusCode != 200) return;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -760,7 +760,7 @@ class SalesInvoiceFormController extends GetxController {
           queryParameters: {'limit': pageSize.toString(), 'page': page.toString(), 'has_invoice': 'true'},
         );
         final response = await http
-            .get(uri, headers: {'Accept': 'application/json'})
+            .get(uri, headers: AuthController.getHeaders)
             .timeout(const Duration(seconds: 15));
         if (response.statusCode != 200) return null;
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -965,7 +965,7 @@ class SalesInvoiceFormController extends GetxController {
     try {
       final response = await http.patch(
         Uri.parse('${ApiConfig.salesOrders}/${sourceOrderId.value}'),
-        headers: {'Accept': 'application/json', 'Content-Type': 'application/json'},
+        headers: AuthController.jsonHeaders,
         body: jsonEncode({'cancel_invoice': true}),
       );
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -1058,7 +1058,7 @@ class SalesInvoiceFormController extends GetxController {
 
     final response = await http.put(
       Uri.parse('${ApiConfig.salesOrders}/$orderId'),
-      headers: {'Accept': 'application/json', 'Content-Type': 'application/json'},
+      headers: AuthController.jsonHeaders,
       body: jsonEncode(payload),
     );
     debugPrint('[SI FORM] PUT $orderId → ${response.statusCode}: ${response.body}');
@@ -1104,7 +1104,7 @@ class SalesInvoiceFormController extends GetxController {
 
     final response = await http.post(
       Uri.parse(ApiConfig.salesOrders),
-      headers: {'Accept': 'application/json', 'Content-Type': 'application/json'},
+      headers: AuthController.jsonHeaders,
       body: jsonEncode(payload),
     );
     debugPrint('[SI FORM] POST → ${response.statusCode}: ${response.body}');

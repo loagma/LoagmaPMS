@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'auth_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -50,7 +51,7 @@ class IssueToProductionController extends GetxController {
 
       final response = await http.get(
         Uri.parse('${ApiConfig.issues}/$issueId'),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
 
       if (response.statusCode == 200) {
@@ -103,7 +104,7 @@ class IssueToProductionController extends GetxController {
       debugPrint('[ISSUE] GET $uri');
 
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 30));
 
       debugPrint('[ISSUE] Response status: ${response.statusCode}');
@@ -140,7 +141,7 @@ class IssueToProductionController extends GetxController {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.unitTypes),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -162,7 +163,7 @@ class IssueToProductionController extends GetxController {
       final url =
           '${ApiConfig.products}?search=${Uri.encodeComponent(query)}&limit=100&include_stock=1';
       final response = await http
-          .get(Uri.parse(url), headers: {'Accept': 'application/json'})
+          .get(Uri.parse(url), headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
@@ -237,18 +238,12 @@ class IssueToProductionController extends GetxController {
       final response = isEdit
           ? await http.put(
               Uri.parse(url),
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              },
+              headers: AuthController.jsonHeaders,
               body: jsonEncode(issueData),
             )
           : await http.post(
               Uri.parse(url),
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              },
+              headers: AuthController.jsonHeaders,
               body: jsonEncode(issueData),
             );
 

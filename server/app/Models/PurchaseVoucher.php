@@ -10,7 +10,7 @@ class PurchaseVoucher extends Model
         'doc_no_prefix',
         'doc_no_number',
         'doc_no',
-        'vendor_id',
+        'supplier_id',
         'purchase_order_id',
         'doc_date',
         'bill_no',
@@ -44,7 +44,7 @@ class PurchaseVoucher extends Model
 
     public function vendor()
     {
-        return $this->belongsTo(Supplier::class, 'vendor_id');
+        return $this->belongsTo(Supplier::class, 'supplier_id');
     }
 
     public function items()

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'auth_controller.dart';
 import 'dart:convert';
 
 import 'package:fluttertoast/fluttertoast.dart';
@@ -588,7 +589,7 @@ class PurchaseVoucherController extends GetxController {
       queryParameters: {'product_id': productId.toString(), 'limit': '100'},
     );
     final response = await http
-        .get(uri, headers: {'Accept': 'application/json'})
+        .get(uri, headers: AuthController.getHeaders)
         .timeout(const Duration(seconds: 10));
     if (response.statusCode != 200) return [];
     final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -610,7 +611,7 @@ class PurchaseVoucherController extends GetxController {
       isLoading.value = true;
       final response = await http.get(
         Uri.parse('${ApiConfig.purchaseVouchers}/$id'),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -634,7 +635,7 @@ class PurchaseVoucherController extends GetxController {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.suppliers),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -660,7 +661,7 @@ class PurchaseVoucherController extends GetxController {
         'limit': '50',
         if (query.trim().isNotEmpty) 'search': query.trim(),
       });
-      final response = await http.get(uri, headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 15));
+      final response = await http.get(uri, headers: AuthController.getHeaders).timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) return [];
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       if (data['success'] != true) return [];
@@ -683,7 +684,7 @@ class PurchaseVoucherController extends GetxController {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.unitTypes),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -702,7 +703,7 @@ class PurchaseVoucherController extends GetxController {
       Future<List<Map<String, dynamic>>> fetch(Uri uri) async {
         final response = await http.get(
           uri,
-          headers: {'Accept': 'application/json'},
+          headers: AuthController.getHeaders,
         );
         if (response.statusCode != 200) return [];
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -736,7 +737,7 @@ class PurchaseVoucherController extends GetxController {
       final response = await http
           .get(
             Uri.parse('${ApiConfig.products}?limit=50'),
-            headers: {'Accept': 'application/json'},
+            headers: AuthController.getHeaders,
           )
           .timeout(const Duration(seconds: 30));
       if (response.statusCode == 200) {
@@ -763,7 +764,7 @@ class PurchaseVoucherController extends GetxController {
         },
       );
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) return;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -810,7 +811,7 @@ class PurchaseVoucherController extends GetxController {
         },
       );
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) return null;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -872,7 +873,7 @@ class PurchaseVoucherController extends GetxController {
           },
         );
         final response = await http
-            .get(uri, headers: {'Accept': 'application/json'})
+            .get(uri, headers: AuthController.getHeaders)
             .timeout(const Duration(seconds: 30));
         if (response.statusCode != 200) {
           debugPrint(
@@ -942,7 +943,7 @@ class PurchaseVoucherController extends GetxController {
             )
           : Uri.parse('$base?limit=50');
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 30));
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body) as Map<String, dynamic>;
@@ -983,7 +984,7 @@ class PurchaseVoucherController extends GetxController {
       }
       currentSeq.value = base;
 
-      vendorId.value = int.tryParse(v['vendor_id']?.toString() ?? v['supplier_id']?.toString() ?? '');
+      vendorId.value = int.tryParse(v['supplier_id']?.toString() ?? v['vendor_id']?.toString() ?? '');
       vendorName.value = v['vendor_name']?.toString() ?? v['supplier_name']?.toString() ?? '';
       docDate.value = v['doc_date']?.toString().split(' ').first ?? _formatDate(DateTime.now());
       billNo.value = v['bill_no']?.toString() ?? '';
@@ -1086,7 +1087,7 @@ class PurchaseVoucherController extends GetxController {
         },
       );
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) {
         await _resetToNewVoucherForm();
@@ -1114,7 +1115,7 @@ class PurchaseVoucherController extends GetxController {
       // Fetch full details by id so we get voucher/items/charges.
       final detailResp = await http.get(
         Uri.parse('${ApiConfig.purchaseVouchers}/$id'),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (detailResp.statusCode != 200) {
         await _resetToNewVoucherForm();
@@ -1241,7 +1242,7 @@ class PurchaseVoucherController extends GetxController {
     try {
       final response = await http.get(
         Uri.parse('${ApiConfig.purchaseOrders}/$poId'),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode != 200) return null;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -1274,7 +1275,7 @@ class PurchaseVoucherController extends GetxController {
       );
       final response = await http.get(
         uri,
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode != 200) return [];
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -1481,7 +1482,7 @@ class PurchaseVoucherController extends GetxController {
         'doc_no_prefix': docNoPrefix.value,
         'doc_no_number': docNoNumber.value.trim().isEmpty ? null : docNoNumber.value,
         if (linkedPurchaseOrderIds.isNotEmpty) 'purchase_order_id': linkedPurchaseOrderIds.first,
-        'vendor_id': vendorId.value,
+        'supplier_id': vendorId.value,
         'doc_date': docDate.value.trim().isEmpty ? _formatDate(DateTime.now()) : docDate.value,
         'bill_no': billNo.value.trim(),
         'narration': narration.value.trim(),
@@ -1562,18 +1563,12 @@ class PurchaseVoucherController extends GetxController {
       final response = isEdit
           ? await http.put(
               Uri.parse(url),
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              },
+              headers: AuthController.jsonHeaders,
               body: jsonEncode(payload),
             )
           : await http.post(
               Uri.parse(url),
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              },
+              headers: AuthController.jsonHeaders,
               body: jsonEncode(payload),
             );
 

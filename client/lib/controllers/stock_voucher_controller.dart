@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'auth_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -48,7 +49,7 @@ class StockVoucherController extends GetxController {
       isLoading.value = true;
       final response = await http.get(
         Uri.parse('${ApiConfig.stockVouchers}/$voucherId'),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -92,7 +93,7 @@ class StockVoucherController extends GetxController {
       final response = await http
           .get(
             Uri.parse('${ApiConfig.products}?limit=50'),
-            headers: {'Accept': 'application/json'},
+            headers: AuthController.getHeaders,
           )
           .timeout(const Duration(seconds: 30));
       if (response.statusCode != 200) {
@@ -117,7 +118,7 @@ class StockVoucherController extends GetxController {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.unitTypes),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -140,7 +141,7 @@ class StockVoucherController extends GetxController {
       final url =
           '${ApiConfig.products}?search=${Uri.encodeComponent(query)}&limit=100';
       final response = await http
-          .get(Uri.parse(url), headers: {'Accept': 'application/json'})
+          .get(Uri.parse(url), headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 30));
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body) as Map<String, dynamic>;
@@ -218,18 +219,12 @@ class StockVoucherController extends GetxController {
       final response = isEdit
           ? await http.put(
               Uri.parse(url),
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              },
+              headers: AuthController.jsonHeaders,
               body: jsonEncode(payload),
             )
           : await http.post(
               Uri.parse(url),
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              },
+              headers: AuthController.jsonHeaders,
               body: jsonEncode(payload),
             );
 

@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\InvoicePdfService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class SalesOrderController extends Controller
 {
@@ -14,31 +17,20 @@ class SalesOrderController extends Controller
 
     private static array $CLOSED_STATES = ['cancelled', 'rejected', 'returned'];
 
-    // GET /sales-orders/debug-schema
-    public function debugSchema(Request $request): JsonResponse
-    {
-        $columns = DB::select('DESCRIBE loagma_new.orders');
-        $itemColumns = DB::select('DESCRIBE loagma_new.orders_item');
-        $orderId = (int) $request->input('order_id', 268082);
-        $row = DB::table(self::ORDERS_TABLE)->where('order_id', $orderId)->first();
-        return response()->json([
-            'columns' => $columns,
-            'item_columns' => $itemColumns,
-            'row' => $row,
-        ]);
-    }
-
     // GET /sales-orders/invoice-series
     public function series(): JsonResponse
     {
         try {
-            $count   = DB::table(self::ORDERS_TABLE)->whereNotNull('bill_no')->count();
-            $nextNum = str_pad((string) ($count + 1), 3, '0', STR_PAD_LEFT);
+            $prefix  = $this->invoicePrefix();
+            $maxNum  = (int) DB::table(self::ORDERS_TABLE)
+                ->where('Doc_Year', $this->currentDocYear())
+                ->max('invoice_number');
+            $nextNum = str_pad((string) ($maxNum + 1), 3, '0', STR_PAD_LEFT);
             return response()->json([
                 'success'     => true,
-                'prefix'      => 'INV/25-26/',
+                'prefix'      => $prefix,
                 'next_number' => $nextNum,
-                'full_number' => 'INV/25-26/' . $nextNum,
+                'full_number' => $prefix . $nextNum,
             ]);
         } catch (\Throwable $e) {
             Log::error('SalesOrder series error: ' . $e->getMessage());
@@ -157,14 +149,15 @@ class SalesOrderController extends Controller
             $narration = trim((string) $request->input('narration', ''));
 
             // Bill fields (populated when status = 'billed')
-            $billNo        = trim((string) $request->input('bill_number', '')) ?: null;
+            $requestedBillNo = trim((string) $request->input('bill_number', '')) ?: null;
             $billDt        = $request->input('bill_dt') ?: null;
             $department    = trim((string) $request->input('department', '')) ?: null;
             $billNarration = trim((string) $request->input('bill_narration', '')) ?: null;
             $billVehicle   = trim((string) $request->input('bill_vehicle', '')) ?: null;
             $billStatement = trim((string) $request->input('bill_statement', '')) ?: null;
             $billRoff      = (float) $request->input('bill_roff', 0);
-            $docYear       = trim((string) $request->input('doc_year', '')) ?: null;
+            $docYear       = trim((string) $request->input('doc_year', '')) ?: $this->currentDocYear();
+            $chargesJson   = $request->input('charges', null);
             $rawSalesmanIdStore = $request->input('supplier_id');
             $salesmanIdStore    = ($rawSalesmanIdStore !== null && $rawSalesmanIdStore !== '') ? trim((string) $rawSalesmanIdStore) : null;
 
@@ -183,10 +176,16 @@ class SalesOrderController extends Controller
             $orderId = null;
             DB::transaction(function () use (
                 $customerId, $status, $orderTotal, $discount, $delivery, $items,
-                $docDate, $narration, $billNo, $billDt, $department, $billNarration,
+                $docDate, $narration, $requestedBillNo, $billDt, $department, $billNarration,
                 $billVehicle, $billStatement, $billRoff, $docYear, $salesmanIdStore,
-                &$orderId
+                $chargesJson, &$orderId
             ) {
+                // Issue B: generate invoice number inside the transaction with a lock so
+                // concurrent requests cannot get the same number.
+                [$billNo, $invoiceNumber] = $status === 'billed'
+                    ? $this->resolveInvoiceNumber($requestedBillNo, $docYear)
+                    : [$requestedBillNo, null];
+
                 $orderId = $this->nextOrderId();
                 DB::table(self::ORDERS_TABLE)->insert([
                     'order_id'        => $orderId,
@@ -203,6 +202,7 @@ class SalesOrderController extends Controller
                     'feedback'        => '',
                     'bill_number'     => 0,
                     'bill_no'         => $billNo,
+                    'invoice_number'  => $invoiceNumber,
                     'Bill_Dt'         => $billDt,
                     'Department'      => $department,
                     'Bill_Narration'  => $billNarration,
@@ -211,6 +211,7 @@ class SalesOrderController extends Controller
                     'bill_roff'       => $billRoff,
                     'Doc_Year'        => $docYear,
                     'salesman_id'     => $salesmanIdStore,
+                    'charges_json'    => $chargesJson !== null ? json_encode($chargesJson) : null,
                 ]);
 
                 $nextId = $this->nextItemId();
@@ -243,10 +244,24 @@ class SalesOrderController extends Controller
             });
 
             $order = DB::table(self::ORDERS_TABLE)->where('order_id', $orderId)->first();
+
+            $pdfUrl = null;
+            if ($status === 'billed') {
+                $adminId = (int) $request->input('admin_id', 0);
+                if ($adminId > 0) {
+                    try {
+                        $pdfUrl = app(InvoicePdfService::class)->generateAndStore($orderId, $adminId);
+                    } catch (\Throwable $pdfErr) {
+                        Log::warning('Invoice PDF generation failed after store: ' . $pdfErr->getMessage());
+                    }
+                }
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Sales order created successfully',
                 'data'    => $this->normalizeHeader($order),
+                'pdf_url' => $pdfUrl,
             ], 201);
         } catch (\Throwable $e) {
             Log::error('SalesOrder store error: ' . $e->getMessage());
@@ -271,6 +286,14 @@ class SalesOrderController extends Controller
                 return response()->json(['success' => true, 'message' => 'Invoice cancelled, order reverted to Pending']);
             }
 
+            $currentState = strtolower(trim((string) ($order->order_state ?? '')));
+            if (in_array($currentState, self::$CLOSED_STATES, true)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot edit order in state: ' . strtoupper($currentState),
+                ], 422);
+            }
+
             $items = $request->input('items', []);
             if (empty($items)) {
                 return response()->json(['success' => false, 'message' => 'At least one item is required'], 422);
@@ -283,14 +306,15 @@ class SalesOrderController extends Controller
             $narration = trim((string) $request->input('narration', ''));
 
             // Bill fields — bill_no (varchar) stores the invoice number string; bill_number is a legacy INT column we don't touch
-            $billNo        = trim((string) $request->input('bill_number', '')) ?: ($order->bill_no ?? null);
+            $requestedBillNo = trim((string) $request->input('bill_number', '')) ?: ($order->bill_no ?? null);
             $billDt        = $request->input('bill_dt') ?: null;
             $department    = trim((string) $request->input('department', '')) ?: null;
             $billNarration = trim((string) $request->input('bill_narration', '')) ?: null;
             $billVehicle   = trim((string) $request->input('bill_vehicle', '')) ?: null;
             $billStatement = trim((string) $request->input('bill_statement', '')) ?: null;
             $billRoff      = (float) $request->input('bill_roff', 0);
-            $docYear       = trim((string) $request->input('doc_year', '')) ?: null;
+            $docYear       = trim((string) $request->input('doc_year', '')) ?: ($order->Doc_Year ?? $this->currentDocYear());
+            $chargesJson   = $request->input('charges', null);
             $rawSalesmanId = $request->input('supplier_id');
             $salesmanId    = ($rawSalesmanId !== null && $rawSalesmanId !== '') ? trim((string) $rawSalesmanId) : null;
 
@@ -306,7 +330,13 @@ class SalesOrderController extends Controller
             }
             $orderTotal = round($lineTotal - $discount + $delivery, 2);
 
-            DB::transaction(function () use ($id, $status, $orderTotal, $discount, $delivery, $items, $narration, $billNo, $billDt, $department, $billNarration, $billVehicle, $billStatement, $billRoff, $docYear, $salesmanId) {
+            DB::transaction(function () use ($id, $order, $status, $orderTotal, $discount, $delivery, $items, $narration, $requestedBillNo, $billDt, $department, $billNarration, $billVehicle, $billStatement, $billRoff, $docYear, $salesmanId, $chargesJson) {
+                // Issue B: generate the authoritative invoice number inside the transaction
+                // with a SELECT ... FOR UPDATE lock so concurrent saves get different numbers.
+                [$billNo, $invoiceNumber] = $status === 'billed'
+                    ? $this->resolveInvoiceNumber($requestedBillNo, $docYear, $id)
+                    : [$requestedBillNo, $order->invoice_number ?? null];
+
                 DB::table(self::ORDERS_TABLE)->where('order_id', $id)->update([
                     'order_state'     => $status,
                     'order_total'     => $orderTotal,
@@ -315,6 +345,7 @@ class SalesOrderController extends Controller
                     'items_count'     => count($items),
                     'txn_id'          => $narration,
                     'bill_no'         => $billNo,
+                    'invoice_number'  => $invoiceNumber,
                     'Bill_Dt'         => $billDt,
                     'Department'      => $department,
                     'Bill_Narration'  => $billNarration,
@@ -323,7 +354,16 @@ class SalesOrderController extends Controller
                     'bill_roff'       => $billRoff,
                     'Doc_Year'        => $docYear,
                     'salesman_id'     => $salesmanId,
+                    'charges_json'    => $chargesJson !== null ? json_encode($chargesJson) : null,
                 ]);
+
+                // Issue D: snapshot existing qty_returned per product_id before deleting,
+                // so we can restore them in the fresh inserts.
+                $returnedMap = DB::table(self::ITEMS_TABLE)
+                    ->where('order_id', $id)
+                    ->pluck('qty_returned', 'product_id')
+                    ->map(fn ($v) => (int) $v)
+                    ->toArray();
 
                 DB::table(self::ITEMS_TABLE)->where('order_id', $id)->delete();
 
@@ -351,16 +391,31 @@ class SalesOrderController extends Controller
                         'pinfo'         => json_encode(!empty($pinfo) ? $pinfo : new \stdClass()),
                         'commission'    => 0,
                         'qty_delivered' => (int) round((float) ($item['qty_delivered'] ?? 0)),
-                        'qty_returned'  => 0,
+                        // Issue D: restore any previously recorded return qty for this product
+                        'qty_returned'  => $returnedMap[$productId] ?? 0,
                     ]);
                 }
             });
 
             $updated = DB::table(self::ORDERS_TABLE)->where('order_id', $id)->first();
+
+            $pdfUrl = null;
+            if ($status === 'billed') {
+                $adminId = (int) $request->input('admin_id', 0);
+                if ($adminId > 0) {
+                    try {
+                        $pdfUrl = app(InvoicePdfService::class)->generateAndStore($id, $adminId);
+                    } catch (\Throwable $pdfErr) {
+                        Log::warning('Invoice PDF generation failed after update: ' . $pdfErr->getMessage());
+                    }
+                }
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Sales order updated successfully',
                 'data'    => $this->normalizeHeader($updated),
+                'pdf_url' => $pdfUrl,
             ]);
         } catch (\Throwable $e) {
             Log::error('SalesOrder update error: ' . $e->getMessage() . ' ' . $e->getTraceAsString());
@@ -421,6 +476,7 @@ class SalesOrderController extends Controller
                     'o.salesman_id',
                     'sm.name as salesman_name',
                     'o.Sales_Return_VoucherNo',
+                    'o.charges_json',
                 ])
                 ->first();
 
@@ -472,6 +528,93 @@ class SalesOrderController extends Controller
             Log::error('SalesOrder show error: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Order not found'], 404);
         }
+    }
+
+    // GET /sales-orders/{id}/pdf?admin_id=1
+    public function generatePdf(Request $request, int $id): JsonResponse
+    {
+        $adminId = (int) $request->input('admin_id', 0);
+        if ($adminId <= 0) {
+            return response()->json(['success' => false, 'message' => 'admin_id is required'], 422);
+        }
+
+        $order = DB::table(self::ORDERS_TABLE)->where('order_id', $id)->first();
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Order not found'], 404);
+        }
+        if (empty($order->bill_no)) {
+            return response()->json(['success' => false, 'message' => 'Order is not invoiced yet — bill_no is empty'], 422);
+        }
+
+        try {
+            $url = app(InvoicePdfService::class)->generateAndStore($id, $adminId);
+            if ($url === null) {
+                return response()->json(['success' => false, 'message' => 'Failed to generate PDF — admin not found or order data incomplete'], 500);
+            }
+            return response()->json(['success' => true, 'pdf_url' => $url]);
+        } catch (\Throwable $e) {
+            Log::error('SalesOrder generatePdf error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'PDF generation failed: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // ── Invoice series helpers ────────────────────────────────────────────────
+
+    private function invoicePrefix(): string
+    {
+        $now     = Carbon::now();
+        $fyStart = $now->month >= 4 ? $now->year : $now->year - 1;
+        return 'INV/' . substr((string) $fyStart, 2) . '-' . substr((string) ($fyStart + 1), 2) . '/';
+    }
+
+    private function currentDocYear(): string
+    {
+        $now     = Carbon::now();
+        $fyStart = $now->month >= 4 ? $now->year : $now->year - 1;
+        return substr((string) $fyStart, 2) . '-' . substr((string) ($fyStart + 1), 2);
+    }
+
+    /**
+     * Issue B fix: resolve the definitive invoice number inside a transaction.
+     *
+     * If the caller already supplied a non-empty bill_no string AND it does not
+     * match the auto-generated prefix pattern (i.e. a manual override), we trust
+     * it as-is and return null for the numeric sequence column.
+     *
+     * Otherwise we lock the MAX(invoice_number) row for the current doc year and
+     * increment it — preventing two concurrent requests from getting the same number.
+     *
+     * @param  string|null  $requestedBillNo  value from the request (may be null or empty)
+     * @param  string       $docYear          e.g. '25-26'
+     * @param  int|null     $excludeOrderId   when editing, exclude this order's own number
+     * @return array{0: string, 1: int}       [bill_no string, invoice_number int]
+     */
+    private function resolveInvoiceNumber(?string $requestedBillNo, string $docYear, ?int $excludeOrderId = null): array
+    {
+        $prefix = $this->invoicePrefix();
+
+        // If the request sends a manually typed bill_no that differs from the
+        // auto prefix, honour it but do not track a sequence number for it.
+        if ($requestedBillNo !== null && $requestedBillNo !== '' && !str_starts_with($requestedBillNo, $prefix)) {
+            return [$requestedBillNo, null];
+        }
+
+        // Lock the current max to prevent duplicate assignment under concurrency.
+        $query = DB::table(self::ORDERS_TABLE)
+            ->where('Doc_Year', $docYear)
+            ->whereNotNull('invoice_number')
+            ->lockForUpdate();
+
+        if ($excludeOrderId !== null) {
+            $query->where('order_id', '<>', $excludeOrderId);
+        }
+
+        $maxNum = (int) $query->max('invoice_number');
+        $nextNum = $maxNum + 1;
+
+        $billNo = $prefix . str_pad((string) $nextNum, 3, '0', STR_PAD_LEFT);
+
+        return [$billNo, $nextNum];
     }
 
     private function nextOrderId(): int
@@ -526,7 +669,26 @@ class SalesOrderController extends Controller
             'salesman_name'              => $data['salesman_name'] ?? null,
             'items_count'                => (int) ($data['items_count'] ?? 0),
             'sales_return_voucher_no'    => $data['Sales_Return_VoucherNo'] ?? null,
+            'charges'                    => isset($data['charges_json'])
+                ? (json_decode((string) $data['charges_json'], true) ?? [])
+                : [],
+            'pdf_url'                    => $this->existingPdfUrl(
+                $data['bill_no'] ?? null,
+                $data['Doc_Year'] ?? null
+            ),
         ];
+    }
+
+    private function existingPdfUrl(?string $billNo, ?string $docYear): ?string
+    {
+        if (empty($billNo)) {
+            return null;
+        }
+        $filename = str_replace('/', '_', $billNo) . '.pdf';
+        $path     = 'documents/sales-invoices/' . ($docYear ?? 'general') . '/' . $filename;
+        return Storage::disk('public')->exists($path)
+            ? Storage::disk('public')->url($path)
+            : null;
     }
 
     private function normalizeItem(object $row, array $productMap = []): array

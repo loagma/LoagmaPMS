@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'auth_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -96,7 +97,7 @@ class SupplierProductFormController extends GetxController {
         },
       );
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) return [];
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -119,7 +120,7 @@ class SupplierProductFormController extends GetxController {
       final response = await http
           .get(
             Uri.parse('${ApiConfig.suppliers}?limit=200&status=ACTIVE'),
-            headers: {'Accept': 'application/json'},
+            headers: AuthController.getHeaders,
           )
           .timeout(const Duration(seconds: 30));
 
@@ -142,7 +143,7 @@ class SupplierProductFormController extends GetxController {
       final response = await http
           .get(
             Uri.parse('${ApiConfig.products}?limit=200'),
-            headers: {'Accept': 'application/json'},
+            headers: AuthController.getHeaders,
           )
           .timeout(const Duration(seconds: 30));
       if (response.statusCode == 200) {
@@ -166,7 +167,7 @@ class SupplierProductFormController extends GetxController {
         Uri.parse(
           '${ApiConfig.apiBaseUrl}/supplier-products/$supplierProductId',
         ),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
 
       if (response.statusCode == 200) {
@@ -231,10 +232,7 @@ class SupplierProductFormController extends GetxController {
       final response = await http
           .post(
             Uri.parse('${ApiConfig.apiBaseUrl}/supplier-products/bulk'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
+            headers: AuthController.jsonHeaders,
             body: jsonEncode({
               'supplier_id': supplierId,
               'product_ids': productIds,
@@ -270,7 +268,7 @@ class SupplierProductFormController extends GetxController {
       final url = '${ApiConfig.apiBaseUrl}/supplier-products/$supplierProductId';
       final response = await http.put(
         Uri.parse(url),
-        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+        headers: AuthController.jsonHeaders,
         body: jsonEncode(payload),
       );
       final data = jsonDecode(response.body) as Map<String, dynamic>;

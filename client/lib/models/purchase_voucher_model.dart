@@ -10,7 +10,7 @@ class PurchaseVoucherHeader {
   final int? id;
   final String docNoPrefix;
   final String docNoNumber;
-  final int? vendorId;
+  final int? supplierId;
   final String? vendorName;
   final String docDate;
   final String billNo;
@@ -26,7 +26,7 @@ class PurchaseVoucherHeader {
     this.id,
     this.docNoPrefix = '25-26/',
     this.docNoNumber = '',
-    this.vendorId,
+    this.supplierId,
     this.vendorName,
     this.docDate = '',
     this.billNo = '',
@@ -44,7 +44,7 @@ class PurchaseVoucherHeader {
       id: _pvIntOrNull(json['id']),
       docNoPrefix: json['doc_no_prefix']?.toString() ?? '25-26/',
       docNoNumber: json['doc_no_number']?.toString() ?? '',
-      vendorId: _pvIntOrNull(json['vendor_id'] ?? json['supplier_id']),
+      supplierId: _pvIntOrNull(json['supplier_id'] ?? json['vendor_id']),
       vendorName: json['vendor_name']?.toString() ?? json['supplier_name']?.toString(),
       docDate: json['doc_date']?.toString() ?? '',
       billNo: json['bill_no']?.toString() ?? '',
@@ -63,7 +63,7 @@ class PurchaseVoucherHeader {
       if (id != null) 'id': id,
       'doc_no_prefix': docNoPrefix,
       'doc_no_number': docNoNumber,
-      if (vendorId != null) 'vendor_id': vendorId,
+      if (supplierId != null) 'supplier_id': supplierId,
       if (vendorName != null) 'vendor_name': vendorName,
       'doc_date': docDate,
       'bill_no': billNo,

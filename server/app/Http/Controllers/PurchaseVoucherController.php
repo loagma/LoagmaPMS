@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\PurchaseVoucher;
 use App\Models\PurchaseVoucherItem;
 use App\Services\PurchaseOrderAllocationService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -40,8 +41,8 @@ class PurchaseVoucherController extends Controller
                 });
             }
 
-            if ($request->filled('vendor_id')) {
-                $query->where('vendor_id', (int) $request->input('vendor_id'));
+            if ($request->filled('supplier_id')) {
+                $query->where('supplier_id', (int) $request->input('supplier_id'));
             }
 
             if ($request->filled('status')) {
@@ -79,7 +80,7 @@ class PurchaseVoucherController extends Controller
                     'doc_no_prefix' => $voucher->doc_no_prefix,
                     'doc_no_number' => (string) $voucher->doc_no_number,
                     'doc_no' => $voucher->doc_no,
-                    'vendor_id' => $voucher->vendor_id,
+                    'supplier_id' => $voucher->supplier_id,
                     'vendor_name' => $voucher->vendor_name,
                     'supplier_name' => $voucher->supplier_name,
                     'doc_date' => optional($voucher->doc_date)->format('Y-m-d'),
@@ -124,7 +125,7 @@ class PurchaseVoucherController extends Controller
                         'doc_no_prefix' => $voucher->doc_no_prefix,
                         'doc_no_number' => (string) $voucher->doc_no_number,
                         'doc_no' => $voucher->doc_no,
-                        'vendor_id' => $voucher->vendor_id,
+                        'supplier_id' => $voucher->supplier_id,
                         'purchase_order_id' => $voucher->purchase_order_id,
                         'vendor_name' => $voucher->vendor_name,
                         'supplier_name' => $voucher->supplier_name,
@@ -206,7 +207,7 @@ class PurchaseVoucherController extends Controller
 
             [$preparedItems, $touchedPoIds] = $this->allocationService->prepareVoucherItems(
                 $validated['items'],
-                (int) ($validated['vendor_id'] ?? $validated['supplier_id']),
+                (int) $validated['supplier_id'],
                 null,
                 $request->user()?->id
             );
@@ -216,7 +217,7 @@ class PurchaseVoucherController extends Controller
             }
 
             $docNoNumber = $this->resolveDocNoNumber($validated['doc_no_number'] ?? null);
-            $docNoPrefix = (string) ($validated['doc_no_prefix'] ?? '25-26/');
+            $docNoPrefix = (string) ($validated['doc_no_prefix'] ?? $this->currentFyPrefix());
             $docNo = $docNoPrefix . $docNoNumber;
 
             [$itemsTotal, $chargesTotal, $netTotal] = $this->computeTotals(
@@ -228,7 +229,7 @@ class PurchaseVoucherController extends Controller
                 'doc_no_prefix' => $docNoPrefix,
                 'doc_no_number' => $docNoNumber,
                 'doc_no' => $docNo,
-                'vendor_id' => (int) ($validated['vendor_id'] ?? $validated['supplier_id']),
+                'supplier_id' => (int) $validated['supplier_id'],
                 'purchase_order_id' => $validated['purchase_order_id'] ?? null,
                 'doc_date' => $validated['doc_date'],
                 'bill_no' => $validated['bill_no'] ?? '',
@@ -290,7 +291,7 @@ class PurchaseVoucherController extends Controller
                 $validated['doc_no_number'] ?? $voucher->doc_no_number,
                 $voucher->id
             );
-            $docNoPrefix = (string) ($validated['doc_no_prefix'] ?? $voucher->doc_no_prefix ?? '25-26/');
+            $docNoPrefix = (string) ($validated['doc_no_prefix'] ?? $voucher->doc_no_prefix ?? $this->currentFyPrefix());
             $docNo = $docNoPrefix . $docNoNumber;
 
             $items = $validated['items'] ?? $voucher->items()->get()->map(function (PurchaseVoucherItem $i) {
@@ -330,7 +331,7 @@ class PurchaseVoucherController extends Controller
             if (array_key_exists('items', $validated)) {
                 [$items, $newTouchedPoIds] = $this->allocationService->prepareVoucherItems(
                     $validated['items'],
-                    (int) ($validated['vendor_id'] ?? $validated['supplier_id'] ?? $voucher->vendor_id),
+                    (int) ($validated['supplier_id'] ?? $voucher->supplier_id),
                     $voucher->id,
                     $request->user()?->id
                 );
@@ -345,7 +346,7 @@ class PurchaseVoucherController extends Controller
                 'doc_no_prefix' => $docNoPrefix,
                 'doc_no_number' => $docNoNumber,
                 'doc_no' => $docNo,
-                'vendor_id' => (int) ($validated['vendor_id'] ?? $validated['supplier_id'] ?? $voucher->vendor_id),
+                'supplier_id' => (int) ($validated['supplier_id'] ?? $voucher->supplier_id),
                 'purchase_order_id' => $validated['purchase_order_id'] ?? $voucher->purchase_order_id,
                 'doc_date' => $validated['doc_date'] ?? optional($voucher->doc_date)->format('Y-m-d'),
                 'bill_no' => $validated['bill_no'] ?? $voucher->bill_no,
@@ -454,6 +455,13 @@ class PurchaseVoucherController extends Controller
         return [round($itemsTotal, 2), round($chargesTotal, 2), $net];
     }
 
+    private function currentFyPrefix(): string
+    {
+        $now = Carbon::now();
+        $fyStart = $now->month >= 4 ? $now->year : $now->year - 1;
+        return substr((string) $fyStart, 2) . '-' . substr((string) ($fyStart + 1), 2) . '/';
+    }
+
     private function resolveDocNoNumber($requested, ?int $ignoreId = null): int
     {
         $candidate = is_null($requested) ? null : (int) $requested;
@@ -477,18 +485,14 @@ class PurchaseVoucherController extends Controller
     private function validatePayload(Request $request, bool $isUpdate): array
     {
         $itemRules = $isUpdate ? 'sometimes|array|min:1' : 'required|array|min:1';
-        $vendorRule = $isUpdate
-            ? 'sometimes|integer|exists:suppliers,id'
-            : 'required_without:supplier_id|integer|exists:suppliers,id';
         $supplierRule = $isUpdate
             ? 'sometimes|integer|exists:suppliers,id'
-            : 'required_without:vendor_id|integer|exists:suppliers,id';
+            : 'required|integer|exists:suppliers,id';
 
         return $request->validate([
             'doc_no_prefix' => 'nullable|string|max:20',
             'doc_no_number' => 'nullable|integer|min:1',
             'purchase_order_id' => 'nullable|integer|exists:purchase_orders,id',
-            'vendor_id' => $vendorRule,
             'supplier_id' => $supplierRule,
             'doc_date' => $isUpdate ? 'sometimes|date' : 'required|date',
             'bill_no' => $isUpdate ? 'sometimes|nullable|regex:/^\d+$/|max:100' : 'nullable|regex:/^\d+$/|max:100',
@@ -537,8 +541,7 @@ class PurchaseVoucherController extends Controller
             'charges.*.calculated_amount' => 'nullable|numeric',
             'charges.*.remarks' => 'nullable|string|max:255',
         ], [
-            'vendor_id.exists' => 'Selected vendor does not exist',
-            'supplier_id.exists' => 'Selected vendor does not exist',
+            'supplier_id.exists' => 'Selected supplier does not exist',
         ]);
     }
 }

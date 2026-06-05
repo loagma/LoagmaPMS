@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'auth_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -33,7 +34,7 @@ class ProductTaxFormController extends GetxController {
         Uri.parse(ApiConfig.taxes).replace(
           queryParameters: {'limit': '100', 'is_active': 'true'},
         ),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -97,10 +98,7 @@ class ProductTaxFormController extends GetxController {
 
       final response = await http.post(
         Uri.parse(ApiConfig.productTaxes),
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
+        headers: AuthController.jsonHeaders,
         body: jsonEncode(payload),
       );
 

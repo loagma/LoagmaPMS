@@ -47,7 +47,7 @@ class PurchaseReturnController extends Controller
                 'doc_no' => $row->doc_no,
                 'doc_date' => optional($row->doc_date)->format('Y-m-d'),
                 'status' => $row->status,
-                'vendor_id' => $row->vendor_id,
+                'supplier_id' => $row->supplier_id,
                 'vendor_name' => $row->vendor?->supplier_name,
                 'source_purchase_voucher_id' => $row->source_purchase_voucher_id,
                 'items_total' => (float) $row->items_total,
@@ -73,12 +73,12 @@ class PurchaseReturnController extends Controller
     public function series(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'vendor_id' => ['required', 'integer', 'exists:suppliers,id'],
+            'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
             'doc_no_prefix' => ['nullable', 'string', 'max:20'],
         ]);
 
         $series = $this->resolveDocumentSeries(
-            (int) $validated['vendor_id'],
+            (int) $validated['supplier_id'],
             $validated['doc_no_prefix'] ?? null
         );
 
@@ -137,7 +137,7 @@ class PurchaseReturnController extends Controller
                 'doc_no' => $purchaseReturn->doc_no,
                 'doc_date' => optional($purchaseReturn->doc_date)->format('Y-m-d'),
                 'status' => $purchaseReturn->status,
-                'vendor_id' => $purchaseReturn->vendor_id,
+                'supplier_id' => $purchaseReturn->supplier_id,
                 'vendor_name' => $purchaseReturn->vendor?->supplier_name,
                 'source_purchase_voucher_id' => $purchaseReturn->source_purchase_voucher_id,
                 'source_purchase_voucher_no' => $purchaseReturn->sourcePurchaseVoucher?->doc_no,
@@ -162,9 +162,9 @@ class PurchaseReturnController extends Controller
             ->with('items')
             ->findOrFail($header['source_purchase_voucher_id']);
 
-        if ((int) $sourceVoucher->vendor_id !== (int) $header['vendor_id']) {
+        if ((int) $sourceVoucher->supplier_id !== (int) $header['supplier_id']) {
             throw ValidationException::withMessages([
-                'header.vendor_id' => 'Vendor must match the selected source purchase voucher.',
+                'header.supplier_id' => 'Supplier must match the selected source purchase voucher.',
             ]);
         }
 
@@ -175,18 +175,19 @@ class PurchaseReturnController extends Controller
         );
 
         $totals = $this->computeTotals($computedItems, $validated['charges'] ?? []);
-        $series = $this->resolveDocumentSeries(
-            (int) $header['vendor_id'],
-            $header['doc_no_prefix'] ?? null
-        );
 
-        $created = DB::transaction(function () use ($header, $computedItems, $totals, $series, $validated): PurchaseReturn {
+        $created = DB::transaction(function () use ($header, $computedItems, $totals, $validated): PurchaseReturn {
+            $series = $this->resolveDocumentSeries(
+                (int) $header['supplier_id'],
+                $header['doc_no_prefix'] ?? null
+            );
+
             $purchaseReturn = PurchaseReturn::query()->create([
                 'doc_no_prefix' => $series['prefix'],
                 'doc_no_number' => $series['number'],
                 'doc_no' => $series['doc_no'],
                 'source_purchase_voucher_id' => $header['source_purchase_voucher_id'],
-                'vendor_id' => $header['vendor_id'],
+                'supplier_id' => $header['supplier_id'],
                 'doc_date' => $header['doc_date'],
                 'reason' => $header['reason'] ?? null,
                 'status' => $header['status'] ?? 'DRAFT',
@@ -222,9 +223,9 @@ class PurchaseReturnController extends Controller
             ->with('items')
             ->findOrFail($header['source_purchase_voucher_id']);
 
-        if ((int) $sourceVoucher->vendor_id !== (int) $header['vendor_id']) {
+        if ((int) $sourceVoucher->supplier_id !== (int) $header['supplier_id']) {
             throw ValidationException::withMessages([
-                'header.vendor_id' => 'Vendor must match the selected source purchase voucher.',
+                'header.supplier_id' => 'Supplier must match the selected source purchase voucher.',
             ]);
         }
 
@@ -239,7 +240,7 @@ class PurchaseReturnController extends Controller
         DB::transaction(function () use ($purchaseReturn, $header, $computedItems, $totals, $validated): void {
             $purchaseReturn->update([
                 'source_purchase_voucher_id' => $header['source_purchase_voucher_id'],
-                'vendor_id' => $header['vendor_id'],
+                'supplier_id' => $header['supplier_id'],
                 'doc_date' => $header['doc_date'],
                 'reason' => $header['reason'] ?? null,
                 'status' => $header['status'] ?? $purchaseReturn->status,
@@ -282,14 +283,14 @@ class PurchaseReturnController extends Controller
             'header' => ['sometimes', 'array'],
             'header.doc_no_prefix' => ['nullable', 'string', 'max:20'],
             'header.source_purchase_voucher_id' => ['required_with:header', 'integer', 'exists:purchase_vouchers,id'],
-            'header.vendor_id' => ['required_with:header', 'integer', 'exists:suppliers,id'],
+            'header.supplier_id' => ['required_with:header', 'integer', 'exists:suppliers,id'],
             'header.doc_date' => ['required_with:header', 'date'],
             'header.reason' => ['nullable', 'string'],
             'header.status' => ['nullable', 'in:DRAFT,POSTED,CANCELLED'],
 
             'doc_no_prefix' => ['nullable', 'string', 'max:20'],
             'source_purchase_voucher_id' => ['required_without:header', 'integer', 'exists:purchase_vouchers,id'],
-            'vendor_id' => ['required_without:header', 'integer', 'exists:suppliers,id'],
+            'supplier_id' => ['required_without:header', 'integer', 'exists:suppliers,id'],
             'doc_date' => ['required_without:header', 'date'],
             'reason' => ['nullable', 'string'],
             'status' => ['nullable', 'in:DRAFT,POSTED,CANCELLED'],
@@ -323,7 +324,7 @@ class PurchaseReturnController extends Controller
         return [
             'doc_no_prefix' => $validated['doc_no_prefix'] ?? null,
             'source_purchase_voucher_id' => $validated['source_purchase_voucher_id'] ?? null,
-            'vendor_id' => $validated['vendor_id'] ?? null,
+            'supplier_id' => $validated['supplier_id'] ?? null,
             'doc_date' => $validated['doc_date'] ?? null,
             'reason' => $validated['reason'] ?? null,
             'status' => $validated['status'] ?? null,
@@ -340,7 +341,7 @@ class PurchaseReturnController extends Controller
         }
 
         $number = ((int) PurchaseReturn::query()
-            ->where('vendor_id', $vendorId)
+            ->where('supplier_id', $vendorId)
             ->where('doc_no_prefix', $prefix)
             ->orderByDesc('doc_no_number')
             ->lockForUpdate()

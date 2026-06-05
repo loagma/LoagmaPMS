@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../controllers/auth_controller.dart';
 
 import 'package:http/http.dart' as http;
 
@@ -95,7 +96,7 @@ class CustomerApiService {
       );
 
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
 
       if (response.statusCode != 200) {
@@ -122,7 +123,7 @@ class CustomerApiService {
       final response = await http
           .get(
             Uri.parse('${ApiConfig.customers}/$id'),
-            headers: {'Accept': 'application/json'},
+            headers: AuthController.getHeaders,
           )
           .timeout(const Duration(seconds: 15));
 
@@ -162,7 +163,7 @@ class CustomerApiService {
       );
 
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
 
       if (response.statusCode != 200) {

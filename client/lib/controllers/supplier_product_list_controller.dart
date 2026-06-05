@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'auth_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -37,7 +38,7 @@ class SupplierProductListController extends GetxController {
       final uri = Uri.parse('${ApiConfig.apiBaseUrl}/supplier-products')
           .replace(queryParameters: queryParams);
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
@@ -75,7 +76,7 @@ class SupplierProductListController extends GetxController {
       final uri = Uri.parse('${ApiConfig.apiBaseUrl}/supplier-products')
           .replace(queryParameters: queryParams);
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
@@ -103,10 +104,7 @@ class SupplierProductListController extends GetxController {
       final response = await http
           .post(
             Uri.parse('${ApiConfig.apiBaseUrl}/supplier-products/bulk'),
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-            },
+            headers: AuthController.jsonHeaders,
             body: jsonEncode({
               'supplier_id': supplierId,
               'product_ids': productIds,
@@ -143,7 +141,7 @@ class SupplierProductListController extends GetxController {
     try {
       final response = await http.delete(
         Uri.parse('${ApiConfig.apiBaseUrl}/supplier-products/$id'),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {

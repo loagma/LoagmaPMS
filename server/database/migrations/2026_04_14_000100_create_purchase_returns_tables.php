@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('doc_no', 80)->nullable()->index();
 
             $table->unsignedBigInteger('source_purchase_voucher_id')->nullable();
-            $table->unsignedBigInteger('vendor_id');
+            $table->unsignedBigInteger('supplier_id');
 
             $table->date('doc_date');
             $table->text('reason')->nullable();
@@ -42,10 +42,10 @@ return new class extends Migration
                 ->references('id')
                 ->on('purchase_vouchers')
                 ->nullOnDelete();
-            $table->foreign('vendor_id')->references('id')->on('suppliers');
+            $table->foreign('supplier_id')->references('id')->on('suppliers');
 
             $table->unique(['doc_no_prefix', 'doc_no_number']);
-            $table->index('vendor_id');
+            $table->index('supplier_id');
             $table->index('doc_date');
         });
 

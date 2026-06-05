@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../controllers/auth_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -50,7 +51,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
         },
       );
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
@@ -102,7 +103,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
     try {
       final uri = Uri.parse('${ApiConfig.categories}/$categoryId');
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 20));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -122,7 +123,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
         queryParameters: {'search': hsnCode},
       );
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 20));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -151,7 +152,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
         },
       );
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 20));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;

@@ -7,6 +7,7 @@ import 'theme/app_colors.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AuthController.loadSession();
   final isLoggedIn = await AuthController.isLoggedIn();
   runApp(MyApp(isLoggedIn: isLoggedIn));
 }

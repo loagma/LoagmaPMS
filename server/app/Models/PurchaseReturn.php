@@ -11,7 +11,7 @@ class PurchaseReturn extends Model
         'doc_no_number',
         'doc_no',
         'source_purchase_voucher_id',
-        'vendor_id',
+        'supplier_id',
         'doc_date',
         'reason',
         'status',
@@ -26,7 +26,7 @@ class PurchaseReturn extends Model
     protected $casts = [
         'doc_no_number' => 'integer',
         'source_purchase_voucher_id' => 'integer',
-        'vendor_id' => 'integer',
+        'supplier_id' => 'integer',
         'doc_date' => 'date',
         'items_total' => 'decimal:2',
         'charges_total' => 'decimal:2',
@@ -38,7 +38,7 @@ class PurchaseReturn extends Model
 
     public function vendor()
     {
-        return $this->belongsTo(Supplier::class, 'vendor_id');
+        return $this->belongsTo(Supplier::class, 'supplier_id');
     }
 
     public function sourcePurchaseVoucher()

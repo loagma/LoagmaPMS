@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../controllers/auth_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -41,7 +42,7 @@ class _InventoryDetailsScreenState extends State<InventoryDetailsScreen> {
       );
 
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
@@ -245,10 +246,7 @@ class _InventoryDetailsScreenState extends State<InventoryDetailsScreen> {
       final response = await http
           .post(
             uri,
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-            },
+            headers: AuthController.jsonHeaders,
             body: jsonEncode({'stock_change': stockChange, 'reason': reason}),
           )
           .timeout(const Duration(seconds: 30));
@@ -292,7 +290,7 @@ class _InventoryDetailsScreenState extends State<InventoryDetailsScreen> {
       );
 
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {

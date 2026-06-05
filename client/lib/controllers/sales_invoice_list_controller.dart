@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'auth_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -57,7 +58,7 @@ class SalesInvoiceListController extends GetxController {
 
       final uri = Uri.parse(ApiConfig.salesOrders).replace(queryParameters: queryParams);
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
@@ -128,7 +129,7 @@ class SalesInvoiceListController extends GetxController {
       final response = await http
           .put(
             Uri.parse('${ApiConfig.salesOrders}/${inv.id}'),
-            headers: {'Accept': 'application/json', 'Content-Type': 'application/json'},
+            headers: AuthController.jsonHeaders,
             body: jsonEncode({'cancel_invoice': true}),
           )
           .timeout(const Duration(seconds: 15));

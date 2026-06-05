@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'auth_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
@@ -105,7 +106,7 @@ class PurchaseReturnFormController extends GetxController {
       final response = await http
           .get(
             Uri.parse(ApiConfig.suppliers),
-            headers: {'Accept': 'application/json'},
+            headers: AuthController.getHeaders,
           )
           .timeout(const Duration(seconds: 15));
 
@@ -157,7 +158,7 @@ class PurchaseReturnFormController extends GetxController {
       final response = await http
           .get(
             Uri.parse(ApiConfig.unitTypes),
-            headers: {'Accept': 'application/json'},
+            headers: AuthController.getHeaders,
           )
           .timeout(const Duration(seconds: 15));
 
@@ -177,10 +178,10 @@ class PurchaseReturnFormController extends GetxController {
     try {
       final uri = Uri.parse(
         ApiConfig.purchaseReturnSeries,
-      ).replace(queryParameters: {'vendor_id': supplierId.toString()});
+      ).replace(queryParameters: {'supplier_id': supplierId.toString()});
 
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
@@ -206,12 +207,12 @@ class PurchaseReturnFormController extends GetxController {
         queryParameters: {
           'limit': '20',
           if (query.trim().isNotEmpty) 'search': query.trim(),
-          if (vendorIdFilter != null) 'vendor_id': vendorIdFilter.toString(),
+          if (vendorIdFilter != null) 'supplier_id': vendorIdFilter.toString(),
         },
       );
 
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
@@ -242,7 +243,7 @@ class PurchaseReturnFormController extends GetxController {
       final response = await http
           .get(
             Uri.parse('${ApiConfig.purchaseVouchers}/$pvId'),
-            headers: {'Accept': 'application/json'},
+            headers: AuthController.getHeaders,
           )
           .timeout(const Duration(seconds: 15));
 
@@ -259,7 +260,7 @@ class PurchaseReturnFormController extends GetxController {
               pvData['doc_no_number']?.toString() ??
               '';
           vendorId.value = _safeInt(
-            pvData['vendor_id'] ?? pvData['supplier_id'],
+            pvData['supplier_id'] ?? pvData['vendor_id'],
           );
           vendorName.value =
               pvData['vendor_name']?.toString() ??
@@ -327,7 +328,7 @@ class PurchaseReturnFormController extends GetxController {
       final response = await http
           .get(
             Uri.parse('${ApiConfig.purchaseReturns}/$returnId'),
-            headers: {'Accept': 'application/json'},
+            headers: AuthController.getHeaders,
           )
           .timeout(const Duration(seconds: 15));
 
@@ -519,7 +520,7 @@ class PurchaseReturnFormController extends GetxController {
 
       final payload = {
         'source_purchase_voucher_id': sourcePvIdSelected.value,
-        'vendor_id': vendorId.value,
+        'supplier_id': vendorId.value,
         'doc_date': docDate.value,
         'reason': reason.value.isNotEmpty ? reason.value : null,
         'status': post ? 'POSTED' : 'DRAFT',
@@ -532,10 +533,7 @@ class PurchaseReturnFormController extends GetxController {
             ? ApiConfig.createPurchaseReturn
             : '${ApiConfig.purchaseReturns}/$returnId',
       );
-      final headers = {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      };
+      final headers = AuthController.jsonHeaders;
 
       final response = returnId == null
           ? await http
@@ -578,7 +576,7 @@ class PurchaseReturnFormController extends GetxController {
       final response = await http
           .delete(
             Uri.parse('${ApiConfig.purchaseReturns}/$returnId'),
-            headers: {'Accept': 'application/json'},
+            headers: AuthController.getHeaders,
           )
           .timeout(const Duration(seconds: 15));
 

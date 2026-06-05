@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'auth_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -50,7 +51,7 @@ class PurchaseReturnListController extends GetxController {
         'per_page': limit.toString(),
         'page': currentPage.value.toString(),
         if (searchQuery.value.isNotEmpty) 'search': searchQuery.value,
-        if (vendorId != null && vendorId.isNotEmpty) 'vendor_id': vendorId,
+        if (vendorId != null && vendorId.isNotEmpty) 'supplier_id': vendorId,
         if (status != null && status.isNotEmpty) 'status': status,
         if (fromDate != null && fromDate.isNotEmpty) 'from_date': fromDate,
         if (toDate != null && toDate.isNotEmpty) 'to_date': toDate,
@@ -61,7 +62,7 @@ class PurchaseReturnListController extends GetxController {
       ).replace(queryParameters: queryParams);
 
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
@@ -161,7 +162,7 @@ class PurchaseReturnListController extends GetxController {
       final response = await http
           .delete(
             Uri.parse('${ApiConfig.purchaseReturns}/${summary.id}'),
-            headers: {'Accept': 'application/json'},
+            headers: AuthController.getHeaders,
           )
           .timeout(const Duration(seconds: 15));
 

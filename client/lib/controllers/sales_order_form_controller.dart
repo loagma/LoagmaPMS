@@ -8,7 +8,7 @@ import 'package:http/http.dart' as http;
 
 import '../api_config.dart';
 import '../constants/charge_constants.dart';
-import '../controllers/auth_controller.dart';
+import 'auth_controller.dart';
 import '../models/party_result.dart';
 import '../models/product_model.dart';
 import '../models/sales_order_model.dart';
@@ -106,7 +106,7 @@ class SalesOrderFormController extends GetxController {
       };
       final uri = Uri.parse(ApiConfig.vendorProducts).replace(queryParameters: params);
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) return [];
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -239,7 +239,7 @@ class SalesOrderFormController extends GetxController {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.departments),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -272,7 +272,7 @@ class SalesOrderFormController extends GetxController {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.salesmen).replace(queryParameters: {'role': 'salesman', 'limit': '500'}),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode != 200) return;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -294,7 +294,7 @@ class SalesOrderFormController extends GetxController {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.unitTypes),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -314,7 +314,7 @@ class SalesOrderFormController extends GetxController {
         queryParameters: {'limit': '1'},
       );
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) return;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -364,7 +364,7 @@ class SalesOrderFormController extends GetxController {
         queryParameters: {'limit': '1'},
       );
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) return null;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -481,7 +481,7 @@ class SalesOrderFormController extends GetxController {
 
       final detailResp = await http.get(
         Uri.parse('${ApiConfig.salesOrders}/$id'),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (detailResp.statusCode != 200) { await _resetToNewForm(); return; }
       final detailData = jsonDecode(detailResp.body) as Map<String, dynamic>;
@@ -530,7 +530,7 @@ class SalesOrderFormController extends GetxController {
         return;
       }
       final detailResp = await http
-          .get(Uri.parse('${ApiConfig.salesOrders}/$id'), headers: {'Accept': 'application/json'})
+          .get(Uri.parse('${ApiConfig.salesOrders}/$id'), headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
       if (detailResp.statusCode != 200) { _showError('Voucher #$n not found'); return; }
       final detailData = jsonDecode(detailResp.body) as Map<String, dynamic>;
@@ -554,7 +554,7 @@ class SalesOrderFormController extends GetxController {
           queryParameters: {'limit': pageSize.toString(), 'page': page.toString()},
         );
         final response = await http
-            .get(uri, headers: {'Accept': 'application/json'})
+            .get(uri, headers: AuthController.getHeaders)
             .timeout(const Duration(seconds: 15));
         if (response.statusCode != 200) return null;
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -584,7 +584,7 @@ class SalesOrderFormController extends GetxController {
       isLoading.value = true;
       final response = await http.get(
         Uri.parse('${ApiConfig.salesOrders}/$soId'),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -890,12 +890,12 @@ class SalesOrderFormController extends GetxController {
       final response = isCreate
           ? await http.post(
               Uri.parse(url),
-              headers: {'Accept': 'application/json', 'Content-Type': 'application/json'},
+              headers: AuthController.jsonHeaders,
               body: jsonEncode(payload),
             )
           : await http.put(
               Uri.parse(url),
-              headers: {'Accept': 'application/json', 'Content-Type': 'application/json'},
+              headers: AuthController.jsonHeaders,
               body: jsonEncode(payload),
             );
 

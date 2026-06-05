@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'auth_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -179,7 +180,7 @@ class ProductFormController extends GetxController {
         },
       );
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) return null;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -212,7 +213,7 @@ class ProductFormController extends GetxController {
         Uri.parse(ApiConfig.taxes).replace(
           queryParameters: {'limit': '100', 'is_active': 'true'},
         ),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -234,7 +235,7 @@ class ProductFormController extends GetxController {
         Uri.parse(ApiConfig.categories).replace(
           queryParameters: {'parent_cat_id': '0'},
         ),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -260,7 +261,7 @@ class ProductFormController extends GetxController {
         Uri.parse(ApiConfig.categories).replace(
           queryParameters: {'parent_cat_id': parentCatId.toString()},
         ),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -414,7 +415,7 @@ class ProductFormController extends GetxController {
       Uri.parse(ApiConfig.productTaxes).replace(
         queryParameters: {'product_id': savedProductId.toString(), 'limit': '200'},
       ),
-      headers: {'Accept': 'application/json'},
+      headers: AuthController.getHeaders,
     );
     if (response.statusCode != 200) {
       return map;
@@ -447,7 +448,7 @@ class ProductFormController extends GetxController {
         if (desired == null || !_isSamePercent(existing.taxPercent, desired)) {
           final deleteResponse = await http.delete(
             Uri.parse('${ApiConfig.productTaxes}/${existing.id}'),
-            headers: {'Accept': 'application/json'},
+            headers: AuthController.getHeaders,
           );
           if (deleteResponse.statusCode != 200 && deleteResponse.statusCode != 204) {
             allSuccess = false;
@@ -463,10 +464,7 @@ class ProductFormController extends GetxController {
 
         final postResponse = await http.post(
           Uri.parse(ApiConfig.productTaxes),
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
+          headers: AuthController.jsonHeaders,
           body: jsonEncode({
             'product_id': savedProductId,
             'tax_id': entry.key,
@@ -648,7 +646,7 @@ class ProductFormController extends GetxController {
     try {
       final response = await http.get(
         Uri.parse('${ApiConfig.products}/$id/edit'),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode != 200) {
         return false;
@@ -862,18 +860,12 @@ class ProductFormController extends GetxController {
       final response = isEditMode
           ? await http.put(
               Uri.parse(url),
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              },
+              headers: AuthController.jsonHeaders,
               body: jsonEncode(payload),
             )
           : await http.post(
               Uri.parse(url),
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              },
+              headers: AuthController.jsonHeaders,
               body: jsonEncode(payload),
             );
 

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'auth_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -102,12 +103,12 @@ class CustomerFormController extends GetxController {
       final response = isEditMode
           ? await http.put(
               Uri.parse(url),
-              headers: {'Accept': 'application/json', 'Content-Type': 'application/json'},
+              headers: AuthController.jsonHeaders,
               body: jsonEncode(payload),
             )
           : await http.post(
               Uri.parse(url),
-              headers: {'Accept': 'application/json', 'Content-Type': 'application/json'},
+              headers: AuthController.jsonHeaders,
               body: jsonEncode(payload),
             );
 

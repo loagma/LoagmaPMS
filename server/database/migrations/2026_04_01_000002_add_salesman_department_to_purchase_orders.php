@@ -21,7 +21,7 @@ return new class extends Migration
                 $table->index('salesman_id');
             }
             if (! Schema::hasColumn('purchase_orders', 'department_id')) {
-                $table->string('department_id', 10)->nullable()->after('salesman_id');
+                $table->string('department_id', 191)->nullable()->after('salesman_id');
                 $table->index('department_id');
             }
         });

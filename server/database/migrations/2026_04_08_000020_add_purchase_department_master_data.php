@@ -79,14 +79,6 @@ return new class extends Migration
             return 'department_crm';
         }
 
-        if (Schema::hasTable('Department')) {
-            return 'Department';
-        }
-
-        if (Schema::hasTable('departments')) {
-            return 'departments';
-        }
-
         return null;
     }
 };

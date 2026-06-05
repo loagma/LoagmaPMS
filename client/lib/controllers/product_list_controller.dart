@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'auth_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -40,7 +41,7 @@ class ProductListController extends GetxController {
       );
 
       final response = await http
-          .get(uri, headers: {'Accept': 'application/json'})
+          .get(uri, headers: AuthController.getHeaders)
           .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
@@ -87,7 +88,7 @@ class ProductListController extends GetxController {
     try {
       final response = await http.delete(
         Uri.parse('${ApiConfig.products}/$productId'),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       ).timeout(const Duration(seconds: 15));
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;

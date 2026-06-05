@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'auth_controller.dart';
 
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter/material.dart';
@@ -51,7 +52,7 @@ class CategoryFormController extends GetxController {
       isLoading.value = true;
       final response = await http.get(
         Uri.parse('${ApiConfig.categories}/$categoryId'),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -86,7 +87,7 @@ class CategoryFormController extends GetxController {
         Uri.parse(ApiConfig.categories).replace(
           queryParameters: {'parent_cat_id': '0'},
         ),
-        headers: {'Accept': 'application/json'},
+        headers: AuthController.getHeaders,
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -121,18 +122,12 @@ class CategoryFormController extends GetxController {
       final response = isEditMode
           ? await http.put(
               Uri.parse(url),
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              },
+              headers: AuthController.jsonHeaders,
               body: jsonEncode(payload),
             )
           : await http.post(
               Uri.parse(url),
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              },
+              headers: AuthController.jsonHeaders,
               body: jsonEncode(payload),
             );
 
@@ -214,10 +209,7 @@ class CategoryFormController extends GetxController {
     try {
       final response = await http.post(
         Uri.parse(ApiConfig.categories),
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
+        headers: AuthController.jsonHeaders,
         body: jsonEncode({
           'name': subcategoryNameText,
           'parent_cat_id': parentCategoryId,

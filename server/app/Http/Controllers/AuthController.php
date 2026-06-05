@@ -13,9 +13,6 @@ class AuthController extends Controller
      * POST /api/auth/login
      *
      * Body: { "mobile": "9876543210", "otp": "5555" }
-     *
-     * Validates the OTP against the master OTP in config/env, then looks up
-     * the deli_staff row by mobile number and returns the staff details.
      */
     public function login(Request $request): JsonResponse
     {
@@ -29,7 +26,6 @@ class AuthController extends Controller
             ], 422);
         }
 
-        // Validate OTP against master secret (set MASTER_OTP in .env, default 5555)
         $masterOtp = env('MASTER_OTP', '5555');
         if ($otp !== $masterOtp) {
             return response()->json([
@@ -58,20 +54,31 @@ class AuthController extends Controller
                 ], 404);
             }
 
-            // Strict cast — PDO returns tinyint as string from some drivers
-            $isLocked = (int) $staff->is_locked;
-
-            if ($isLocked === 1) {
+            if ((int) $staff->is_locked === 1) {
                 return response()->json([
-                    'success'  => false,
-                    'message'  => 'This account is locked. Contact your admin.',
-                    '_debug'   => ['is_locked_raw' => $staff->is_locked, 'deli_id' => $staff->deli_id],
+                    'success' => false,
+                    'message' => 'This account is locked. Contact your admin.',
                 ], 403);
             }
 
+            $rawToken  = bin2hex(random_bytes(32));
+            $expiresAt = now()->addHours(24);
+
+            DB::table('api_tokens')->insert([
+                'token_hash' => hash('sha256', $rawToken),
+                'user_id'    => (string) $staff->deli_id,
+                'user_type'  => 'deli_staff',
+                'mobile'     => $staff->mobile,
+                'expires_at' => $expiresAt,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
             return response()->json([
-                'success' => true,
-                'data' => [
+                'success'    => true,
+                'token'      => $rawToken,
+                'expires_at' => $expiresAt->toISOString(),
+                'data'       => [
                     'deli_id'  => $staff->deli_id,
                     'admin_id' => $staff->admin_id,
                     'role'     => $staff->role,
@@ -88,5 +95,17 @@ class AuthController extends Controller
                 'message' => 'Login failed. Please try again.',
             ], 500);
         }
+    }
+
+    /**
+     * DELETE /api/auth/logout
+     */
+    public function logout(Request $request): JsonResponse
+    {
+        $raw = $request->bearerToken();
+        if ($raw) {
+            DB::table('api_tokens')->where('token_hash', hash('sha256', $raw))->delete();
+        }
+        return response()->json(['success' => true, 'message' => 'Logged out']);
     }
 }
