@@ -181,6 +181,13 @@ class SalesReturnController extends Controller
                 return response()->json(['success' => false, 'message' => 'Source order not found'], 404);
             }
 
+            if (!empty($order->Sales_Return_VoucherNo)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'A return already exists for this order: ' . $order->Sales_Return_VoucherNo . '. Use PUT to update it.',
+                ], 422);
+            }
+
             $items = $request->input('items', []);
             if (empty($items)) {
                 return response()->json(['success' => false, 'message' => 'At least one item is required'], 422);
@@ -294,6 +301,7 @@ class SalesReturnController extends Controller
                     'Sales_Return_VoucherNo' => null,
                     'Sales_Return_Dt'        => null,
                     'Sales_Return_Reason'    => null,
+                    'order_state'            => 'billed',
                 ]);
             });
 

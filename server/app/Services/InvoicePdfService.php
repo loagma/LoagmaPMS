@@ -30,6 +30,11 @@ class InvoicePdfService
         $docYear  = $data['doc_year'] ?? 'general';
         $filename = str_replace('/', '_', $data['bill_no']) . '.pdf';
         $path     = "documents/sales-invoices/{$docYear}/{$filename}";
+        $dir      = "documents/sales-invoices/{$docYear}";
+
+        if (!Storage::disk('public')->exists($dir)) {
+            Storage::disk('public')->makeDirectory($dir);
+        }
 
         Storage::disk('public')->put($path, $pdf->output());
 
@@ -74,7 +79,7 @@ class InvoicePdfService
             ->where('userid', $adminId)
             ->select([
                 'userid', 'org_name', 'org_address', 'org_gst', 'fssai_no', 'gst_no',
-                'bank_name', 'bank_branch', 'account_number', 'ifsc_code', 'state',
+                'bank_name', 'bank_branch', 'account_number', 'ifsc_code',
             ])
             ->first();
 
@@ -107,7 +112,10 @@ class InvoicePdfService
         }
 
         // ── 5. Tax split: SGST/CGST for same state, IGST for inter-state ────
-        $companyState  = strtolower(trim((string) ($admin->state ?? '')));
+        // Company state is derived from the GST number (chars 1-2 are the state code).
+        // If GST is unavailable, $companyState stays empty and all tax defaults to IGST.
+        $gstNo         = (string) ($admin->org_gst ?? $admin->gst_no ?? '');
+        $companyState  = strlen($gstNo) >= 2 ? strtolower(substr($gstNo, 0, 2)) : '';
         $customerState = strtolower(trim((string) ($customer->state ?? '')));
         $sameState     = $companyState !== '' && $customerState !== ''
                          && $companyState === $customerState;

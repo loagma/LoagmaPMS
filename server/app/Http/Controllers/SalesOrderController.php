@@ -22,8 +22,10 @@ class SalesOrderController extends Controller
     {
         try {
             $prefix  = $this->invoicePrefix();
+            $docYear = $this->currentDocYear();
             $maxNum  = (int) DB::table(self::ORDERS_TABLE)
-                ->where('Doc_Year', $this->currentDocYear())
+                ->where('Doc_Year', $docYear)
+                ->whereNotNull('Doc_Year')
                 ->max('invoice_number');
             $nextNum = str_pad((string) ($maxNum + 1), 3, '0', STR_PAD_LEFT);
             return response()->json([
@@ -108,6 +110,7 @@ class SalesOrderController extends Controller
                     'o.salesman_id',
                     'sm.name as salesman_name',
                     'o.Sales_Return_VoucherNo',
+                    'o.charges_json',
                 ])
                 ->offset(($page - 1) * $limit)
                 ->limit($limit)
@@ -279,9 +282,10 @@ class SalesOrderController extends Controller
 
             if ($request->boolean('cancel_invoice')) {
                 DB::table(self::ORDERS_TABLE)->where('order_id', $id)->update([
-                    'bill_no'     => null,
-                    'Bill_Dt'     => null,
-                    'order_state' => 'pending',
+                    'bill_no'        => null,
+                    'invoice_number' => null,
+                    'Bill_Dt'        => null,
+                    'order_state'    => 'pending',
                 ]);
                 return response()->json(['success' => true, 'message' => 'Invoice cancelled, order reverted to Pending']);
             }
@@ -593,26 +597,41 @@ class SalesOrderController extends Controller
     {
         $prefix = $this->invoicePrefix();
 
-        // If the request sends a manually typed bill_no that differs from the
-        // auto prefix, honour it but do not track a sequence number for it.
+        // Re-editing an already-billed order: if the bill_no being submitted is the
+        // same one already on the order (i.e. the user did not change it), preserve
+        // the existing number — do NOT burn a new sequence slot.
+        if ($excludeOrderId !== null && $requestedBillNo !== null && $requestedBillNo !== '') {
+            $existing = DB::table(self::ORDERS_TABLE)
+                ->where('order_id', $excludeOrderId)
+                ->value('invoice_number');
+
+            if ($existing !== null) {
+                // Order already owns a sequence number — keep bill_no and number unchanged.
+                return [$requestedBillNo, (int) $existing];
+            }
+        }
+
+        // If the request sends a manually typed bill_no that does not match the
+        // auto-generated prefix, honour it as-is without consuming a sequence slot.
         if ($requestedBillNo !== null && $requestedBillNo !== '' && !str_starts_with($requestedBillNo, $prefix)) {
             return [$requestedBillNo, null];
         }
 
-        // Lock the current max to prevent duplicate assignment under concurrency.
+        // Lock ALL rows for this doc year so concurrent requests queue here and
+        // each reads a fresh max after the previous transaction commits.
+        // whereNotNull('Doc_Year') excludes legacy rows that predate the column.
         $query = DB::table(self::ORDERS_TABLE)
             ->where('Doc_Year', $docYear)
-            ->whereNotNull('invoice_number')
+            ->whereNotNull('Doc_Year')
             ->lockForUpdate();
 
         if ($excludeOrderId !== null) {
             $query->where('order_id', '<>', $excludeOrderId);
         }
 
-        $maxNum = (int) $query->max('invoice_number');
+        $maxNum  = (int) $query->max('invoice_number');
         $nextNum = $maxNum + 1;
-
-        $billNo = $prefix . str_pad((string) $nextNum, 3, '0', STR_PAD_LEFT);
+        $billNo  = $prefix . str_pad((string) $nextNum, 3, '0', STR_PAD_LEFT);
 
         return [$billNo, $nextNum];
     }
@@ -658,6 +677,7 @@ class SalesOrderController extends Controller
             'total_with_charges' => round($total - $discount + $delivery, 2),
             'narration'        => $data['txn_id'] ?? null,
             'bill_number'      => $data['bill_no'] ?? null,
+            'invoice_number'   => isset($data['invoice_number']) ? (int) $data['invoice_number'] : null,
             'bill_dt'          => $data['Bill_Dt'] ?? null,
             'department'       => $data['Department'] ?? null,
             'bill_narration'   => $data['Bill_Narration'] ?? null,

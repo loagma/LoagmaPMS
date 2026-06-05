@@ -116,7 +116,7 @@
           <div class="line"><span>Invoice No:</span> {{ $data['bill_no'] ?? '—' }}</div>
           <div class="line"><span>Invoice Date:</span> {{ \Carbon\Carbon::parse($data['bill_dt'] ?? now())->format('d M Y') }}</div>
           @if(!empty($data['doc_date']))
-            <div class="line"><span>Order Date:</span> {{ \Carbon\Carbon::parse($data['doc_date'])->format('d M Y') }}</div>
+            <div class="line"><span>Order Date:</span> {{ \Carbon\Carbon::parse($data['doc_date'] ?? now())->format('d M Y') }}</div>
           @endif
           @if(!empty($data['so_number']))
             <div class="line"><span>SO#:</span> {{ $data['so_number'] }}</div>
@@ -165,8 +165,8 @@
           <td class="col-prod">{{ $item['product_name'] ?? '—' }}</td>
           <td class="col-hsn">{{ $item['hsn_code'] ?? '—' }}</td>
           <td class="col-pack">{{ $item['pack_label'] ?? $item['unit'] ?? '—' }}</td>
-          <td class="col-soqty">{{ number_format($item['quantity'] ?? 0, 2) }}</td>
-          <td class="col-invqty">{{ number_format($item['used_qty'] ?? 0, 2) }}</td>
+          <td class="col-soqty">{{ number_format($item['quantity'] ?? 0, ($item['quantity'] == floor($item['quantity'] ?? 0)) ? 0 : 2) }}</td>
+          <td class="col-invqty">{{ number_format($item['used_qty'] ?? 0, ($item['used_qty'] == floor($item['used_qty'] ?? 0)) ? 0 : 2) }}</td>
           <td class="col-rate">{{ number_format($item['price'] ?? 0, 2) }}</td>
           <td class="col-disc">{{ $item['discount_percent'] > 0 ? number_format($item['discount_percent'], 1).'%' : '—' }}</td>
           <td class="col-tax" style="font-size:7.5pt">{{ $item['tax_label'] ?? '—' }}</td>
