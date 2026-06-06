@@ -183,8 +183,6 @@ class SalesOrderController extends Controller
                 $billVehicle, $billStatement, $billRoff, $docYear, $salesmanIdStore,
                 $chargesJson, &$orderId
             ) {
-                // Issue B: generate invoice number inside the transaction with a lock so
-                // concurrent requests cannot get the same number.
                 [$billNo, $invoiceNumber] = $status === 'billed'
                     ? $this->resolveInvoiceNumber($requestedBillNo, $docYear)
                     : [$requestedBillNo, null];
@@ -240,7 +238,8 @@ class SalesOrderController extends Controller
                         'item_total'    => round($qty * $price, 2),
                         'pinfo'         => json_encode(!empty($pinfo) ? $pinfo : new \stdClass()),
                         'commission'    => 0,
-                        'qty_delivered' => (int) round((float) ($item['qty_delivered'] ?? 0)),
+                        'qty_loaded'    => isset($item['qty_loaded']) ? (int) round((float) $item['qty_loaded']) : null,
+                        'qty_delivered' => 0,
                         'qty_returned'  => 0,
                     ]);
                 }
@@ -254,6 +253,11 @@ class SalesOrderController extends Controller
                 if ($adminId > 0) {
                     try {
                         $pdfUrl = app(InvoicePdfService::class)->generateAndStore($orderId, $adminId);
+                        if ($pdfUrl) {
+                            DB::table(self::ORDERS_TABLE)->where('order_id', $orderId)
+                                ->update(['invoice_pdf_url' => $pdfUrl]);
+                            $order->invoice_pdf_url = $pdfUrl;
+                        }
                     } catch (\Throwable $pdfErr) {
                         Log::warning('Invoice PDF generation failed after store: ' . $pdfErr->getMessage());
                     }
@@ -335,8 +339,6 @@ class SalesOrderController extends Controller
             $orderTotal = round($lineTotal - $discount + $delivery, 2);
 
             DB::transaction(function () use ($id, $order, $status, $orderTotal, $discount, $delivery, $items, $narration, $requestedBillNo, $billDt, $department, $billNarration, $billVehicle, $billStatement, $billRoff, $docYear, $salesmanId, $chargesJson) {
-                // Issue B: generate the authoritative invoice number inside the transaction
-                // with a SELECT ... FOR UPDATE lock so concurrent saves get different numbers.
                 [$billNo, $invoiceNumber] = $status === 'billed'
                     ? $this->resolveInvoiceNumber($requestedBillNo, $docYear, $id)
                     : [$requestedBillNo, $order->invoice_number ?? null];
@@ -394,7 +396,8 @@ class SalesOrderController extends Controller
                         'item_total'    => round($qty * $price, 2),
                         'pinfo'         => json_encode(!empty($pinfo) ? $pinfo : new \stdClass()),
                         'commission'    => 0,
-                        'qty_delivered' => (int) round((float) ($item['qty_delivered'] ?? 0)),
+                        'qty_loaded'    => isset($item['qty_loaded']) ? (int) round((float) $item['qty_loaded']) : null,
+                        'qty_delivered' => 0,
                         // Issue D: restore any previously recorded return qty for this product
                         'qty_returned'  => $returnedMap[$productId] ?? 0,
                     ]);
@@ -409,6 +412,11 @@ class SalesOrderController extends Controller
                 if ($adminId > 0) {
                     try {
                         $pdfUrl = app(InvoicePdfService::class)->generateAndStore($id, $adminId);
+                        if ($pdfUrl) {
+                            DB::table(self::ORDERS_TABLE)->where('order_id', $id)
+                                ->update(['invoice_pdf_url' => $pdfUrl]);
+                            $updated->invoice_pdf_url = $pdfUrl;
+                        }
                     } catch (\Throwable $pdfErr) {
                         Log::warning('Invoice PDF generation failed after update: ' . $pdfErr->getMessage());
                     }
@@ -481,6 +489,7 @@ class SalesOrderController extends Controller
                     'sm.name as salesman_name',
                     'o.Sales_Return_VoucherNo',
                     'o.charges_json',
+                    'o.invoice_pdf_url',
                 ])
                 ->first();
 
@@ -496,6 +505,7 @@ class SalesOrderController extends Controller
                     'oi.product_id',
                     'oi.pinfo',
                     'oi.quantity',
+                    'oi.qty_loaded',
                     'oi.qty_delivered',
                     'oi.qty_returned',
                     'oi.item_price',
@@ -555,6 +565,8 @@ class SalesOrderController extends Controller
             if ($url === null) {
                 return response()->json(['success' => false, 'message' => 'Failed to generate PDF — admin not found or order data incomplete'], 500);
             }
+            DB::table(self::ORDERS_TABLE)->where('order_id', $id)
+                ->update(['invoice_pdf_url' => $url]);
             return response()->json(['success' => true, 'pdf_url' => $url]);
         } catch (\Throwable $e) {
             Log::error('SalesOrder generatePdf error: ' . $e->getMessage());
@@ -692,10 +704,8 @@ class SalesOrderController extends Controller
             'charges'                    => isset($data['charges_json'])
                 ? (json_decode((string) $data['charges_json'], true) ?? [])
                 : [],
-            'pdf_url'                    => $this->existingPdfUrl(
-                $data['bill_no'] ?? null,
-                $data['Doc_Year'] ?? null
-            ),
+            'pdf_url'                    => $data['invoice_pdf_url']
+                ?? $this->existingPdfUrl($data['bill_no'] ?? null, $data['Doc_Year'] ?? null),
         ];
     }
 
@@ -707,7 +717,7 @@ class SalesOrderController extends Controller
         $filename = str_replace('/', '_', $billNo) . '.pdf';
         $path     = 'documents/sales-invoices/' . ($docYear ?? 'general') . '/' . $filename;
         return Storage::disk('public')->exists($path)
-            ? Storage::disk('public')->url($path)
+            ? asset('storage/' . $path)
             : null;
     }
 
@@ -785,6 +795,7 @@ class SalesOrderController extends Controller
         }
 
         $qty          = (float) ($data['quantity'] ?? 0);
+        $qtyLoaded    = isset($data['qty_loaded']) && $data['qty_loaded'] !== null ? (float) $data['qty_loaded'] : null;
         $qtyDelivered = (float) ($data['qty_delivered'] ?? 0);
         $qtyReturned  = (float) ($data['qty_returned'] ?? 0);
 
@@ -811,6 +822,7 @@ class SalesOrderController extends Controller
             'pack_label'         => $packLabel,
             'quantity'           => $qty,
             'price'              => $price,
+            'qty_loaded'         => $qtyLoaded,
             'used_qty'           => $qtyDelivered,
             'writeoff_qty'       => 0,
             'returned_qty'       => $qtyReturned,

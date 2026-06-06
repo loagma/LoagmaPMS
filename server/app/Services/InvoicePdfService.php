@@ -38,7 +38,10 @@ class InvoicePdfService
 
         Storage::disk('public')->put($path, $pdf->output());
 
-        return Storage::disk('public')->url($path);
+        // asset() builds the URL from APP_URL correctly in all environments.
+        // Storage::disk('public')->url() is equivalent but triggers a static-analysis
+        // warning because the Filesystem contract does not declare url().
+        return asset('storage/' . $path);
     }
 
     /**
@@ -91,7 +94,7 @@ class InvoicePdfService
         $rawItems = DB::table(self::ITEMS_TABLE)
             ->where('order_id', $orderId)
             ->select(['item_id', 'product_id', 'quantity', 'item_price', 'item_total',
-                      'qty_delivered', 'qty_returned', 'pinfo'])
+                      'qty_loaded', 'qty_delivered', 'qty_returned', 'pinfo'])
             ->get();
 
         $productIds = $rawItems->pluck('product_id')->filter()->unique()->values()->toArray();
@@ -146,7 +149,7 @@ class InvoicePdfService
 
             $discPct    = (float) ($pinfo['discount_percent'] ?? 0);
             $taxPct     = (float) ($pinfo['tax_percent'] ?? 0);
-            $usedQty    = (float) ($raw->qty_delivered ?? 0);
+            $usedQty    = (float) ($raw->qty_loaded ?? 0);
 
             $taxableAmt = round($qty * $price * (1 - $discPct / 100), 2);
             $lineTax    = round($taxableAmt * $taxPct / 100, 2);

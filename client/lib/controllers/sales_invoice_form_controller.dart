@@ -23,7 +23,7 @@ class SILineRow {
   final productCode = ''.obs; // HSN code
   final unit = 'PCS'.obs;
   final orderedQty = '0'.obs;
-  final qtyDelivered = '1'.obs;
+  final invoiceQty = '1'.obs;
   final price = '0'.obs;
   final discountPercent = ''.obs;
   final taxPercent = ''.obs;
@@ -45,7 +45,7 @@ class SILineRow {
     String? productCode,
     String? unit,
     String? orderedQty,
-    String? qtyDelivered,
+    String? invoiceQty,
     String? price,
     String? discountPercent,
     String? taxPercent,
@@ -55,13 +55,13 @@ class SILineRow {
     if (productCode != null) this.productCode.value = productCode;
     if (unit != null) this.unit.value = unit;
     if (orderedQty != null) this.orderedQty.value = orderedQty;
-    if (qtyDelivered != null) this.qtyDelivered.value = qtyDelivered;
+    if (invoiceQty != null) this.invoiceQty.value = invoiceQty;
     if (price != null) this.price.value = price;
     if (discountPercent != null) this.discountPercent.value = discountPercent;
     if (taxPercent != null) this.taxPercent.value = taxPercent;
   }
 
-  double get deliveredQtyDouble => double.tryParse(qtyDelivered.value) ?? 0;
+  double get invoiceQtyDouble => double.tryParse(invoiceQty.value) ?? 0;
   double get orderedQtyDouble => double.tryParse(orderedQty.value) ?? 0;
   double get priceDouble => double.tryParse(price.value) ?? 0;
 
@@ -78,14 +78,14 @@ class SILineRow {
   }
 
   double get lineTotalExclTax {
-    final qty = deliveredQtyDouble;
+    final qty = invoiceQtyDouble;
     final p = isInclusiveTax.value ? _priceExclFromInclusive() : priceDouble;
     final d = double.tryParse(discountPercent.value) ?? 0;
     return qty * p * (1 - d / 100);
   }
 
   double get lineTotal {
-    final qty = deliveredQtyDouble;
+    final qty = invoiceQtyDouble;
     final pExcl = isInclusiveTax.value ? _priceExclFromInclusive() : priceDouble;
     final d = double.tryParse(discountPercent.value) ?? 0;
     final t = _effectiveTaxPercent;
@@ -522,7 +522,7 @@ class SalesInvoiceFormController extends GetxController {
   // ── Items ─────────────────────────────────────────────────────────────────
 
   void addItem() {
-    final row = SILineRow(qtyDelivered: '1');
+    final row = SILineRow(invoiceQty: '1');
     if (unitTypes.isNotEmpty) row.unit.value = unitTypes.first;
     items.add(row);
   }
@@ -538,7 +538,7 @@ class SalesInvoiceFormController extends GetxController {
     row.unit.value = unit?.isNotEmpty == true ? unit! : 'Nos';
     row.price.value = price.toString();
     row.orderedQty.value = '0';
-    row.qtyDelivered.value = '1';
+    row.invoiceQty.value = '1';
     unawaited(applyProductTaxesToRow(row, productId));
   }
 
@@ -868,14 +868,16 @@ class SalesInvoiceFormController extends GetxController {
     // Items
     items.clear();
     for (final item in so.items) {
-      final delivered = item.usedQty > 0 ? item.usedQty : item.quantity;
+      final invoiceQty = (item.qtyLoaded != null && item.qtyLoaded! > 0)
+          ? item.qtyLoaded!
+          : item.quantity;
       items.add(SILineRow(
         productId: item.productId,
         productName: item.productName,
         productCode: item.hsnCode,
         unit: item.unit ?? 'Nos',
         orderedQty: item.quantity.toString(),
-        qtyDelivered: delivered.toString(),
+        invoiceQty: invoiceQty.toString(),
         price: item.price.toString(),
         discountPercent: item.discountPercent?.toString() ?? '',
         taxPercent: item.taxPercent?.toString() ?? '',
@@ -924,7 +926,7 @@ class SalesInvoiceFormController extends GetxController {
       return false;
     }
     for (final r in validItems) {
-      final qty = r.deliveredQtyDouble;
+      final qty = r.invoiceQtyDouble;
       if (qty <= 0) {
         _showError('Qty must be > 0 for ${r.productName.value.isEmpty ? "item" : r.productName.value}');
         return false;
@@ -1018,8 +1020,8 @@ class SalesInvoiceFormController extends GetxController {
       if (r.productCode.value.trim().isNotEmpty) 'hsn_code': r.productCode.value.trim(),
       if (r.unit.value.trim().isNotEmpty) 'unit': r.unit.value.trim(),
       if (r.selectedPackId.value.trim().isNotEmpty) 'pack_id': r.selectedPackId.value.trim(),
-      'quantity': r.orderedQtyDouble > 0 ? r.orderedQtyDouble : r.deliveredQtyDouble,
-      'qty_delivered': r.deliveredQtyDouble,
+      'quantity': r.orderedQtyDouble > 0 ? r.orderedQtyDouble : r.invoiceQtyDouble,
+      'qty_loaded': r.invoiceQtyDouble,
       'price': r.priceDouble,
       if (discount != null && discount > 0) 'discount_percent': discount,
       if (tax != null && tax > 0) 'tax_percent': tax,

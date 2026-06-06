@@ -875,7 +875,6 @@ class SalesOrderFormController extends GetxController {
             if (r.unit.value.trim().isNotEmpty) 'unit': r.unit.value.trim(),
             if (r.selectedPackId.value.trim().isNotEmpty) 'pack_id': r.selectedPackId.value.trim(),
             'quantity': qty,
-            'qty_delivered': double.tryParse(r.qtyDelivered.value) ?? 0,
             'price': price,
             if (discount != null && discount > 0) 'discount_percent': discount,
             if (tax != null && tax > 0) 'tax_percent': tax,

@@ -160,7 +160,7 @@ class _SalesInvoiceFormScreenState extends State<SalesInvoiceFormScreen> {
         r.productId.value = sel.product.id;
         r.productName.value = sel.product.name;
         r.productCode.value = sel.product.hsnCode ?? '';
-        r.qtyDelivered.value = sel.quantity.toString();
+        r.invoiceQty.value = sel.quantity.toString();
         if (sel.selectedPack != null) {
           r.selectedPackId.value = sel.selectedPack!.id;
           r.selectedPackLabel.value = sel.selectedPack!.label;
@@ -468,7 +468,7 @@ class _SalesInvoiceReportView extends StatelessWidget {
                   ],
                   rows: List<DataRow>.generate(controller.items.length, (i) {
                     final row = controller.items[i];
-                    final qty = row.deliveredQtyDouble;
+                    final qty = row.invoiceQtyDouble;
                     final rate = row.priceDouble;
                     final disc = double.tryParse(row.discountPercent.value) ?? 0;
                     final tax = double.tryParse(row.taxPercent.value) ?? 0;
@@ -1732,7 +1732,7 @@ class _ItemRow extends StatelessWidget {
                   child: Obx(() => TextFormField(
                         key: ValueKey('inv_qty_${row.productId.value ?? 'empty'}_${row.selectedPackId.value}'),
                         enabled: !controller.isFieldsLocked,
-                        initialValue: row.qtyDelivered.value,
+                        initialValue: row.invoiceQty.value,
                         decoration: _siInputDecoration(labelText: 'Inv Qty *'),
                         keyboardType:
                             const TextInputType.numberWithOptions(decimal: true),
@@ -1746,7 +1746,7 @@ class _ItemRow extends StatelessWidget {
                           if (q == null || q <= 0) return 'Must be > 0';
                           return null;
                         },
-                        onChanged: (v) => row.qtyDelivered.value = v,
+                        onChanged: (v) => row.invoiceQty.value = v,
                       )),
                 ),
               ),
@@ -1997,7 +1997,7 @@ class _ProductPickerState extends State<_ProductPicker> {
                           r.productId.value = sel.product.id;
                           r.productName.value = sel.product.name;
                           r.productCode.value = sel.product.hsnCode ?? '';
-                          r.qtyDelivered.value = sel.quantity.toString();
+                          r.invoiceQty.value = sel.quantity.toString();
                           if (sel.selectedPack != null) {
                             r.selectedPackId.value = sel.selectedPack!.id;
                             r.selectedPackLabel.value = sel.selectedPack!.label;

@@ -1506,20 +1506,6 @@ class _ItemRow extends StatelessWidget {
               ),
             ],
           ),
-          // Qty Delivered — only visible when billing
-          Obx(() {
-            if (!controller.isBillMode) return const SizedBox.shrink();
-            return Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: TextFormField(
-                initialValue: row.qtyDelivered.value,
-                decoration: _soInputDecoration(labelText: 'Qty Delivered'),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,3}'))],
-                onChanged: (v) => row.qtyDelivered.value = v,
-              ),
-            );
-          }),
           Obx(() {
             if (row.productId.value == null || row.availableTaxKeys.isEmpty) {
               return const SizedBox.shrink();

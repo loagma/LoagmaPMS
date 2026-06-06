@@ -238,6 +238,7 @@ class SalesOrderItem {
   final String? packId;
   final String? packLabel;
   final double quantity;
+  final double? qtyLoaded;
   final double usedQty;
   final double writeoffQty;
   final double leftQty;
@@ -260,6 +261,7 @@ class SalesOrderItem {
     this.packId,
     this.packLabel,
     required this.quantity,
+    this.qtyLoaded,
     this.usedQty = 0,
     this.writeoffQty = 0,
     this.leftQty = 0,
@@ -292,6 +294,7 @@ class SalesOrderItem {
     final price = parseDouble(json['price']);
     final taxPct = parseDouble(json['tax_percent'], defaultValue: 0);
     final qty = parseDouble(json['quantity']);
+    final qtyLoaded = json['qty_loaded'] != null ? parseDouble(json['qty_loaded']) : null;
     final usedQty = parseDouble(json['used_qty'] ?? json['consumed_quantity']);
     final writeoffQty = parseDouble(json['writeoff_qty'] ?? json['written_off_quantity']);
     final leftQtyRaw = json['left_qty'] ?? json['remaining_quantity'];
@@ -323,6 +326,7 @@ class SalesOrderItem {
       packId: json['pack_id']?.toString(),
       packLabel: json['pack_label']?.toString(),
       quantity: qty,
+      qtyLoaded: qtyLoaded,
       usedQty: usedQty,
       writeoffQty: writeoffQty,
       leftQty: leftQty < 0 ? 0 : leftQty,
