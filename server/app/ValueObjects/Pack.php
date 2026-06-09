@@ -20,6 +20,7 @@ class Pack
     public string $retailPrice;      // rp field
     public int $serialNumber;        // sn field
     public float $conversionFactor;  // calculated
+    public ?float $maxVariation;     // mv field — max price variation % (null = no restriction)
 
     public function __construct(
         string $packId,
@@ -31,7 +32,8 @@ class Pack
         string $originalPrice,
         string $retailPrice,
         int $serialNumber,
-        float $conversionFactor = 0.0
+        float $conversionFactor = 0.0,
+        ?float $maxVariation = null
     ) {
         $this->packId = $packId;
         $this->packSize = $packSize;
@@ -43,6 +45,7 @@ class Pack
         $this->retailPrice = $retailPrice;
         $this->serialNumber = $serialNumber;
         $this->conversionFactor = $conversionFactor;
+        $this->maxVariation = $maxVariation;
     }
 
     /**
@@ -60,7 +63,8 @@ class Pack
             originalPrice: $data['op'] ?? '',
             retailPrice: $data['rp'] ?? '',
             serialNumber: (int) ($data['sn'] ?? 0),
-            conversionFactor: (float) ($data['conversion_factor'] ?? 0.0)
+            conversionFactor: (float) ($data['conversion_factor'] ?? 0.0),
+            maxVariation: isset($data['mv']) ? (float) $data['mv'] : null,
         );
     }
 
@@ -69,7 +73,7 @@ class Pack
      */
     public function toArray(): array
     {
-        return [
+        $arr = [
             'pi' => $this->packId,
             'ps' => $this->packSize,
             'pu' => $this->packUnit,
@@ -80,5 +84,9 @@ class Pack
             'rp' => $this->retailPrice,
             'sn' => $this->serialNumber,
         ];
+        if ($this->maxVariation !== null) {
+            $arr['mv'] = $this->maxVariation;
+        }
+        return $arr;
     }
 }

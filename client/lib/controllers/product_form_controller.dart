@@ -20,6 +20,7 @@ class PackageUiModel {
     required this.unit,
     required this.marketPrice,
     required this.retailPricesRaw,
+    this.mv,
     this.minLimit,
     this.maxLimit,
     this.barcode,
@@ -32,6 +33,7 @@ class PackageUiModel {
   final String unit;
   final double marketPrice;
   final String retailPricesRaw; // e.g. \"100,95,90\"
+  final double? mv;             // max variation % for price editing (null = unrestricted)
   final int? minLimit;
   final int? maxLimit;
   final String? barcode;
@@ -61,6 +63,7 @@ class PackageUiModel {
       'unit': unit,
       'market_price': marketPrice,
       if (prices != null) 'prices': prices,
+      if (mv != null) 'mv': mv,
       'min_limit': minLimit,
       'max_limit': maxLimit,
       'barcode': barcode,

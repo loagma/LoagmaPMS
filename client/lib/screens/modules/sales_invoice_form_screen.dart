@@ -165,7 +165,22 @@ class _SalesInvoiceFormScreenState extends State<SalesInvoiceFormScreen> {
           r.selectedPackId.value = sel.selectedPack!.id;
           r.selectedPackLabel.value = sel.selectedPack!.label;
           if (sel.selectedPack!.unit != null) r.unit.value = sel.selectedPack!.unit!;
-          if (sel.selectedPack!.price != null) r.price.value = sel.selectedPack!.price!.toString();
+          if (sel.selectedPack!.price != null) {
+            r.price.value = sel.selectedPack!.price!.toString();
+            r.packBasePrice = sel.selectedPack!.price!;
+          }
+          r.packMv = sel.selectedPack!.mv;
+        } else if (sel.product.packs.isNotEmpty) {
+          final fallbackPack = sel.product.packs.firstWhere(
+            (p) => p.id == sel.product.defaultPackId,
+            orElse: () => sel.product.packs.first,
+          );
+          if (fallbackPack.price != null) {
+            r.price.value = fallbackPack.price!.toString();
+            r.packBasePrice = fallbackPack.price!;
+          }
+          if (fallbackPack.unit != null) r.unit.value = fallbackPack.unit!;
+          r.packMv = fallbackPack.mv;
         }
         await controller.applyProductTaxesToRow(r, sel.product.id);
       }
@@ -963,10 +978,14 @@ class _HeaderCardState extends State<_HeaderCard> {
                   height: 48,
                   child: Obx(() {
                     final fy = controller.financialYear.value.trim();
+                    final now = DateTime.now();
+                    final curStart = now.month >= 4 ? now.year : now.year - 1;
+                    final curFy = '${curStart.toString().substring(2)}-${(curStart + 1).toString().substring(2)}';
+                    final prevFy = '${(curStart - 1).toString().substring(2)}-${curStart.toString().substring(2)}';
                     final options = <String>{
                       if (fy.isNotEmpty) fy,
-                      '25-26',
-                      '24-25',
+                      curFy,
+                      prevFy,
                     }.toList();
                     return DropdownButtonFormField<String>(
                       initialValue: fy.isEmpty ? null : fy,
@@ -1797,6 +1816,7 @@ class _ItemRow extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: _fieldVerticalGap),
                   child: Obx(() => TextFormField(
+                        key: ValueKey('si_price_${row.productId.value ?? 'empty'}_${row.selectedPackId.value}'),
                         enabled: !controller.isFieldsLocked,
                         initialValue: row.price.value,
                         decoration: _siInputDecoration(labelText: 'Rate *'),
@@ -1818,6 +1838,25 @@ class _ItemRow extends StatelessWidget {
               ),
             ],
           ),
+
+          // Inline price range hint — shown when pack has mv set
+          Obx(() {
+            final mv = row.packMv;
+            if (mv == null || mv <= 0 || row.packBasePrice <= 0) return const SizedBox.shrink();
+            final minP = (row.packBasePrice * (1 - mv / 100)).toStringAsFixed(2);
+            final maxP = (row.packBasePrice * (1 + mv / 100)).toStringAsFixed(2);
+            final hasError = row.priceError != null;
+            return Padding(
+              padding: const EdgeInsets.only(top: 2, bottom: 4),
+              child: Text(
+                'Allowed: ₹$minP – ₹$maxP (±${mv.toStringAsFixed(0)}%)',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: hasError ? Colors.red.shade700 : Colors.grey[600],
+                ),
+              ),
+            );
+          }),
 
           // Tax breakdown rows
           Obx(() {
@@ -2002,7 +2041,22 @@ class _ProductPickerState extends State<_ProductPicker> {
                             r.selectedPackId.value = sel.selectedPack!.id;
                             r.selectedPackLabel.value = sel.selectedPack!.label;
                             if (sel.selectedPack!.unit != null) r.unit.value = sel.selectedPack!.unit!;
-                            if (sel.selectedPack!.price != null) r.price.value = sel.selectedPack!.price!.toString();
+                            if (sel.selectedPack!.price != null) {
+                              r.price.value = sel.selectedPack!.price!.toString();
+                              r.packBasePrice = sel.selectedPack!.price!;
+                            }
+                            r.packMv = sel.selectedPack!.mv;
+                          } else if (sel.product.packs.isNotEmpty) {
+                            final fallbackPack = sel.product.packs.firstWhere(
+                              (p) => p.id == sel.product.defaultPackId,
+                              orElse: () => sel.product.packs.first,
+                            );
+                            if (fallbackPack.price != null) {
+                              r.price.value = fallbackPack.price!.toString();
+                              r.packBasePrice = fallbackPack.price!;
+                            }
+                            if (fallbackPack.unit != null) r.unit.value = fallbackPack.unit!;
+                            r.packMv = fallbackPack.mv;
                           }
                           await controller.applyProductTaxesToRow(r, sel.product.id);
                           if (i == 0) {

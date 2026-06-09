@@ -343,7 +343,7 @@ class PurchaseReturnFormController extends GetxController {
           docNoNumber.value = pr.header.docNoNumber;
           sourcePvNumber.value = pr.header.sourcePvNumber ?? '';
           sourcePvIdSelected.value = pr.header.sourcePurchaseVoucherId;
-          vendorId.value = pr.header.vendorId;
+          vendorId.value = pr.header.supplierId;
           vendorName.value = pr.header.vendorName ?? '';
           docDate.value = pr.header.docDate;
           reason.value = pr.header.reason ?? '';

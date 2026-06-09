@@ -610,8 +610,19 @@ ALTER TABLE `orders`
     ADD COLUMN IF NOT EXISTS `Sales_Return_Dt`        DATE         NULL AFTER `Sales_Return_VoucherNo`,
     ADD COLUMN IF NOT EXISTS `Sales_Return_Reason`    TEXT         NULL AFTER `Sales_Return_Dt`;
 
--- orders_item: qty_returned tracks cumulative returned qty per item
+-- orders_item: qty_loaded = invoice/dispatch qty; qty_returned = cumulative returned qty
 -- available_to_return = qty_delivered - qty_returned
+-- Note: qty_loaded and qty_returned already exist in legacy schema.
+--       The ALTER below is a safety net for environments where they may be missing.
+ALTER TABLE `orders_item`
+    ADD COLUMN IF NOT EXISTS `qty_loaded`   int DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS `qty_returned` int DEFAULT NULL;
+
+-- 2026-06-05: orders — invoice sequence tracking, charges storage, PDF URL persistence
+ALTER TABLE `orders`
+    ADD COLUMN IF NOT EXISTS `invoice_number`  int unsigned DEFAULT NULL AFTER `bill_no`,
+    ADD COLUMN IF NOT EXISTS `charges_json`    json         DEFAULT NULL AFTER `invoice_number`,
+    ADD COLUMN IF NOT EXISTS `invoice_pdf_url` varchar(500) DEFAULT NULL AFTER `charges_json`;
 
 -- 2026-05-25: admin — payment / licence / org compliance fields
 ALTER TABLE `admin`

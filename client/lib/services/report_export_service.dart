@@ -1107,7 +1107,7 @@ class ReportExportService {
 
     final itemRows = c.items.where((r) => r.productId.value != null).map((row) {
       final orderedQty = row.orderedQtyDouble;
-      final invQty     = row.deliveredQtyDouble;
+      final invQty     = row.invoiceQtyDouble;
       final price      = row.priceDouble;
       final disc       = double.tryParse(row.discountPercent.value) ?? 0;
       final packLabel  = row.selectedPackLabel.value.trim();

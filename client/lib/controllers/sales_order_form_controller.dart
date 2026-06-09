@@ -14,6 +14,12 @@ import '../models/product_model.dart';
 import '../models/sales_order_model.dart';
 import '../services/customer_api_service.dart';
 
+String currentFinancialYear() {
+  final now = DateTime.now();
+  final start = now.month >= 4 ? now.year : now.year - 1;
+  return '${start.toString().substring(2)}-${(start + 1).toString().substring(2)}';
+}
+
 class SalesOrderFormController extends GetxController {
   final formKey = GlobalKey<FormState>();
   final int? soId;
@@ -29,7 +35,7 @@ class SalesOrderFormController extends GetxController {
   final currentSoNumber = ''.obs;
   final RxnInt currentSoSeq = RxnInt();
 
-  final financialYear = '25-26'.obs;
+  final financialYear = currentFinancialYear().obs;
   final customerId = Rxn<int>();
   final customerName = ''.obs;
   final customerPhone = ''.obs;
@@ -379,7 +385,7 @@ class SalesOrderFormController extends GetxController {
   }
 
   Future<void> _applySalesOrderToState(SalesOrder so) async {
-    financialYear.value = so.financialYear ?? '25-26';
+    financialYear.value = so.financialYear ?? currentFinancialYear();
     customerId.value = so.customerId;
     customerName.value = so.customerName ?? '';
     customerPhone.value = '';
@@ -414,7 +420,7 @@ class SalesOrderFormController extends GetxController {
     unawaited(_hydrateCustomerDetails(so.customerId));
     items.clear();
     for (final item in so.items) {
-      items.add(SOLineRow(
+      final row = SOLineRow(
         productId: item.productId,
         productName: item.productName,
         hsnCode: item.hsnCode,
@@ -428,7 +434,11 @@ class SalesOrderFormController extends GetxController {
         taxPercent: item.taxPercent?.toString() ?? '',
         unit: item.unit ?? '',
         description: item.description ?? '',
-      ));
+      );
+      // Restore packBasePrice from stored price so priceError stays silent on load.
+      // packMv stays null — mv comes only from live pack JSON, not stored order data.
+      row.packBasePrice = item.price;
+      items.add(row);
     }
     if (items.isEmpty) items.add(SOLineRow());
     await _hydrateLineItemTaxes();
@@ -591,7 +601,7 @@ class SalesOrderFormController extends GetxController {
         if (data['success'] == true) {
           final soData = data['data'] as Map<String, dynamic>;
           final so = SalesOrder.fromJson(soData);
-          financialYear.value = so.financialYear ?? '25-26';
+          financialYear.value = so.financialYear ?? currentFinancialYear();
           customerId.value = so.customerId;
           departmentId.value = so.departmentId;
           salesmanId.value = so.salesmanId;
@@ -828,6 +838,47 @@ class SalesOrderFormController extends GetxController {
         return;
       }
 
+      // Price variation check — show warning dialog listing all violations
+      final priceViolations = validItems
+          .where((r) => r.priceError != null)
+          .map((r) => '• ${r.productName.value}: ${r.priceError}')
+          .toList();
+      if (priceViolations.isNotEmpty) {
+        isSaving.value = false;
+        await Get.dialog(
+          AlertDialog(
+            title: Row(children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700),
+              const SizedBox(width: 8),
+              const Text('Price Out of Range'),
+            ]),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('The following item prices exceed the allowed variation:'),
+                const SizedBox(height: 10),
+                ...priceViolations.map((v) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Text(v, style: TextStyle(fontSize: 13, color: Colors.red.shade700)),
+                )),
+                const SizedBox(height: 10),
+                Text('Please correct the prices before saving.',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('Fix Prices'),
+              ),
+            ],
+          ),
+          barrierDismissible: false,
+        );
+        return;
+      }
+
       final payload = {
         'financial_year': financialYear.value,
         'customer_id': customerId.value,
@@ -1001,6 +1052,13 @@ class SOLineRow {
   final description = ''.obs;
   final selectedPackId = ''.obs;
   final selectedPackLabel = ''.obs;
+  final packMvRx = Rxn<double>();  // mv from the selected pack (null = no restriction)
+  final packBasePriceRx = 0.0.obs; // rp at the time pack was selected
+
+  double? get packMv => packMvRx.value;
+  set packMv(double? v) => packMvRx.value = v;
+  double get packBasePrice => packBasePriceRx.value;
+  set packBasePrice(double v) => packBasePriceRx.value = v;
 
   SOLineRow({
     int? productId,
@@ -1033,6 +1091,18 @@ class SOLineRow {
   }
 
   double get priceExclTax => double.tryParse(price.value) ?? 0;
+
+  String? get priceError {
+    final mv = packMv;
+    if (mv == null || mv <= 0 || packBasePrice <= 0) return null;
+    final p = double.tryParse(price.value) ?? 0;
+    final minP = packBasePrice * (1 - mv / 100);
+    final maxP = packBasePrice * (1 + mv / 100);
+    if (p < minP - 0.001 || p > maxP + 0.001) {
+      return 'Price must be ₹${minP.toStringAsFixed(2)} – ₹${maxP.toStringAsFixed(2)} (±${mv.toStringAsFixed(0)}%)';
+    }
+    return null;
+  }
 
   double get _effectiveTaxPercent {
     final fromTaxPercent = double.tryParse(taxPercent.value) ?? 0;

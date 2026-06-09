@@ -22,6 +22,7 @@ class ProductPackageFormController extends GetxController {
   final unit = 'KG'.obs;
   final marketPrice = ''.obs;
   final retailPrices = ''.obs;
+  final maxVariation = ''.obs; // mv — max price variation % (empty = unrestricted)
   final productIdInput = ''.obs;
 
   ProductPackageFormController({
@@ -57,6 +58,7 @@ class ProductPackageFormController extends GetxController {
           marketPrice.value =
               (model.marketPrice ?? model.price)?.toString() ?? '';
           retailPrices.value = model.retailPrices ?? '';
+          maxVariation.value = json['mv'] != null ? json['mv'].toString() : '';
         }
       }
     } catch (e) {
@@ -90,6 +92,7 @@ class ProductPackageFormController extends GetxController {
         return false;
       }
 
+      final mvTrimmed = maxVariation.value.trim();
       final payload = {
         'product_id': effectiveProductId,
         'description': description.value.trim(),
@@ -99,6 +102,8 @@ class ProductPackageFormController extends GetxController {
         'retail_prices': retailPrices.value.trim().isEmpty
             ? null
             : retailPrices.value.trim(),
+        if (mvTrimmed.isNotEmpty) 'mv': double.parse(mvTrimmed),
+        if (mvTrimmed.isEmpty) 'mv': null,
       };
 
       final url = isEditMode

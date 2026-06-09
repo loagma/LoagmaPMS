@@ -188,8 +188,30 @@ class SalesOrderController extends Controller
                     : [$requestedBillNo, null];
 
                 $orderId = $this->nextOrderId();
+
+                // Mirror entry in master_orders for CRM / reporting visibility.
+                // id matches orders.order_id (1-to-1).
+                // payment_status, payment_method, delivery_info, status are NOT NULL
+                // in the legacy schema — filled with neutral values for PMS orders.
+                DB::table('loagma_new.master_orders')->insert([
+                    'id'             => $orderId,
+                    'user_id'        => $customerId,
+                    'txn_id'         => $narration ?: '',
+                    'payment_status' => 'pms',
+                    'payment_method' => 'pms',
+                    'delivery_info'  => '{}',
+                    'order_count'    => count($items),
+                    'order_total'    => $orderTotal,
+                    'delivery_charge'=> $delivery,
+                    'discount'       => $discount,
+                    'before_discount'=> round($orderTotal + $discount, 2),
+                    'status'         => '1',
+                    'created_at'     => now(),
+                ]);
+
                 DB::table(self::ORDERS_TABLE)->insert([
                     'order_id'        => $orderId,
+                    'master_order_id' => $orderId,
                     'buyer_userid'    => $customerId,
                     'order_state'     => $status,
                     'order_total'     => $orderTotal,
@@ -343,6 +365,16 @@ class SalesOrderController extends Controller
                     ? $this->resolveInvoiceNumber($requestedBillNo, $docYear, $id)
                     : [$requestedBillNo, $order->invoice_number ?? null];
 
+                // Keep master_orders totals in sync with orders.
+                DB::table('loagma_new.master_orders')->where('id', $id)->update([
+                    'order_total'    => $orderTotal,
+                    'delivery_charge'=> $delivery,
+                    'discount'       => $discount,
+                    'before_discount'=> round($orderTotal + $discount, 2),
+                    'order_count'    => count($items),
+                    'txn_id'         => $narration ?: '',
+                ]);
+
                 DB::table(self::ORDERS_TABLE)->where('order_id', $id)->update([
                     'order_state'     => $status,
                     'order_total'     => $orderTotal,
@@ -448,8 +480,11 @@ class SalesOrderController extends Controller
                     'message' => 'Cannot delete order: invoice ' . $order->bill_no . ' is linked. Delete the invoice first.',
                 ], 422);
             }
-            DB::table(self::ITEMS_TABLE)->where('order_id', $id)->delete();
-            DB::table(self::ORDERS_TABLE)->where('order_id', $id)->delete();
+            DB::transaction(function () use ($id) {
+                DB::table(self::ITEMS_TABLE)->where('order_id', $id)->delete();
+                DB::table(self::ORDERS_TABLE)->where('order_id', $id)->delete();
+                DB::table('loagma_new.master_orders')->where('id', $id)->delete();
+            });
             return response()->json(['success' => true, 'message' => 'Order deleted']);
         } catch (\Throwable $e) {
             Log::error('SalesOrder destroy error: ' . $e->getMessage());

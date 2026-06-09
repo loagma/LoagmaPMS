@@ -197,6 +197,27 @@ class ProductPackageFormScreen extends StatelessWidget {
                             },
                           ),
                         ),
+                        const SizedBox(height: 16),
+                        Obx(
+                          () => TextFormField(
+                            initialValue: controller.maxVariation.value,
+                            decoration: AppInputDecoration.standard(
+                              labelText: 'Max Variation %',
+                              hintText: 'e.g. 10  →  price editable ±10%',
+                            ).copyWith(
+                              helperText: 'Leave empty to allow free price editing',
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            onChanged: (v) => controller.maxVariation.value = v,
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return null;
+                              final val = double.tryParse(v.trim());
+                              if (val == null) return 'Must be a number';
+                              if (val < 0 || val > 100) return 'Must be between 0 and 100';
+                              return null;
+                            },
+                          ),
+                        ),
                       ],
                     ),
                   ),

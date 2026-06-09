@@ -6,6 +6,7 @@ class ProductPack {
   final double? weight;
   final String? unit;
   final double? price;
+  final double? mv; // max variation % — price editable ±mv% of rp; null = unrestricted
 
   ProductPack({
     required this.id,
@@ -13,6 +14,7 @@ class ProductPack {
     this.weight,
     this.unit,
     this.price,
+    this.mv,
   });
 
   factory ProductPack.fromJson(Map<String, dynamic> json) {
@@ -57,6 +59,12 @@ class ProductPack {
       }
     }
 
+    double? mv;
+    final mvRaw = json['mv'];
+    if (mvRaw != null) {
+      mv = mvRaw is num ? mvRaw.toDouble() : double.tryParse(mvRaw.toString());
+    }
+
     return ProductPack(
       id: rawId.toString(),
       label: label.toString(),
@@ -65,6 +73,7 @@ class ProductPack {
           json['pack_ut']?.toString() ??
           json['pu']?.toString(),
       price: price,
+      mv: mv,
     );
   }
 }

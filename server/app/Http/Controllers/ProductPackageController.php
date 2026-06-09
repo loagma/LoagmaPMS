@@ -64,6 +64,7 @@ class ProductPackageController extends Controller
             'price' => 'nullable|numeric|min:0',
             'market_price' => 'nullable|numeric|min:0',
             'retail_prices' => 'nullable|string|max:255',
+            'mv' => 'nullable|numeric|min:0|max:100',
         ]);
 
         $product = DB::table('product')
@@ -106,6 +107,9 @@ class ProductPackageController extends Controller
             'prices' => $retailPrices,
             'is_active' => true,
         ];
+        if ($request->filled('mv')) {
+            $newPack['mv'] = (float) $validated['mv'];
+        }
 
         $packs[] = $newPack;
 
@@ -133,6 +137,7 @@ class ProductPackageController extends Controller
             'price' => 'nullable|numeric|min:0',
             'market_price' => 'nullable|numeric|min:0',
             'retail_prices' => 'sometimes|nullable|string|max:255',
+            'mv' => 'sometimes|nullable|numeric|min:0|max:100',
         ]);
 
         $found = $this->findPackageByRouteId($id);
@@ -178,6 +183,14 @@ class ProductPackageController extends Controller
             if ($retailPrices !== null) {
                 $pack['prices'] = $retailPrices;
                 $pack['rp'] = $retailPrices['regular'] ?? ($pack['market_price'] ?? null);
+            }
+        }
+
+        if (array_key_exists('mv', $validated)) {
+            if ($validated['mv'] === null) {
+                unset($pack['mv']);
+            } else {
+                $pack['mv'] = (float) $validated['mv'];
             }
         }
 
@@ -237,6 +250,7 @@ class ProductPackageController extends Controller
             'price' => $price,
             'market_price' => $this->firstNumeric($pack, ['market_price', 'price', 'op']),
             'retail_prices' => $this->retailPricesToRaw($pack['prices'] ?? null),
+            'mv' => isset($pack['mv']) ? (float) $pack['mv'] : null,
         ];
     }
 

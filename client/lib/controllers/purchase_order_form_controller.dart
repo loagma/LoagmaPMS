@@ -12,6 +12,12 @@ import '../models/party_result.dart';
 import '../models/product_model.dart';
 import '../models/purchase_order_model.dart';
 
+String currentFinancialYear() {
+  final now = DateTime.now();
+  final start = now.month >= 4 ? now.year : now.year - 1;
+  return '${start.toString().substring(2)}-${(start + 1).toString().substring(2)}';
+}
+
 class PurchaseOrderFormController extends GetxController {
   final formKey = GlobalKey<FormState>();
   final int? poId;
@@ -29,7 +35,7 @@ class PurchaseOrderFormController extends GetxController {
   /// Parsed numeric sequence used for previous/next navigation.
   final RxnInt currentPoSeq = RxnInt();
 
-  final financialYear = '25-26'.obs;
+  final financialYear = currentFinancialYear().obs;
   final supplierId = Rxn<int>();
   final supplierName = ''.obs;
   final salesmanId = Rxn<String>();
@@ -530,7 +536,7 @@ class PurchaseOrderFormController extends GetxController {
   }
 
   Future<void> _applyPurchaseOrderToState(PurchaseOrder po) async {
-    financialYear.value = po.financialYear ?? '25-26';
+    financialYear.value = po.financialYear ?? currentFinancialYear();
     supplierId.value = po.supplierId;
     supplierName.value = po.supplierName ?? '';
     salesmanId.value = po.salesmanId;
@@ -689,7 +695,7 @@ class PurchaseOrderFormController extends GetxController {
         if (data['success'] == true) {
           final poData = data['data'] as Map<String, dynamic>;
           final po = PurchaseOrder.fromJson(poData);
-          financialYear.value = po.financialYear ?? '25-26';
+          financialYear.value = po.financialYear ?? currentFinancialYear();
           supplierId.value = po.supplierId;
           salesmanId.value = po.salesmanId;
           departmentId.value = po.departmentId;

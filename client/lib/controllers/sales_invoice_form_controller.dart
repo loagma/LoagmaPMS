@@ -38,6 +38,13 @@ class SILineRow {
   final isTaxLoading = false.obs;
   final selectedPackId = ''.obs;
   final selectedPackLabel = ''.obs;
+  final packMvRx = Rxn<double>();
+  final packBasePriceRx = 0.0.obs;
+
+  double? get packMv => packMvRx.value;
+  set packMv(double? v) => packMvRx.value = v;
+  double get packBasePrice => packBasePriceRx.value;
+  set packBasePrice(double v) => packBasePriceRx.value = v;
 
   SILineRow({
     int? productId,
@@ -64,6 +71,18 @@ class SILineRow {
   double get invoiceQtyDouble => double.tryParse(invoiceQty.value) ?? 0;
   double get orderedQtyDouble => double.tryParse(orderedQty.value) ?? 0;
   double get priceDouble => double.tryParse(price.value) ?? 0;
+
+  String? get priceError {
+    final mv = packMv;
+    if (mv == null || mv <= 0 || packBasePrice <= 0) return null;
+    final p = priceDouble;
+    final minP = packBasePrice * (1 - mv / 100);
+    final maxP = packBasePrice * (1 + mv / 100);
+    if (p < minP - 0.001 || p > maxP + 0.001) {
+      return 'Price must be ₹${minP.toStringAsFixed(2)} – ₹${maxP.toStringAsFixed(2)} (±${mv.toStringAsFixed(0)}%)';
+    }
+    return null;
+  }
 
   double get _effectiveTaxPercent {
     final fromTaxPercent = double.tryParse(taxPercent.value) ?? 0;
@@ -119,6 +138,16 @@ class SIChargeRow {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+String currentFinancialYear() {
+  final now = DateTime.now();
+  final start = now.month >= 4 ? now.year : now.year - 1;
+  return '${start.toString().substring(2)}-${(start + 1).toString().substring(2)}';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Controller
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -139,8 +168,8 @@ class SalesInvoiceFormController extends GetxController {
 
   // ── Meta ──────────────────────────────────────────────────────────────────
   final invoiceNumber = ''.obs;
-  final invoicePrefix = 'INV/25-26/'.obs;
-  final financialYear = '25-26'.obs;
+  final invoicePrefix = 'INV/${currentFinancialYear()}/'.obs;
+  final financialYear = currentFinancialYear().obs;
   final currentSoNumber = ''.obs;
   final RxnInt currentSoSeq = RxnInt();
 
@@ -380,7 +409,7 @@ class SalesInvoiceFormController extends GetxController {
       if (response.statusCode != 200) return;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       if (data['success'] == true) {
-        invoicePrefix.value = data['prefix']?.toString() ?? 'INV/25-26/';
+        invoicePrefix.value = data['prefix']?.toString() ?? 'INV/${currentFinancialYear()}/';
         invoiceNumber.value = data['full_number']?.toString() ?? '';
       }
     } catch (e) {
@@ -871,7 +900,7 @@ class SalesInvoiceFormController extends GetxController {
       final invoiceQty = (item.qtyLoaded != null && item.qtyLoaded! > 0)
           ? item.qtyLoaded!
           : item.quantity;
-      items.add(SILineRow(
+      final siRow = SILineRow(
         productId: item.productId,
         productName: item.productName,
         productCode: item.hsnCode,
@@ -881,7 +910,10 @@ class SalesInvoiceFormController extends GetxController {
         price: item.price.toString(),
         discountPercent: item.discountPercent?.toString() ?? '',
         taxPercent: item.taxPercent?.toString() ?? '',
-      ));
+      );
+      // Restore packBasePrice from stored price so validation stays silent on re-open.
+      siRow.packBasePrice = item.price;
+      items.add(siRow);
     }
     if (items.isEmpty && !viewOnly.value) addItem();
     await _hydrateLineItemTaxes();
@@ -987,6 +1019,48 @@ class SalesInvoiceFormController extends GetxController {
 
   Future<void> save() async {
     if (!validateForm()) return;
+
+    // Price variation check — show warning dialog listing all violations
+    final validItems = items.where((r) => r.productId.value != null).toList();
+    final priceViolations = validItems
+        .where((r) => r.priceError != null)
+        .map((r) => '• ${r.productName.value}: ${r.priceError}')
+        .toList();
+    if (priceViolations.isNotEmpty) {
+      await Get.dialog(
+        AlertDialog(
+          title: Row(children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700),
+            const SizedBox(width: 8),
+            const Text('Price Out of Range'),
+          ]),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('The following item prices exceed the allowed variation:'),
+              const SizedBox(height: 10),
+              ...priceViolations.map((v) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Text(v, style: TextStyle(fontSize: 13, color: Colors.red.shade700)),
+              )),
+              const SizedBox(height: 10),
+              Text('Please correct the prices before saving.',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(),
+              child: const Text('Fix Prices'),
+            ),
+          ],
+        ),
+        barrierDismissible: false,
+      );
+      return;
+    }
+
     isBrowsing.value = false;
     isSaving.value = true;
     try {
