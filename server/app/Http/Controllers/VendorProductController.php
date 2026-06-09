@@ -108,6 +108,7 @@ class VendorProductController extends Controller
                         'description'  => $desc,
                         'unit'         => $unit,
                         'market_price' => isset($pack['op']) ? (float) $pack['op'] : null,
+                        'mv'           => isset($pack['mv']) ? (float) $pack['mv'] : null,
                     ];
                 }
 
@@ -213,6 +214,7 @@ class VendorProductController extends Controller
                     'description'  => trim((string) ($pack['ps'] ?? $id2)),
                     'unit'         => trim((string) ($pack['pu'] ?? '')),
                     'market_price' => isset($pack['op']) ? (float) $pack['op'] : null,
+                    'mv'           => isset($pack['mv']) ? (float) $pack['mv'] : null,
                 ];
             }
 
