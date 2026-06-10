@@ -109,7 +109,100 @@ Content-Type: application/json
 
 ---
 
-### 2. Update / Convert Existing Order to Invoice
+### 2. Bulk Create Invoices (multiple orders, atomic)
+
+**`POST /api/sales-orders/bulk`**
+
+Creates multiple sales orders in a single all-or-nothing transaction. If any order fails validation, no orders are created. Each billed order gets its own sequential invoice number.
+
+**Request**
+```http
+POST https://loagmapms-hd5u.onrender.com/api/sales-orders/bulk
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+```json
+{
+  "orders": [
+    {
+      "status": "billed",
+      "customer_id": 1234,
+      "doc_date": "2026-06-05",
+      "admin_id": 1,
+      "bill_dt": "2026-06-05",
+      "doc_year": "26-27",
+      "bill_roff": 0,
+      "items": [
+        { "product_id": 42, "quantity": 10, "qty_loaded": 9, "price": 45.00, "tax_percent": 5.0 }
+      ]
+    },
+    {
+      "status": "billed",
+      "customer_id": 5678,
+      "doc_date": "2026-06-05",
+      "admin_id": 1,
+      "bill_dt": "2026-06-05",
+      "doc_year": "26-27",
+      "bill_roff": 0,
+      "items": [
+        { "product_id": 55, "quantity": 5, "qty_loaded": 5, "price": 120.00, "tax_percent": 12.0 }
+      ]
+    }
+  ]
+}
+```
+
+Each object in `orders` accepts the same fields as `POST /api/sales-orders` (see endpoint 1 above).
+
+**Response `201`**
+```json
+{
+  "success": true,
+  "message": "2 order(s) created successfully",
+  "data": [
+    {
+      "id": 268101,
+      "so_number": "ORD-268101",
+      "status": "BILLED",
+      "bill_number": "INV/26-27/003",
+      "bill_dt": "2026-06-05",
+      "customer_id": 1234,
+      "total_amount": 450.00,
+      "grand_total": 472.50,
+      "pdf_url": null
+    },
+    {
+      "id": 268102,
+      "so_number": "ORD-268102",
+      "status": "BILLED",
+      "bill_number": "INV/26-27/004",
+      "bill_dt": "2026-06-05",
+      "customer_id": 5678,
+      "total_amount": 600.00,
+      "grand_total": 672.00,
+      "pdf_url": null
+    }
+  ]
+}
+```
+
+> `pdf_url` is `null` for all orders in a bulk call — PDFs are not auto-generated. Call `GET /api/sales-orders/{id}/pdf?admin_id={admin_id}` per order after creation if needed.
+
+**Error responses**
+
+| Code | Reason |
+|---|---|
+| `422` | Validation failed on any order in the batch — no orders are created |
+| `400` | `orders` array is empty or missing |
+
+**Atomicity**: if the DB insert fails mid-way (e.g. duplicate bill number), the entire batch is rolled back. Invoice numbers are assigned sequentially inside a single transaction using `SELECT ... FOR UPDATE` to prevent gaps or collisions.
+
+**Flutter client constant**: `ApiConfig.salesOrdersBulk`
+
+---
+
+### 3. Update / Convert Existing Order to Invoice (single)
 
 **`PUT /api/sales-orders/{id}`**
 
@@ -170,7 +263,7 @@ Content-Type: application/json
 
 ---
 
-### 3. Generate / Re-generate PDF (on demand)
+### 4. Generate / Re-generate PDF (on demand)
 
 **`GET /api/sales-orders/{id}/pdf?admin_id={admin_id}`**
 
@@ -206,7 +299,7 @@ Authorization: Bearer <token>
 
 ---
 
-### 4. Get Order with PDF URL
+### 5. Get Order with PDF URL
 
 **`GET /api/sales-orders/{id}`**
 
@@ -303,13 +396,29 @@ import 'package:http/http.dart' as http;
 import 'api_config.dart';
 import 'controllers/auth_controller.dart';
 
-// On-demand PDF
-final response = await http.get(
+// Single invoice
+final res = await http.post(
+  Uri.parse(ApiConfig.salesOrders),
+  headers: AuthController.getHeaders,
+  body: jsonEncode(orderPayload),
+);
+
+// Bulk invoices — all-or-nothing
+final res = await http.post(
+  Uri.parse(ApiConfig.salesOrdersBulk),
+  headers: AuthController.getHeaders,
+  body: jsonEncode({'orders': [order1, order2, ...]}),
+);
+final body = jsonDecode(res.body);
+// body['data'] is a List of created orders
+
+// On-demand PDF (after creation)
+final pdfRes = await http.get(
   Uri.parse(ApiConfig.salesInvoicePdf(orderId)).replace(
     queryParameters: {'admin_id': '1'},
   ),
   headers: AuthController.getHeaders,
 );
-final body = jsonDecode(response.body);
-final pdfUrl = body['pdf_url']; // open in browser or download
+final pdfBody = jsonDecode(pdfRes.body);
+final pdfUrl = pdfBody['pdf_url']; // open in browser or download
 ```

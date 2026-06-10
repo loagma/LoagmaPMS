@@ -1,0 +1,33 @@
+{
+    "BJFK": {
+        "tx": "5 ",
+        "op": "40",
+        "rp": "40",
+        "sn": 0,
+        "ps": "1",
+        "pu": "nos",
+        "pi": "BJFK",
+        "stk": -995,
+        "in_stk": 0
+    },
+    "qL0f": {
+        "tx": "10 ",
+        "op": "400",
+        "rp": "400",
+        "sn": 0,
+        "ps": "10",
+        "pu": "nos",
+        "pi": "qL0f",
+        "stk": -995,
+        "in_stk": 0
+    }
+}
+
+
+
+ps + pu = whole label
+op = orignial price
+rp = retail price = use
+sn = serial no
+tx = ignore
+pi= pack id

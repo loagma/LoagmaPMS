@@ -298,6 +298,180 @@ class SalesOrderController extends Controller
         }
     }
 
+    // POST /sales-orders/bulk
+    // Body: { "orders": [ <same shape as POST /sales-orders>, ... ] }
+    // All-or-nothing: any failure rolls back the entire batch.
+    // Optimised: single MAX query per table, three batch-inserts total regardless of N.
+    public function storeBulk(Request $request): JsonResponse
+    {
+        try {
+            $orders = $request->input('orders', []);
+
+            if (empty($orders) || !is_array($orders)) {
+                return response()->json(['success' => false, 'message' => 'orders array is required and must not be empty'], 422);
+            }
+
+            // Validate all orders upfront — no DB touched yet
+            $parsed = [];
+            foreach ($orders as $index => $order) {
+                $customerId = (int) ($order['customer_id'] ?? 0);
+                if ($customerId <= 0) {
+                    return response()->json(['success' => false, 'message' => "orders[$index]: customer_id is required"], 422);
+                }
+                if (empty($order['items'])) {
+                    return response()->json(['success' => false, 'message' => "orders[$index]: at least one item is required"], 422);
+                }
+                $status = strtolower(trim((string) ($order['status'] ?? 'pending')));
+                if ($status === 'billed' && empty($order['bill_dt'])) {
+                    return response()->json(['success' => false, 'message' => "orders[$index]: bill_dt is required when status is billed"], 422);
+                }
+                $parsed[] = $order;
+            }
+
+            $createdOrderIds = [];
+            $now = now()->toDateTimeString();
+
+            DB::transaction(function () use ($parsed, $now, &$createdOrderIds) {
+                // Grab starting IDs once with locks — avoids N individual MAX queries
+                $nextOrderId = (int) DB::table(self::ORDERS_TABLE)->lockForUpdate()->max('order_id') + 1;
+                $nextItemId  = (int) DB::table(self::ITEMS_TABLE)->lockForUpdate()->max('item_id') + 1;
+
+                $masterRows = [];
+                $orderRows  = [];
+                $itemRows   = [];
+
+                foreach ($parsed as $order) {
+                    $customerId    = (int) $order['customer_id'];
+                    $items         = $order['items'];
+                    $status        = strtolower(trim((string) ($order['status'] ?? 'pending')));
+                    $docDate       = trim((string) ($order['doc_date'] ?? date('Y-m-d')));
+                    $discount      = (float) ($order['discount'] ?? 0);
+                    $delivery      = (float) ($order['delivery_charge'] ?? 0);
+                    $narration     = trim((string) ($order['narration'] ?? ''));
+                    $requestedBillNo = trim((string) ($order['bill_number'] ?? '')) ?: null;
+                    $billDt        = $order['bill_dt'] ?? null;
+                    $department    = trim((string) ($order['department'] ?? '')) ?: null;
+                    $billNarration = trim((string) ($order['bill_narration'] ?? '')) ?: null;
+                    $billVehicle   = trim((string) ($order['bill_vehicle'] ?? '')) ?: null;
+                    $billStatement = trim((string) ($order['bill_statement'] ?? '')) ?: null;
+                    $billRoff      = (float) ($order['bill_roff'] ?? 0);
+                    $docYear       = trim((string) ($order['doc_year'] ?? '')) ?: $this->currentDocYear();
+                    $chargesJson   = $order['charges'] ?? null;
+                    $rawSalesmanId = $order['supplier_id'] ?? null;
+                    $salesmanId    = ($rawSalesmanId !== null && $rawSalesmanId !== '') ? trim((string) $rawSalesmanId) : null;
+
+                    $lineTotal = 0.0;
+                    foreach ($items as $item) {
+                        $lineTotal += round((float) ($item['quantity'] ?? 0) * (float) ($item['price'] ?? 0), 2);
+                    }
+                    $orderTotal = round($lineTotal - $discount + $delivery, 2);
+
+                    // resolveInvoiceNumber() uses lockForUpdate internally — safe inside this transaction
+                    [$billNo, $invoiceNumber] = $status === 'billed'
+                        ? $this->resolveInvoiceNumber($requestedBillNo, $docYear)
+                        : [$requestedBillNo, null];
+
+                    $orderId = $nextOrderId++;
+                    $createdOrderIds[] = $orderId;
+
+                    $masterRows[] = [
+                        'id'             => $orderId,
+                        'user_id'        => $customerId,
+                        'txn_id'         => $narration ?: '',
+                        'payment_status' => 'pms',
+                        'payment_method' => 'pms',
+                        'delivery_info'  => '{}',
+                        'order_count'    => count($items),
+                        'order_total'    => $orderTotal,
+                        'delivery_charge'=> $delivery,
+                        'discount'       => $discount,
+                        'before_discount'=> round($orderTotal + $discount, 2),
+                        'status'         => '1',
+                        'created_at'     => $now,
+                    ];
+
+                    $orderRows[] = [
+                        'order_id'        => $orderId,
+                        'master_order_id' => $orderId,
+                        'buyer_userid'    => $customerId,
+                        'order_state'     => $status,
+                        'order_total'     => $orderTotal,
+                        'discount'        => $discount,
+                        'delivery_charge' => $delivery,
+                        'items_count'     => count($items),
+                        'short_datetime'  => $docDate,
+                        'txn_id'          => $narration,
+                        'delivery_info'   => '{}',
+                        'area_name'       => '',
+                        'feedback'        => '',
+                        'bill_number'     => 0,
+                        'bill_no'         => $billNo,
+                        'invoice_number'  => $invoiceNumber,
+                        'Bill_Dt'         => $billDt,
+                        'Department'      => $department,
+                        'Bill_Narration'  => $billNarration,
+                        'Bill_Vehicle'    => $billVehicle,
+                        'Bill_Statement'  => $billStatement,
+                        'bill_roff'       => $billRoff,
+                        'Doc_Year'        => $docYear,
+                        'salesman_id'     => $salesmanId,
+                        'charges_json'    => $chargesJson !== null ? json_encode($chargesJson) : null,
+                    ];
+
+                    foreach ($items as $item) {
+                        $qty   = (int) round((float) ($item['quantity'] ?? 0));
+                        $price = (float) ($item['price'] ?? 0);
+
+                        $pinfo = [];
+                        if (!empty($item['hsn_code']))       $pinfo['hsn_code']         = $item['hsn_code'];
+                        if (!empty($item['unit']))            $pinfo['unit']             = $item['unit'];
+                        if (!empty($item['pack_id']))         $pinfo['selected_pack']    = ['id' => $item['pack_id'], 'unit' => $item['unit'] ?? 'Nos'];
+                        if (!empty($item['description']))     $pinfo['description']      = $item['description'];
+                        if (isset($item['discount_percent'])) $pinfo['discount_percent'] = (float) $item['discount_percent'];
+                        if (isset($item['tax_percent']))      $pinfo['tax_percent']      = (float) $item['tax_percent'];
+
+                        $itemRows[] = [
+                            'item_id'       => $nextItemId++,
+                            'order_id'      => $orderId,
+                            'product_id'    => (int) ($item['product_id'] ?? 0),
+                            'quantity'      => $qty,
+                            'item_price'    => $price,
+                            'item_total'    => round($qty * $price, 2),
+                            'pinfo'         => json_encode(!empty($pinfo) ? $pinfo : new \stdClass()),
+                            'commission'    => 0,
+                            'qty_loaded'    => isset($item['qty_loaded']) ? (int) round((float) $item['qty_loaded']) : null,
+                            'qty_delivered' => 0,
+                            'qty_returned'  => 0,
+                        ];
+                    }
+                }
+
+                // Three inserts for the whole batch
+                DB::table('loagma_new.master_orders')->insert($masterRows);
+                DB::table(self::ORDERS_TABLE)->insert($orderRows);
+                DB::table(self::ITEMS_TABLE)->insert($itemRows);
+            });
+
+            $result = DB::table(self::ORDERS_TABLE)
+                ->whereIn('order_id', $createdOrderIds)
+                ->orderBy('order_id')
+                ->get()
+                ->map(fn($row) => $this->normalizeHeader($row))
+                ->values()
+                ->all();
+
+            return response()->json([
+                'success' => true,
+                'message' => count($createdOrderIds) . ' order(s) created successfully',
+                'data'    => $result,
+            ], 201);
+
+        } catch (\Throwable $e) {
+            Log::error('SalesOrder storeBulk error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to create orders: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function update(Request $request, int $id): JsonResponse
     {
         try {

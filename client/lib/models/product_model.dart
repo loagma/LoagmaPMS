@@ -239,6 +239,7 @@ List<ProductPack> _parsePacks(dynamic packsRaw) {
         weight: pack.weight,
         unit: pack.unit,
         price: pack.price,
+        mv: pack.mv,
       ),
     );
   }
