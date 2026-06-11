@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PurchaseVoucher;
 use App\Models\PurchaseVoucherItem;
+use App\Services\InventoryLedgerService;
 use App\Services\PurchaseOrderAllocationService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -251,6 +252,10 @@ class PurchaseVoucherController extends Controller
 
             DB::commit();
 
+            if ($voucher->status === 'POSTED' && !$voucher->do_not_update_inventory) {
+                $this->applyPurchaseInvoiceInventory($voucher, $preparedItems);
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Purchase voucher created successfully',
@@ -278,6 +283,7 @@ class PurchaseVoucherController extends Controller
 
         try {
             $voucher = PurchaseVoucher::findOrFail($id);
+            $oldStatus = $voucher->status;
 
             $existingPoIds = $voucher->items()
                 ->whereNotNull('source_purchase_order_id')
@@ -373,6 +379,10 @@ class PurchaseVoucherController extends Controller
             $this->allocationService->refreshPurchaseOrders($touchedPoIds);
 
             DB::commit();
+
+            if ($voucher->status === 'POSTED' && $oldStatus === 'DRAFT' && !$voucher->do_not_update_inventory) {
+                $this->applyPurchaseInvoiceInventory($voucher, $items);
+            }
 
             return response()->json([
                 'success' => true,
@@ -480,6 +490,56 @@ class PurchaseVoucherController extends Controller
             ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
             ->max('doc_no_number');
         return ((int) $max) + 1;
+    }
+
+    private function applyPurchaseInvoiceInventory(PurchaseVoucher $voucher, array $items): void
+    {
+        $ledger  = app(InventoryLedgerService::class);
+        $invDate = optional($voucher->doc_date)->format('Y-m-d') ?? now()->format('Y-m-d');
+
+        foreach ($items as $item) {
+            try {
+                $productId = (int) ($item['product_id'] ?? 0);
+                if ($productId <= 0) {
+                    continue;
+                }
+
+                $vp = $ledger->resolveVendorProduct($productId, (int) $voucher->supplier_id);
+                if (!$vp) {
+                    Log::warning('PurchaseVoucher inventory: no vendor_product', [
+                        'product_id'  => $productId,
+                        'supplier_id' => $voucher->supplier_id,
+                        'voucher_id'  => $voucher->id,
+                    ]);
+                    continue;
+                }
+
+                $qty         = (float) ($item['quantity'] ?? 0);
+                $firstPackPi = $ledger->updatePacksStock($vp->id, $qty, 'increase');
+                $packId      = (string) ($item['pack_id'] ?? $firstPackPi);
+
+                $ledger->recordLedger(
+                    vendorProductId: $vp->id,
+                    productId:       $productId,
+                    packId:          $packId,
+                    quantity:        $qty,
+                    unitType:        (string) ($item['unit'] ?? 'Nos'),
+                    amount:          $qty * (float) ($item['unit_price'] ?? 0),
+                    actionType:      'purchase',
+                    invType:         'CREDIT',
+                    source:          'purchase_invoice',
+                    note:            "Purchase Invoice {$voucher->doc_no} - " . ($item['product_name'] ?? "Product #{$productId}"),
+                    invDate:         $invDate,
+                    vendorId:        (int) $voucher->supplier_id,
+                );
+            } catch (\Throwable $e) {
+                Log::warning('PurchaseVoucher inventory failed for item', [
+                    'product_id' => $item['product_id'] ?? 0,
+                    'voucher_id' => $voucher->id,
+                    'error'      => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     private function validatePayload(Request $request, bool $isUpdate): array

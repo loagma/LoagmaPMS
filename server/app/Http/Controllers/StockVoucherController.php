@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\InventoryLedgerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -152,6 +153,35 @@ class StockVoucherController extends Controller
 
             DB::commit();
 
+            // Ledger entries — outside transaction so inventory errors never break the main save
+            if ($request->status === 'POSTED') {
+                $svType   = $request->voucher_type;
+                $svDate   = $request->voucher_date ?: now()->format('Y-m-d');
+                $ledger   = app(InventoryLedgerService::class);
+                foreach ($request->items as $svItem) {
+                    try {
+                        $pid = (int) ($svItem['product_id'] ?? 0);
+                        $vp  = $ledger->resolveVendorProduct($pid, null);
+                        if (!$vp) { Log::warning('StockVoucher store: no vendor_product', ['product_id' => $pid, 'voucher_id' => $voucherId]); continue; }
+                        $ledger->recordLedger(
+                            vendorProductId: $vp->id,
+                            productId:       $pid,
+                            packId:          '',
+                            quantity:        (float) ($svItem['quantity'] ?? 0),
+                            unitType:        (string) ($svItem['unit_type'] ?? 'Nos'),
+                            amount:          0,
+                            actionType:      $svType === 'IN' ? 'stock_in' : 'stock_out',
+                            invType:         $svType === 'IN' ? 'CREDIT' : 'DEBIT',
+                            source:          'stock_voucher',
+                            note:            "Stock Voucher #{$voucherId} {$svType} - " . ($svItem['unit_type'] ?? ''),
+                            invDate:         $svDate,
+                        );
+                    } catch (\Throwable $ie) {
+                        Log::warning('StockVoucher store: ledger failed', ['product_id' => $svItem['product_id'] ?? 0, 'voucher_id' => $voucherId, 'error' => $ie->getMessage()]);
+                    }
+                }
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Stock voucher created successfully',
@@ -272,6 +302,35 @@ class StockVoucherController extends Controller
             }
 
             DB::commit();
+
+            // Ledger entries for the final (new) stock application only — not the reversal
+            if ($request->status === 'POSTED') {
+                $svType   = $request->voucher_type;
+                $svDate   = $request->voucher_date ?: ($existing->voucher_date ?? now()->format('Y-m-d'));
+                $ledger   = app(InventoryLedgerService::class);
+                foreach ($request->items as $svItem) {
+                    try {
+                        $pid = (int) ($svItem['product_id'] ?? 0);
+                        $vp  = $ledger->resolveVendorProduct($pid, null);
+                        if (!$vp) { Log::warning('StockVoucher update: no vendor_product', ['product_id' => $pid, 'voucher_id' => $id]); continue; }
+                        $ledger->recordLedger(
+                            vendorProductId: $vp->id,
+                            productId:       $pid,
+                            packId:          '',
+                            quantity:        (float) ($svItem['quantity'] ?? 0),
+                            unitType:        (string) ($svItem['unit_type'] ?? 'Nos'),
+                            amount:          0,
+                            actionType:      $svType === 'IN' ? 'stock_in' : 'stock_out',
+                            invType:         $svType === 'IN' ? 'CREDIT' : 'DEBIT',
+                            source:          'stock_voucher',
+                            note:            "Stock Voucher #{$id} {$svType} - " . ($svItem['unit_type'] ?? ''),
+                            invDate:         $svDate,
+                        );
+                    } catch (\Throwable $ie) {
+                        Log::warning('StockVoucher update: ledger failed', ['product_id' => $svItem['product_id'] ?? 0, 'voucher_id' => $id, 'error' => $ie->getMessage()]);
+                    }
+                }
+            }
 
             return response()->json([
                 'success' => true,

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\InventoryLedgerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -226,6 +227,48 @@ class SalesReturnController extends Controller
                 }
             });
 
+            // Inventory: increase packs stock + CREDIT ledger for each returned item
+            $ledger = app(InventoryLedgerService::class);
+            foreach ($items as $srItem) {
+                try {
+                    $orderItemId = (int) ($srItem['source_sales_invoice_item_id'] ?? $srItem['order_item_id'] ?? $srItem['item_id'] ?? 0);
+                    $returnedQty = (float) ($srItem['returned_quantity'] ?? $srItem['return_qty'] ?? 0);
+                    if ($orderItemId <= 0 || $returnedQty <= 0) continue;
+
+                    $origItem = DB::table(self::ITEMS_TABLE)
+                        ->where('item_id', $orderItemId)
+                        ->where('order_id', $sourceOrderId)
+                        ->first();
+                    if (!$origItem) continue;
+
+                    $pinfo   = json_decode((string) ($origItem->pinfo ?? '{}'), true) ?: [];
+                    $packId  = (string) ($pinfo['selected_pack']['id'] ?? '');
+                    if ($packId === '') Log::warning('SalesReturn store: missing pack_id in pinfo', ['item_id' => $orderItemId]);
+
+                    $vp = $ledger->resolveVendorProduct((int) $origItem->product_id, null);
+                    if (!$vp) { Log::warning('SalesReturn store: no vendor_product', ['product_id' => $origItem->product_id, 'order_id' => $sourceOrderId]); continue; }
+
+                    $ledger->updatePacksStock($vp->id, $returnedQty, 'increase');
+
+                    $productName = $pinfo['product_name'] ?? $pinfo['name'] ?? "Product #{$origItem->product_id}";
+                    $ledger->recordLedger(
+                        vendorProductId: $vp->id,
+                        productId:       (int) $origItem->product_id,
+                        packId:          $packId,
+                        quantity:        $returnedQty,
+                        unitType:        (string) ($pinfo['unit'] ?? 'Nos'),
+                        amount:          $returnedQty * (float) ($origItem->item_price ?? 0),
+                        actionType:      'sale_return',
+                        invType:         'CREDIT',
+                        source:          'sales_return',
+                        note:            "Sales Return Order #{$sourceOrderId} - {$productName}",
+                        invDate:         $docDate,
+                    );
+                } catch (\Throwable $ie) {
+                    Log::warning('SalesReturn store: inventory failed', ['item' => $srItem, 'order_id' => $sourceOrderId, 'error' => $ie->getMessage()]);
+                }
+            }
+
             return $this->show($sourceOrderId);
         } catch (\Throwable $e) {
             Log::error('SalesReturn store error: ' . $e->getMessage());
@@ -247,6 +290,13 @@ class SalesReturnController extends Controller
             $items   = $request->input('items', []);
             $rawStatus = strtoupper(trim((string) $request->input('status', $order->order_state ?? 'DRAFT')));
             $status  = in_array($rawStatus, ['DRAFT', 'POSTED', 'CANCELLED']) ? $rawStatus : ($order->order_state ?? 'DRAFT');
+
+            // Capture old qty_returned per item_id before transaction resets them
+            $oldQtyReturned = DB::table(self::ITEMS_TABLE)
+                ->where('order_id', $id)
+                ->pluck('qty_returned', 'item_id')
+                ->map(fn ($v) => (float) $v)
+                ->toArray();
 
             DB::transaction(function () use ($id, $docDate, $reason, $status, $items) {
                 if (!empty($items)) {
@@ -277,6 +327,55 @@ class SalesReturnController extends Controller
                     'order_state'         => $status,
                 ]);
             });
+
+            // Inventory: apply delta (new qty − old qty) per item
+            if (!empty($items)) {
+                $ledger = app(InventoryLedgerService::class);
+                foreach ($items as $srItem) {
+                    try {
+                        $orderItemId = (int) ($srItem['source_sales_invoice_item_id'] ?? $srItem['order_item_id'] ?? $srItem['item_id'] ?? 0);
+                        $newQty      = (float) ($srItem['returned_quantity'] ?? $srItem['return_qty'] ?? 0);
+                        $oldQty      = $oldQtyReturned[$orderItemId] ?? 0.0;
+                        $delta       = $newQty - $oldQty;
+                        if (abs($delta) < 0.001) continue;
+
+                        $origItem = DB::table(self::ITEMS_TABLE)
+                            ->where('item_id', $orderItemId)
+                            ->where('order_id', $id)
+                            ->first();
+                        if (!$origItem) continue;
+
+                        $pinfo  = json_decode((string) ($origItem->pinfo ?? '{}'), true) ?: [];
+                        $packId = (string) ($pinfo['selected_pack']['id'] ?? '');
+                        if ($packId === '') Log::warning('SalesReturn update: missing pack_id in pinfo', ['item_id' => $orderItemId]);
+
+                        $vp = $ledger->resolveVendorProduct((int) $origItem->product_id, null);
+                        if (!$vp) { Log::warning('SalesReturn update: no vendor_product', ['product_id' => $origItem->product_id, 'order_id' => $id]); continue; }
+
+                        if ($delta > 0) {
+                            $ledger->updatePacksStock($vp->id, $delta, 'increase');
+                            $productName = $pinfo['product_name'] ?? $pinfo['name'] ?? "Product #{$origItem->product_id}";
+                            $ledger->recordLedger(
+                                vendorProductId: $vp->id,
+                                productId:       (int) $origItem->product_id,
+                                packId:          $packId,
+                                quantity:        $delta,
+                                unitType:        (string) ($pinfo['unit'] ?? 'Nos'),
+                                amount:          $delta * (float) ($origItem->item_price ?? 0),
+                                actionType:      'sale_return',
+                                invType:         'CREDIT',
+                                source:          'sales_return',
+                                note:            "Sales Return Order #{$id} - {$productName}",
+                                invDate:         $docDate,
+                            );
+                        } else {
+                            $ledger->updatePacksStock($vp->id, abs($delta), 'decrease');
+                        }
+                    } catch (\Throwable $ie) {
+                        Log::warning('SalesReturn update: inventory failed', ['item' => $srItem, 'order_id' => $id, 'error' => $ie->getMessage()]);
+                    }
+                }
+            }
 
             return $this->show($id);
         } catch (\Throwable $e) {

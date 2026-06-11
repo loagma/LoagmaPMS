@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnItem;
 use App\Models\PurchaseVoucher;
+use App\Services\InventoryLedgerService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class PurchaseReturnController extends Controller
@@ -206,6 +208,10 @@ class PurchaseReturnController extends Controller
             return $purchaseReturn;
         });
 
+        if (($header['status'] ?? 'DRAFT') === 'POSTED') {
+            $this->applyPurchaseReturnInventory($created, $computedItems);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Purchase return created successfully.',
@@ -257,6 +263,11 @@ class PurchaseReturnController extends Controller
             }
         });
 
+        $newStatus = $header['status'] ?? $purchaseReturn->status;
+        if ($newStatus === 'POSTED') {
+            $this->applyPurchaseReturnInventory($purchaseReturn, $computedItems);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Purchase return updated successfully.',
@@ -275,6 +286,56 @@ class PurchaseReturnController extends Controller
             'success' => true,
             'message' => 'Purchase return deleted successfully.',
         ]);
+    }
+
+    private function applyPurchaseReturnInventory(PurchaseReturn $purchaseReturn, array $items): void
+    {
+        $ledger  = app(InventoryLedgerService::class);
+        $invDate = optional($purchaseReturn->doc_date)->format('Y-m-d') ?? now()->format('Y-m-d');
+
+        foreach ($items as $item) {
+            try {
+                $productId = (int) ($item['product_id'] ?? 0);
+                if ($productId <= 0) {
+                    continue;
+                }
+
+                $vp = $ledger->resolveVendorProduct($productId, (int) $purchaseReturn->supplier_id);
+                if (!$vp) {
+                    Log::warning('PurchaseReturn inventory: no vendor_product', [
+                        'product_id'       => $productId,
+                        'supplier_id'      => $purchaseReturn->supplier_id,
+                        'purchase_return_id' => $purchaseReturn->id,
+                    ]);
+                    continue;
+                }
+
+                $qty         = (float) ($item['returned_quantity'] ?? 0);
+                $firstPackPi = $ledger->updatePacksStock($vp->id, $qty, 'decrease');
+                $packId      = (string) ($item['pack_id'] ?? $firstPackPi);
+
+                $ledger->recordLedger(
+                    vendorProductId: $vp->id,
+                    productId:       $productId,
+                    packId:          $packId,
+                    quantity:        $qty,
+                    unitType:        (string) ($item['unit'] ?? 'Nos'),
+                    amount:          $qty * (float) ($item['unit_price'] ?? 0),
+                    actionType:      'purchase_return',
+                    invType:         'DEBIT',
+                    source:          'purchase_return',
+                    note:            "Purchase Return {$purchaseReturn->doc_no} - " . ($item['product_name'] ?? "Product #{$productId}"),
+                    invDate:         $invDate,
+                    vendorId:        (int) $purchaseReturn->supplier_id,
+                );
+            } catch (\Throwable $e) {
+                Log::warning('PurchaseReturn inventory failed for item', [
+                    'product_id'       => $item['product_id'] ?? 0,
+                    'purchase_return_id' => $purchaseReturn->id,
+                    'error'            => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     private function validatePayload(Request $request): array

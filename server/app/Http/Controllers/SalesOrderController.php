@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\InventoryLedgerService;
 use App\Services\InvoicePdfService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -268,6 +269,51 @@ class SalesOrderController extends Controller
             });
 
             $order = DB::table(self::ORDERS_TABLE)->where('order_id', $orderId)->first();
+
+            // Inventory: decrease packs stock for every item
+            $supplierIdForVp = is_numeric($salesmanIdStore) ? (int) $salesmanIdStore : null;
+            $ledger = app(InventoryLedgerService::class);
+            foreach ($items as $soItem) {
+                try {
+                    $pid = (int) ($soItem['product_id'] ?? 0);
+                    if ($pid <= 0) continue;
+                    $vp = $ledger->resolveVendorProduct($pid, $supplierIdForVp);
+                    if (!$vp) { Log::warning('SO store: no vendor_product', ['product_id' => $pid, 'order_id' => $orderId]); continue; }
+                    $ledger->updatePacksStock($vp->id, (float) ($soItem['quantity'] ?? 0), 'decrease');
+                } catch (\Throwable $ie) {
+                    Log::warning('SO store: packs decrease failed', ['product_id' => $soItem['product_id'] ?? 0, 'order_id' => $orderId, 'error' => $ie->getMessage()]);
+                }
+            }
+            // Ledger: DEBIT entry when order is created as billed
+            if ($status === 'billed') {
+                foreach ($items as $soItem) {
+                    try {
+                        $pid = (int) ($soItem['product_id'] ?? 0);
+                        if ($pid <= 0) continue;
+                        $vp = $ledger->resolveVendorProduct($pid, $supplierIdForVp);
+                        if (!$vp) continue;
+                        $packId = (string) ($soItem['pack_id'] ?? '');
+                        if ($packId === '') Log::warning('SO store BILLED: missing pack_id', ['product_id' => $pid, 'order_id' => $orderId]);
+                        $qty   = (float) ($soItem['quantity'] ?? 0);
+                        $price = (float) ($soItem['price'] ?? 0);
+                        $ledger->recordLedger(
+                            vendorProductId: $vp->id,
+                            productId:       $pid,
+                            packId:          $packId,
+                            quantity:        $qty,
+                            unitType:        (string) ($soItem['unit'] ?? 'Nos'),
+                            amount:          $qty * $price,
+                            actionType:      'sale',
+                            invType:         'DEBIT',
+                            source:          'sales_invoice',
+                            note:            "Sales Invoice SO#{$orderId} - " . ($soItem['product_name'] ?? "Product #{$pid}"),
+                            invDate:         $docDate,
+                        );
+                    } catch (\Throwable $ie) {
+                        Log::warning('SO store BILLED ledger failed', ['product_id' => $soItem['product_id'] ?? 0, 'order_id' => $orderId, 'error' => $ie->getMessage()]);
+                    }
+                }
+            }
 
             $pdfUrl = null;
             if ($status === 'billed') {
@@ -550,7 +596,7 @@ class SalesOrderController extends Controller
                 ->whereIn('order_id', $billedIds)
                 ->orderBy('order_id')
                 ->get()
-                ->map(fn($row) => $this->normalizeHeader($row))
+                ->map(fn($row) => $this->normalizeHeader($row, false))
                 ->values()
                 ->all();
 
@@ -596,6 +642,26 @@ class SalesOrderController extends Controller
             if (empty($items)) {
                 return response()->json(['success' => false, 'message' => 'At least one item is required'], 422);
             }
+
+            // Guard: block edit if any item has already been returned
+            $hasReturns = DB::table(self::ITEMS_TABLE)
+                ->where('order_id', $id)
+                ->where('qty_returned', '>', 0)
+                ->exists();
+            if ($hasReturns) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot edit order with processed returns.',
+                ], 422);
+            }
+
+            // Capture old items for stock reversal before transaction deletes them
+            $oldItems = DB::table(self::ITEMS_TABLE)
+                ->where('order_id', $id)
+                ->select(['product_id', 'quantity'])
+                ->get()
+                ->map(fn ($r) => ['product_id' => (int) $r->product_id, 'quantity' => (float) $r->quantity])
+                ->all();
 
             $status   = strtolower(trim((string) $request->input('status', $order->order_state ?? 'pending')));
             $docDate  = trim((string) $request->input('doc_date', $order->short_datetime ?? date('Y-m-d')));
@@ -705,6 +771,60 @@ class SalesOrderController extends Controller
             });
 
             $updated = DB::table(self::ORDERS_TABLE)->where('order_id', $id)->first();
+
+            // Inventory: reverse old packs stock, then re-apply new packs stock
+            $supplierIdForVp   = is_numeric($salesmanId) ? (int) $salesmanId : null;
+            $oldSupplierIdForVp = is_numeric($order->salesman_id ?? null) ? (int) $order->salesman_id : null;
+            $ledger = app(InventoryLedgerService::class);
+
+            foreach ($oldItems as $oldItem) {
+                try {
+                    $vp = $ledger->resolveVendorProduct($oldItem['product_id'], $oldSupplierIdForVp);
+                    if ($vp) $ledger->updatePacksStock($vp->id, $oldItem['quantity'], 'increase');
+                } catch (\Throwable $ie) {
+                    Log::warning('SO update: failed to reverse old stock', ['product_id' => $oldItem['product_id'], 'order_id' => $id, 'error' => $ie->getMessage()]);
+                }
+            }
+            foreach ($items as $soItem) {
+                try {
+                    $pid = (int) ($soItem['product_id'] ?? 0);
+                    if ($pid <= 0) continue;
+                    $vp = $ledger->resolveVendorProduct($pid, $supplierIdForVp);
+                    if ($vp) $ledger->updatePacksStock($vp->id, (float) ($soItem['quantity'] ?? 0), 'decrease');
+                } catch (\Throwable $ie) {
+                    Log::warning('SO update: failed to apply new stock', ['product_id' => $soItem['product_id'] ?? 0, 'order_id' => $id, 'error' => $ie->getMessage()]);
+                }
+            }
+            // BILLED ledger: write DEBIT entries only on DRAFT→BILLED transition
+            if ($status === 'billed' && $currentState !== 'billed') {
+                foreach ($items as $soItem) {
+                    try {
+                        $pid = (int) ($soItem['product_id'] ?? 0);
+                        if ($pid <= 0) continue;
+                        $vp = $ledger->resolveVendorProduct($pid, $supplierIdForVp);
+                        if (!$vp) { Log::warning('SO update BILLED: no vendor_product', ['product_id' => $pid, 'order_id' => $id]); continue; }
+                        $packId = (string) ($soItem['pack_id'] ?? '');
+                        if ($packId === '') Log::warning('SO update BILLED: missing pack_id', ['product_id' => $pid, 'order_id' => $id]);
+                        $qty   = (float) ($soItem['quantity'] ?? 0);
+                        $price = (float) ($soItem['price'] ?? 0);
+                        $ledger->recordLedger(
+                            vendorProductId: $vp->id,
+                            productId:       $pid,
+                            packId:          $packId,
+                            quantity:        $qty,
+                            unitType:        (string) ($soItem['unit'] ?? 'Nos'),
+                            amount:          $qty * $price,
+                            actionType:      'sale',
+                            invType:         'DEBIT',
+                            source:          'sales_invoice',
+                            note:            "Sales Invoice SO#{$id} - " . ($soItem['product_name'] ?? "Product #{$pid}"),
+                            invDate:         $docDate,
+                        );
+                    } catch (\Throwable $ie) {
+                        Log::warning('SO update BILLED ledger failed', ['product_id' => $soItem['product_id'] ?? 0, 'order_id' => $id, 'error' => $ie->getMessage()]);
+                    }
+                }
+            }
 
             $pdfUrl = null;
             if ($status === 'billed') {
@@ -963,7 +1083,7 @@ class SalesOrderController extends Controller
         return (int) $max + 1;
     }
 
-    private function normalizeHeader(object $row): array
+    private function normalizeHeader(object $row, bool $includeCharges = true): array
     {
         $data = json_decode(json_encode($row), true) ?: [];
 
@@ -977,7 +1097,7 @@ class SalesOrderController extends Controller
 
         $state = strtolower(trim((string) ($data['order_state'] ?? 'pending')));
 
-        return [
+        $normalized = [
             'id'               => $orderId,
             'so_number'        => 'ORD-' . $orderId,
             'customer_id'      => (int) ($data['buyer_userid'] ?? 0),
@@ -1004,12 +1124,17 @@ class SalesOrderController extends Controller
             'salesman_name'              => $data['salesman_name'] ?? null,
             'items_count'                => (int) ($data['items_count'] ?? 0),
             'sales_return_voucher_no'    => $data['Sales_Return_VoucherNo'] ?? null,
-            'charges'                    => isset($data['charges_json'])
-                ? (json_decode((string) $data['charges_json'], true) ?? [])
-                : [],
             'pdf_url'                    => $data['invoice_pdf_url']
                 ?? $this->existingPdfUrl($data['bill_no'] ?? null, $data['Doc_Year'] ?? null),
         ];
+
+        if ($includeCharges) {
+            $normalized['charges'] = isset($data['charges_json'])
+                ? (json_decode((string) $data['charges_json'], true) ?? [])
+                : [];
+        }
+
+        return $normalized;
     }
 
     private function existingPdfUrl(?string $billNo, ?string $docYear): ?string
