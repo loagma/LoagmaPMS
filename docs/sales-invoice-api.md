@@ -109,11 +109,11 @@ Content-Type: application/json
 
 ---
 
-### 2. Bulk Create Invoices (multiple orders, atomic)
+### 2. Bulk Create Orders (multiple new orders, atomic)
 
 **`POST /api/sales-orders/bulk`**
 
-Creates multiple sales orders in a single all-or-nothing transaction. If any order fails validation, no orders are created. Each billed order gets its own sequential invoice number.
+Creates multiple brand-new sales orders in a single all-or-nothing transaction. Each order has its own full payload (customer, items, billing fields). Use this when the orders don't exist yet.
 
 **Request**
 ```http
@@ -129,7 +129,6 @@ Content-Type: application/json
       "status": "billed",
       "customer_id": 1234,
       "doc_date": "2026-06-05",
-      "admin_id": 1,
       "bill_dt": "2026-06-05",
       "doc_year": "26-27",
       "bill_roff": 0,
@@ -141,7 +140,6 @@ Content-Type: application/json
       "status": "billed",
       "customer_id": 5678,
       "doc_date": "2026-06-05",
-      "admin_id": 1,
       "bill_dt": "2026-06-05",
       "doc_year": "26-27",
       "bill_roff": 0,
@@ -153,56 +151,97 @@ Content-Type: application/json
 }
 ```
 
-Each object in `orders` accepts the same fields as `POST /api/sales-orders` (see endpoint 1 above).
+Each object in `orders` accepts the same fields as `POST /api/sales-orders` (see endpoint 1). Invoice numbers are auto-assigned sequentially.
 
-**Response `201`**
-```json
-{
-  "success": true,
-  "message": "2 order(s) created successfully",
-  "data": [
-    {
-      "id": 268101,
-      "so_number": "ORD-268101",
-      "status": "BILLED",
-      "bill_number": "INV/26-27/003",
-      "bill_dt": "2026-06-05",
-      "customer_id": 1234,
-      "total_amount": 450.00,
-      "grand_total": 472.50,
-      "pdf_url": null
-    },
-    {
-      "id": 268102,
-      "so_number": "ORD-268102",
-      "status": "BILLED",
-      "bill_number": "INV/26-27/004",
-      "bill_dt": "2026-06-05",
-      "customer_id": 5678,
-      "total_amount": 600.00,
-      "grand_total": 672.00,
-      "pdf_url": null
-    }
-  ]
-}
-```
-
-> `pdf_url` is `null` for all orders in a bulk call — PDFs are not auto-generated. Call `GET /api/sales-orders/{id}/pdf?admin_id={admin_id}` per order after creation if needed.
-
-**Error responses**
-
-| Code | Reason |
-|---|---|
-| `422` | Validation failed on any order in the batch — no orders are created |
-| `400` | `orders` array is empty or missing |
-
-**Atomicity**: if the DB insert fails mid-way (e.g. duplicate bill number), the entire batch is rolled back. Invoice numbers are assigned sequentially inside a single transaction using `SELECT ... FOR UPDATE` to prevent gaps or collisions.
+**Response `201`** — same shape as endpoint 1, `data` is an array of created orders. `pdf_url` is always `null` — call `GET /{id}/pdf` per order separately.
 
 **Flutter client constant**: `ApiConfig.salesOrdersBulk`
 
 ---
 
-### 3. Update / Convert Existing Order to Invoice (single)
+### 3. Bulk Invoice Existing Orders (convert by order IDs)
+
+**`POST /api/sales-orders/bulk-invoice`**
+
+Takes existing orders (already saved as pending/dispatched/delivered) and converts them all to `billed` in one atomic transaction. Billing fields are shared across all orders. Items are taken from what's already saved on each order — no items array needed.
+
+Use this for end-of-day invoicing where orders were created earlier in the day and now need to be bulk-billed.
+
+**Request**
+```http
+POST https://loagmapms-hd5u.onrender.com/api/sales-orders/bulk-invoice
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+```json
+{
+  "order_ids": [268080, 268081, 268082],
+  "bill_dt": "2026-06-11",
+  "doc_year": "26-27",
+  "bill_roff": 0.50,
+  "admin_id": 1,
+  "department": "Sales",
+  "bill_narration": "June batch",
+  "bill_vehicle": "GJ01AB1234",
+  "bill_statement": "Payment due in 30 days",
+  "charges": [
+    { "name": "Freight", "amount": 150.00, "remarks": "Road transport" }
+  ]
+}
+```
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `order_ids` | int[] | Yes | IDs of existing orders to invoice |
+| `bill_dt` | date | Yes | Invoice date `YYYY-MM-DD` applied to all |
+| `doc_year` | string | No | e.g. `"26-27"` — defaults to current FY |
+| `bill_roff` | float | No | Round-off amount applied to all |
+| `admin_id` | int | No | Not used for PDF — call `GET /{id}/pdf` separately |
+| `department` | string | No | Applied to all orders |
+| `bill_narration` | string | No | Applied to all orders |
+| `bill_vehicle` | string | No | Applied to all orders |
+| `bill_statement` | string | No | Applied to all orders |
+| `charges` | array | No | Extra charges applied to all orders |
+
+**Response `200`**
+```json
+{
+  "success": true,
+  "message": "3 order(s) invoiced successfully",
+  "data": [
+    {
+      "id": 268080,
+      "so_number": "ORD-268080",
+      "status": "BILLED",
+      "bill_number": "INV/26-27/005",
+      "bill_dt": "2026-06-11",
+      "customer_id": 1234,
+      "customer_name": "Ramesh Traders",
+      "total_amount": 450.00,
+      "pdf_url": null
+    },
+    { "...": "..." }
+  ]
+}
+```
+
+**Error responses**
+
+| Code | Reason |
+|---|---|
+| `422` | `order_ids` empty, or `bill_dt` missing |
+| `404` | One or more order IDs not found |
+| `422` | Any order is already `billed` |
+| `422` | Any order is in a closed state (`cancelled`, `rejected`, `returned`) |
+
+**Atomicity**: all orders are updated in a single transaction. If any update fails, none are invoiced. Invoice numbers are assigned sequentially inside the transaction using `SELECT ... FOR UPDATE`.
+
+**Flutter client constant**: `ApiConfig.salesOrdersBulkInvoice`
+
+---
+
+### 4. Update / Convert Existing Order to Invoice (single)
 
 **`PUT /api/sales-orders/{id}`**
 
@@ -263,7 +302,7 @@ Content-Type: application/json
 
 ---
 
-### 4. Generate / Re-generate PDF (on demand)
+### 5. Generate / Re-generate PDF (on demand)
 
 **`GET /api/sales-orders/{id}/pdf?admin_id={admin_id}`**
 
@@ -299,7 +338,7 @@ Authorization: Bearer <token>
 
 ---
 
-### 5. Get Order with PDF URL
+### 6. Get Order with PDF URL
 
 **`GET /api/sales-orders/{id}`**
 

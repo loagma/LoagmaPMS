@@ -472,6 +472,100 @@ class SalesOrderController extends Controller
         }
     }
 
+    // POST /sales-orders/bulk-invoice
+    // Body: { "order_ids": [...], "bill_dt": "...", "doc_year": "...", shared billing fields }
+    // Converts existing pending/dispatched/delivered orders to billed invoices atomically.
+    // Invoice numbers are auto-assigned sequentially — caller must not send bill_number.
+    public function bulkInvoice(Request $request): JsonResponse
+    {
+        try {
+            $orderIds = $request->input('order_ids', []);
+            if (empty($orderIds) || !is_array($orderIds)) {
+                return response()->json(['success' => false, 'message' => 'order_ids array is required and must not be empty'], 422);
+            }
+
+            $billDt = $request->input('bill_dt');
+            if (empty($billDt)) {
+                return response()->json(['success' => false, 'message' => 'bill_dt is required'], 422);
+            }
+
+            $orderIds = array_values(array_unique(array_map('intval', $orderIds)));
+
+            // Shared billing fields applied to every order
+            $docYear       = trim((string) $request->input('doc_year', '')) ?: $this->currentDocYear();
+            $billRoff      = (float) $request->input('bill_roff', 0);
+            $department    = trim((string) $request->input('department', '')) ?: null;
+            $billNarration = trim((string) $request->input('bill_narration', '')) ?: null;
+            $billVehicle   = trim((string) $request->input('bill_vehicle', '')) ?: null;
+            $billStatement = trim((string) $request->input('bill_statement', '')) ?: null;
+            $chargesJson   = $request->input('charges', null);
+            $adminId       = (int) $request->input('admin_id', 0);
+
+            // Load and validate all orders before touching anything
+            $orders = DB::table(self::ORDERS_TABLE)
+                ->whereIn('order_id', $orderIds)
+                ->get()
+                ->keyBy('order_id');
+
+            $missing = array_diff($orderIds, $orders->keys()->toArray());
+            if (!empty($missing)) {
+                return response()->json(['success' => false, 'message' => 'Orders not found: ' . implode(', ', $missing)], 404);
+            }
+
+            foreach ($orders as $order) {
+                $state = strtolower(trim((string) ($order->order_state ?? '')));
+                if (in_array($state, self::$CLOSED_STATES, true)) {
+                    return response()->json(['success' => false, 'message' => "Order {$order->order_id} is in a closed state: " . strtoupper($state)], 422);
+                }
+                if ($state === 'billed') {
+                    return response()->json(['success' => false, 'message' => "Order {$order->order_id} is already billed (invoice: {$order->bill_no})"], 422);
+                }
+            }
+
+            $billedIds = [];
+
+            DB::transaction(function () use ($orderIds, $orders, $billDt, $docYear, $billRoff, $department, $billNarration, $billVehicle, $billStatement, $chargesJson, &$billedIds) {
+                foreach ($orderIds as $orderId) {
+                    [$billNo, $invoiceNumber] = $this->resolveInvoiceNumber(null, $docYear);
+
+                    DB::table(self::ORDERS_TABLE)->where('order_id', $orderId)->update([
+                        'order_state'     => 'billed',
+                        'bill_no'         => $billNo,
+                        'invoice_number'  => $invoiceNumber,
+                        'Bill_Dt'         => $billDt,
+                        'Doc_Year'        => $docYear,
+                        'bill_roff'       => $billRoff,
+                        'Department'      => $department,
+                        'Bill_Narration'  => $billNarration,
+                        'Bill_Vehicle'    => $billVehicle,
+                        'Bill_Statement'  => $billStatement,
+                        'charges_json'    => $chargesJson !== null ? json_encode($chargesJson) : null,
+                    ]);
+
+                    $billedIds[] = $orderId;
+                }
+            });
+
+            $result = DB::table(self::ORDERS_TABLE)
+                ->whereIn('order_id', $billedIds)
+                ->orderBy('order_id')
+                ->get()
+                ->map(fn($row) => $this->normalizeHeader($row))
+                ->values()
+                ->all();
+
+            return response()->json([
+                'success' => true,
+                'message' => count($billedIds) . ' order(s) invoiced successfully',
+                'data'    => $result,
+            ], 200);
+
+        } catch (\Throwable $e) {
+            Log::error('SalesOrder bulkInvoice error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to invoice orders: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function update(Request $request, int $id): JsonResponse
     {
         try {
