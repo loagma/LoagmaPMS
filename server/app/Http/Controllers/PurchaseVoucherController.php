@@ -70,7 +70,7 @@ class PurchaseVoucherController extends Controller
 
             $query->orderBy((string) $sortField, $sortOrder);
 
-            $limit = max(1, (int) $request->input('limit', 20));
+            $limit = min(max((int) $request->input('limit', 20), 1), 200);
             $page = max(1, (int) $request->input('page', 1));
             $total = $query->count();
             $list = $query->skip(($page - 1) * $limit)->take($limit)->get();
@@ -506,7 +506,7 @@ class PurchaseVoucherController extends Controller
 
                 $vp = $ledger->resolveVendorProduct($productId, (int) $voucher->supplier_id);
                 if (!$vp) {
-                    Log::warning('PurchaseVoucher inventory: no vendor_product', [
+                    Log::error('PurchaseVoucher inventory: no vendor_product', [
                         'product_id'  => $productId,
                         'supplier_id' => $voucher->supplier_id,
                         'voucher_id'  => $voucher->id,
@@ -533,7 +533,7 @@ class PurchaseVoucherController extends Controller
                     vendorId:        (int) $voucher->supplier_id,
                 );
             } catch (\Throwable $e) {
-                Log::warning('PurchaseVoucher inventory failed for item', [
+                Log::error('PurchaseVoucher inventory failed for item', [
                     'product_id' => $item['product_id'] ?? 0,
                     'voucher_id' => $voucher->id,
                     'error'      => $e->getMessage(),

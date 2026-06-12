@@ -44,7 +44,7 @@ class UserController extends Controller
                 });
             }
 
-            $limit = (int) $request->input('limit', 500);
+            $limit = min(max((int) $request->input('limit', 100), 1), 200);
             $items = $query->orderBy('name')->limit($limit)->get();
 
             return response()->json([

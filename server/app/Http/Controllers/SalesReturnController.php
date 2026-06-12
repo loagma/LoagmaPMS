@@ -265,7 +265,7 @@ class SalesReturnController extends Controller
                         invDate:         $docDate,
                     );
                 } catch (\Throwable $ie) {
-                    Log::warning('SalesReturn store: inventory failed', ['item' => $srItem, 'order_id' => $sourceOrderId, 'error' => $ie->getMessage()]);
+                    Log::error('SalesReturn store: inventory failed', ['item' => $srItem, 'order_id' => $sourceOrderId, 'error' => $ie->getMessage()]);
                 }
             }
 
@@ -372,7 +372,7 @@ class SalesReturnController extends Controller
                             $ledger->updatePacksStock($vp->id, abs($delta), 'decrease');
                         }
                     } catch (\Throwable $ie) {
-                        Log::warning('SalesReturn update: inventory failed', ['item' => $srItem, 'order_id' => $id, 'error' => $ie->getMessage()]);
+                        Log::error('SalesReturn update: inventory failed', ['item' => $srItem, 'order_id' => $id, 'error' => $ie->getMessage()]);
                     }
                 }
             }

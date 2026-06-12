@@ -34,8 +34,8 @@ class TaxController extends Controller
             }
             $query->orderBy($sortField, $sortOrder);
 
-            $limit = (int) $request->input('limit', 20);
-            $page = (int) $request->input('page', 1);
+            $limit = min(max((int) $request->input('limit', 20), 1), 200);
+            $page = max(1, (int) $request->input('page', 1));
             $total = $query->count();
             $taxes = $query->skip(($page - 1) * $limit)->take($limit)->get();
 

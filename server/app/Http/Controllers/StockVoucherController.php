@@ -177,7 +177,7 @@ class StockVoucherController extends Controller
                             invDate:         $svDate,
                         );
                     } catch (\Throwable $ie) {
-                        Log::warning('StockVoucher store: ledger failed', ['product_id' => $svItem['product_id'] ?? 0, 'voucher_id' => $voucherId, 'error' => $ie->getMessage()]);
+                        Log::error('StockVoucher store: ledger failed', ['product_id' => $svItem['product_id'] ?? 0, 'voucher_id' => $voucherId, 'error' => $ie->getMessage()]);
                     }
                 }
             }
@@ -327,7 +327,7 @@ class StockVoucherController extends Controller
                             invDate:         $svDate,
                         );
                     } catch (\Throwable $ie) {
-                        Log::warning('StockVoucher update: ledger failed', ['product_id' => $svItem['product_id'] ?? 0, 'voucher_id' => $id, 'error' => $ie->getMessage()]);
+                        Log::error('StockVoucher update: ledger failed', ['product_id' => $svItem['product_id'] ?? 0, 'voucher_id' => $id, 'error' => $ie->getMessage()]);
                     }
                 }
             }

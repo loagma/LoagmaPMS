@@ -45,8 +45,8 @@ class SupplierController extends Controller
             $query->orderBy($sortField, $sortOrder);
 
             // Pagination
-            $limit = $request->input('limit', 20);
-            $page = $request->input('page', 1);
+            $limit = min(max((int) $request->input('limit', 20), 1), 200);
+            $page = max(1, (int) $request->input('page', 1));
             
             $total = $query->count();
             $suppliers = $query->skip(($page - 1) * $limit)

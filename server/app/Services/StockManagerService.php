@@ -105,14 +105,20 @@ class StockManagerService
                         $pack->packUnit
                     );
                 } catch (\InvalidArgumentException $e) {
-                    Log::warning('Failed to calculate conversion factor for pack', [
+                    Log::error('Invalid pack unit — stock update will abort', [
                         'vendor_product_id' => $vendorProductId,
-                        'pack_id' => $pack->packId,
-                        'error' => $e->getMessage()
+                        'pack_id'           => $pack->packId,
+                        'error'             => $e->getMessage(),
                     ]);
-                    // Set to 0 to mark as invalid
                     $pack->conversionFactor = 0;
                 }
+            }
+
+            if ($triggerPack->conversionFactor === 0) {
+                return StockUpdateResult::failure(
+                    "Cannot update stock: invalid pack unit for pack {$packId}",
+                    ['vendor_product_id' => $vendorProductId, 'pack_id' => $packId]
+                );
             }
 
             // Calculate base unit change

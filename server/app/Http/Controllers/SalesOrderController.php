@@ -310,7 +310,7 @@ class SalesOrderController extends Controller
                             invDate:         $docDate,
                         );
                     } catch (\Throwable $ie) {
-                        Log::warning('SO store BILLED ledger failed', ['product_id' => $soItem['product_id'] ?? 0, 'order_id' => $orderId, 'error' => $ie->getMessage()]);
+                        Log::error('SO store BILLED ledger failed', ['product_id' => $soItem['product_id'] ?? 0, 'order_id' => $orderId, 'error' => $ie->getMessage()]);
                     }
                 }
             }
@@ -821,7 +821,7 @@ class SalesOrderController extends Controller
                             invDate:         $docDate,
                         );
                     } catch (\Throwable $ie) {
-                        Log::warning('SO update BILLED ledger failed', ['product_id' => $soItem['product_id'] ?? 0, 'order_id' => $id, 'error' => $ie->getMessage()]);
+                        Log::error('SO update BILLED ledger failed', ['product_id' => $soItem['product_id'] ?? 0, 'order_id' => $id, 'error' => $ie->getMessage()]);
                     }
                 }
             }

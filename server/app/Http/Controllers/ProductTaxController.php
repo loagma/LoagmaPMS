@@ -29,8 +29,8 @@ class ProductTaxController extends Controller
             }
             $query->orderBy($sortField, $sortOrder);
 
-            $limit = (int) $request->input('limit', 50);
-            $page = (int) $request->input('page', 1);
+            $limit = min(max((int) $request->input('limit', 50), 1), 200);
+            $page = max(1, (int) $request->input('page', 1));
             $total = $query->count();
             $items = $query->skip(($page - 1) * $limit)->take($limit)->get();
 

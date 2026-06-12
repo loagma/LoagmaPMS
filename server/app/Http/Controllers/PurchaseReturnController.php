@@ -302,7 +302,7 @@ class PurchaseReturnController extends Controller
 
                 $vp = $ledger->resolveVendorProduct($productId, (int) $purchaseReturn->supplier_id);
                 if (!$vp) {
-                    Log::warning('PurchaseReturn inventory: no vendor_product', [
+                    Log::error('PurchaseReturn inventory: no vendor_product', [
                         'product_id'       => $productId,
                         'supplier_id'      => $purchaseReturn->supplier_id,
                         'purchase_return_id' => $purchaseReturn->id,
@@ -329,7 +329,7 @@ class PurchaseReturnController extends Controller
                     vendorId:        (int) $purchaseReturn->supplier_id,
                 );
             } catch (\Throwable $e) {
-                Log::warning('PurchaseReturn inventory failed for item', [
+                Log::error('PurchaseReturn inventory failed for item', [
                     'product_id'       => $item['product_id'] ?? 0,
                     'purchase_return_id' => $purchaseReturn->id,
                     'error'            => $e->getMessage(),
