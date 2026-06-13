@@ -439,6 +439,10 @@ class PurchaseReturnFormController extends GetxController {
     }
   }
 
+  // One idempotency key per intended submission; reused across retries (incl. after the
+  // 30s timeout below) until it succeeds, so a retry never creates a second return.
+  String? _pendingIdempotencyKey;
+
   Future<void> savePurchaseReturn({bool post = false}) async {
     if (!formKey.currentState!.validate()) {
       _showError('Please fill all required fields');
@@ -533,20 +537,28 @@ class PurchaseReturnFormController extends GetxController {
             ? ApiConfig.createPurchaseReturn
             : '${ApiConfig.purchaseReturns}/$returnId',
       );
-      final headers = AuthController.jsonHeaders;
 
-      final response = returnId == null
-          ? await http
-                .post(uri, headers: headers, body: jsonEncode(payload))
-                .timeout(const Duration(seconds: 30))
-          : await http
-                .put(uri, headers: headers, body: jsonEncode(payload))
-                .timeout(const Duration(seconds: 30));
+      final http.Response response;
+      if (returnId == null) {
+        _pendingIdempotencyKey ??= AuthController.newIdempotencyKey();
+        response = await http
+            .post(
+              uri,
+              headers: AuthController.jsonHeadersWithIdempotency(_pendingIdempotencyKey!),
+              body: jsonEncode(payload),
+            )
+            .timeout(const Duration(seconds: 30));
+      } else {
+        response = await http
+            .put(uri, headers: AuthController.jsonHeaders, body: jsonEncode(payload))
+            .timeout(const Duration(seconds: 30));
+      }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (data['success'] == true) {
+          _pendingIdempotencyKey = null; // submission landed — next save gets a fresh key
           _showSuccess(
             returnId == null
                 ? 'Return saved successfully'

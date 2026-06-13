@@ -107,6 +107,20 @@ class StockVoucherController extends Controller
                 ], 422);
             }
 
+            // Idempotency: a retried submission with the same key replays the original result
+            // instead of creating a second voucher and double-applying stock.
+            $idempotencyKey = $request->header('Idempotency-Key') ?: $request->input('idempotency_key');
+            if ($idempotencyKey) {
+                $existing = DB::table('stock_voucher')->where('idempotency_key', $idempotencyKey)->first();
+                if ($existing) {
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Stock voucher created successfully',
+                        'data' => ['voucher_id' => $existing->id, 'status' => $existing->status],
+                    ], 200);
+                }
+            }
+
             // Validate stock for OUT vouchers
             if ($request->status === 'POSTED' && $request->voucher_type === 'OUT') {
                 $stockError = $this->validateStock($request->items);
@@ -127,6 +141,7 @@ class StockVoucherController extends Controller
                 'voucher_date' => $request->voucher_date ?: now()->format('Y-m-d'),
                 'remarks' => $request->remarks,
                 'posted_at' => $request->status === 'POSTED' ? now() : null,
+                'idempotency_key' => $idempotencyKey ?: null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -151,42 +166,45 @@ class StockVoucherController extends Controller
                 }
             }
 
-            DB::commit();
-
-            // Ledger entries — outside transaction so inventory errors never break the main save
+            // Ledger entries — inside the transaction so a ledger failure rolls back the
+            // stock change instead of leaving an unexplained movement (audit gap).
             if ($request->status === 'POSTED') {
                 $svType   = $request->voucher_type;
                 $svDate   = $request->voucher_date ?: now()->format('Y-m-d');
                 $ledger   = app(InventoryLedgerService::class);
                 foreach ($request->items as $svItem) {
-                    try {
-                        $pid = (int) ($svItem['product_id'] ?? 0);
-                        $vp  = $ledger->resolveVendorProduct($pid, null);
-                        if (!$vp) { Log::warning('StockVoucher store: no vendor_product', ['product_id' => $pid, 'voucher_id' => $voucherId]); continue; }
-                        $ledger->recordLedger(
-                            vendorProductId: $vp->id,
-                            productId:       $pid,
-                            packId:          '',
-                            quantity:        (float) ($svItem['quantity'] ?? 0),
-                            unitType:        (string) ($svItem['unit_type'] ?? 'Nos'),
-                            amount:          0,
-                            actionType:      $svType === 'IN' ? 'stock_in' : 'stock_out',
-                            invType:         $svType === 'IN' ? 'CREDIT' : 'DEBIT',
-                            source:          'stock_voucher',
-                            note:            "Stock Voucher #{$voucherId} {$svType} - " . ($svItem['unit_type'] ?? ''),
-                            invDate:         $svDate,
-                        );
-                    } catch (\Throwable $ie) {
-                        Log::error('StockVoucher store: ledger failed', ['product_id' => $svItem['product_id'] ?? 0, 'voucher_id' => $voucherId, 'error' => $ie->getMessage()]);
-                    }
+                    $pid = (int) ($svItem['product_id'] ?? 0);
+                    $vp  = $ledger->resolveVendorProduct($pid, null);
+                    if (!$vp) { Log::warning('StockVoucher store: no vendor_product', ['product_id' => $pid, 'voucher_id' => $voucherId]); continue; }
+                    $ledger->recordLedger(
+                        vendorProductId: $vp->id,
+                        productId:       $pid,
+                        packId:          '',
+                        quantity:        (float) ($svItem['quantity'] ?? 0),
+                        unitType:        (string) ($svItem['unit_type'] ?? 'Nos'),
+                        amount:          0,
+                        actionType:      $svType === 'IN' ? 'stock_in' : 'stock_out',
+                        invType:         $svType === 'IN' ? 'CREDIT' : 'DEBIT',
+                        source:          'stock_voucher',
+                        note:            "Stock Voucher #{$voucherId} {$svType} - " . ($svItem['unit_type'] ?? ''),
+                        invDate:         $svDate,
+                    );
                 }
             }
+
+            DB::commit();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Stock voucher created successfully',
                 'data' => ['voucher_id' => $voucherId, 'status' => $request->status]
             ], 201);
+        } catch (\RuntimeException $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 409);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Stock voucher creation failed', ['error' => $e->getMessage()]);
@@ -301,42 +319,45 @@ class StockVoucherController extends Controller
                 }
             }
 
-            DB::commit();
-
-            // Ledger entries for the final (new) stock application only — not the reversal
+            // Ledger entries for the final (new) stock application only — not the reversal.
+            // Inside the transaction so a ledger failure rolls back the stock change.
             if ($request->status === 'POSTED') {
                 $svType   = $request->voucher_type;
                 $svDate   = $request->voucher_date ?: ($existing->voucher_date ?? now()->format('Y-m-d'));
                 $ledger   = app(InventoryLedgerService::class);
                 foreach ($request->items as $svItem) {
-                    try {
-                        $pid = (int) ($svItem['product_id'] ?? 0);
-                        $vp  = $ledger->resolveVendorProduct($pid, null);
-                        if (!$vp) { Log::warning('StockVoucher update: no vendor_product', ['product_id' => $pid, 'voucher_id' => $id]); continue; }
-                        $ledger->recordLedger(
-                            vendorProductId: $vp->id,
-                            productId:       $pid,
-                            packId:          '',
-                            quantity:        (float) ($svItem['quantity'] ?? 0),
-                            unitType:        (string) ($svItem['unit_type'] ?? 'Nos'),
-                            amount:          0,
-                            actionType:      $svType === 'IN' ? 'stock_in' : 'stock_out',
-                            invType:         $svType === 'IN' ? 'CREDIT' : 'DEBIT',
-                            source:          'stock_voucher',
-                            note:            "Stock Voucher #{$id} {$svType} - " . ($svItem['unit_type'] ?? ''),
-                            invDate:         $svDate,
-                        );
-                    } catch (\Throwable $ie) {
-                        Log::error('StockVoucher update: ledger failed', ['product_id' => $svItem['product_id'] ?? 0, 'voucher_id' => $id, 'error' => $ie->getMessage()]);
-                    }
+                    $pid = (int) ($svItem['product_id'] ?? 0);
+                    $vp  = $ledger->resolveVendorProduct($pid, null);
+                    if (!$vp) { Log::warning('StockVoucher update: no vendor_product', ['product_id' => $pid, 'voucher_id' => $id]); continue; }
+                    $ledger->recordLedger(
+                        vendorProductId: $vp->id,
+                        productId:       $pid,
+                        packId:          '',
+                        quantity:        (float) ($svItem['quantity'] ?? 0),
+                        unitType:        (string) ($svItem['unit_type'] ?? 'Nos'),
+                        amount:          0,
+                        actionType:      $svType === 'IN' ? 'stock_in' : 'stock_out',
+                        invType:         $svType === 'IN' ? 'CREDIT' : 'DEBIT',
+                        source:          'stock_voucher',
+                        note:            "Stock Voucher #{$id} {$svType} - " . ($svItem['unit_type'] ?? ''),
+                        invDate:         $svDate,
+                    );
                 }
             }
+
+            DB::commit();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Stock voucher updated successfully',
                 'data' => ['voucher_id' => (int) $id, 'status' => $request->status]
             ]);
+        } catch (\RuntimeException $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 409);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Stock voucher update failed', ['error' => $e->getMessage()]);
@@ -357,17 +378,20 @@ class StockVoucherController extends Controller
             
             $product = DB::table('product')
                 ->where('product_id', $productId)
-                ->select('product_id', 'name', 'stock')
+                ->select('product_id', 'name', 'stock', 'inventory_type')
                 ->first();
             if (!$product) {
                 $errors["items.{$index}"] = ['Product not found'];
                 continue;
             }
-            
-            $vendorProductsStock = $this->getVendorProductsTotalStock($productId);
-            $availableStock = $vendorProductsStock > 0 ? $vendorProductsStock : ($product->stock !== null ? (float) $product->stock : 0);
-            
-            if ($availableStock < $quantity) {
+
+            // Each product type has ONE source of truth: PACK_WISE → vendor_products.packs,
+            // SINGLE → products.stock. Read whichever applies (no cross-store fallback).
+            $availableStock = $this->isPackWise($product->inventory_type ?? null)
+                ? $this->getVendorProductsTotalStock($productId)
+                : ($product->stock !== null ? (float) $product->stock : 0.0);
+
+            if ($availableStock + 1e-9 < $quantity) {
                 $productName = $product->name ?? "Product #{$productId}";
                 $errors["items.{$index}"] = [
                     "Insufficient stock for {$productName}. Available: {$availableStock}, Required: {$quantity}",
@@ -412,18 +436,32 @@ class StockVoucherController extends Controller
         return $totalStock;
     }
 
+    /** True when the product tracks stock per-pack (vendor_products.packs) rather than as a single products.stock value. */
+    private function isPackWise(?string $inventoryType): bool
+    {
+        return strtoupper(trim((string) ($inventoryType ?? 'SINGLE'))) === 'PACK_WISE';
+    }
+
+    private function productIsPackWise(int $productId): bool
+    {
+        return $this->isPackWise(DB::table('product')->where('product_id', $productId)->value('inventory_type'));
+    }
+
     private function increaseStock(array $items): void
     {
         foreach ($items as $item) {
             $productId = (int) $item['product_id'];
             $quantity = (float) $item['quantity'];
-            
-            $this->updateVendorProductStock($productId, $quantity, 'increase');
-            
-            DB::statement(
-                'UPDATE product SET stock = COALESCE(stock, 0) + ? WHERE product_id = ?',
-                [$quantity, $productId]
-            );
+
+            if ($this->productIsPackWise($productId)) {
+                // PACK_WISE: vendor_products.packs is authoritative; products.stock is then
+                // re-derived from the pack totals by the aggregator so the two cannot diverge.
+                $this->updateVendorProductStock($productId, $quantity, 'increase');
+                app(\App\Services\ProductStockAggregator::class)->updateProductStock($productId);
+            } else {
+                // SINGLE: stock lives directly on products.stock.
+                DB::update('UPDATE product SET stock = COALESCE(stock, 0) + ? WHERE product_id = ?', [$quantity, $productId]);
+            }
         }
     }
 
@@ -432,27 +470,32 @@ class StockVoucherController extends Controller
         foreach ($items as $item) {
             $productId = (int) $item['product_id'];
             $quantity = (float) $item['quantity'];
-            
-            $this->updateVendorProductStock($productId, $quantity, 'reduce');
-            
-            $product = DB::table('product')->where('product_id', $productId)->first();
-            $currentStock = $product && $product->stock !== null ? (float) $product->stock : 0;
-            
-            if ($currentStock > 0) {
-                $reduceAmount = min($quantity, $currentStock);
-                DB::update(
-                    'UPDATE product SET stock = COALESCE(stock, 0) - ? WHERE product_id = ?',
-                    [$reduceAmount, $productId]
-                );
+
+            if ($this->productIsPackWise($productId)) {
+                $this->updateVendorProductStock($productId, $quantity, 'reduce');
+                app(\App\Services\ProductStockAggregator::class)->updateProductStock($productId);
+            } else {
+                // SINGLE: lock the row, reject if insufficient, then deduct exactly (no clamp).
+                $row = DB::table('product')->where('product_id', $productId)->lockForUpdate()->first();
+                $current = $row && $row->stock !== null ? (float) $row->stock : 0.0;
+                if ($current + 1e-9 < $quantity) {
+                    throw new \RuntimeException(
+                        "Insufficient stock for product {$productId}. Available: {$current}, Requested: {$quantity}"
+                    );
+                }
+                DB::update('UPDATE product SET stock = ? WHERE product_id = ?', [$current - $quantity, $productId]);
             }
         }
     }
 
     private function updateVendorProductStock(int $productId, float $quantity, string $operation): void
     {
+        // Lock the vendor_products rows for the duration of the transaction so a concurrent
+        // voucher cannot slip stock out between the validation read and this deduction.
         $vendorProducts = DB::table('vendor_products')
             ->where('product_id', $productId)
             ->where('status', '1')
+            ->lockForUpdate()
             ->get();
 
         if ($vendorProducts->isEmpty()) {
@@ -466,28 +509,25 @@ class StockVoucherController extends Controller
                     continue;
                 }
 
-                $totalStock = 0;
-                foreach ($packsData as $packData) {
-                    if (isset($packData['stk'])) {
-                        $totalStock += (float) $packData['stk'];
-                    }
-                }
-
-                if ($operation === 'reduce' && $totalStock <= 0) {
-                    continue;
-                }
-
                 $updatedPacks = [];
                 foreach ($packsData as $packId => $packData) {
                     if (isset($packData['stk'])) {
                         $currentStock = (float) $packData['stk'];
-                        
+
                         if ($operation === 'increase') {
                             $newStock = $currentStock + $quantity;
                         } else {
-                            $newStock = max(0, $currentStock - $quantity);
+                            // Reject rather than silently clamp to 0. The throw rolls back the
+                            // whole transaction (stock + ledger), so the client can retry.
+                            if ($currentStock + 1e-9 < $quantity) {
+                                throw new \RuntimeException(
+                                    "Insufficient stock for product {$productId} (pack {$packId}). " .
+                                    "Available: {$currentStock}, Requested: {$quantity}"
+                                );
+                            }
+                            $newStock = $currentStock - $quantity;
                         }
-                        
+
                         $packData['stk'] = $newStock;
                         $packData['in_stk'] = $newStock > 0 ? 1 : 0;
                     }
@@ -510,6 +550,9 @@ class StockVoucherController extends Controller
                 ]);
 
                 break;
+            } catch (\RuntimeException $e) {
+                // Insufficient-stock rejection must propagate to roll back the transaction.
+                throw $e;
             } catch (\Exception $e) {
                 Log::error('Error updating vendor product stock', [
                     'vendor_product_id' => $vendorProduct->id,

@@ -203,6 +203,19 @@ class PurchaseVoucherController extends Controller
     {
         $validated = $this->validatePayload($request, false);
 
+        // Idempotency: replay the original result for a retried submission with the same key.
+        $idempotencyKey = $request->header('Idempotency-Key') ?: $request->input('idempotency_key');
+        if ($idempotencyKey) {
+            $existing = DB::table('purchase_vouchers')->where('idempotency_key', $idempotencyKey)->first();
+            if ($existing) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Purchase voucher created successfully',
+                    'data' => ['id' => $existing->id, 'doc_no' => $existing->doc_no, 'status' => $existing->status],
+                ], 200);
+            }
+        }
+
         try {
             DB::beginTransaction();
 
@@ -245,16 +258,21 @@ class PurchaseVoucherController extends Controller
                 'charges_total' => $chargesTotal,
                 'net_total' => $netTotal,
                 'charges_json' => $validated['charges'] ?? [],
+                'created_by' => auth()->id(),
+                'updated_by' => auth()->id(),
+                'idempotency_key' => $idempotencyKey ?: null,
             ]);
 
             $this->replaceItems($voucher, $preparedItems);
             $this->allocationService->refreshPurchaseOrders($touchedPoIds);
 
-            DB::commit();
-
+            // Inventory + ledger inside the transaction so a failure rolls back the voucher
+            // rather than leaving a posted voucher with no matching ledger entry (audit gap).
             if ($voucher->status === 'POSTED' && !$voucher->do_not_update_inventory) {
                 $this->applyPurchaseInvoiceInventory($voucher, $preparedItems);
             }
+
+            DB::commit();
 
             return response()->json([
                 'success' => true,
@@ -378,11 +396,12 @@ class PurchaseVoucherController extends Controller
 
             $this->allocationService->refreshPurchaseOrders($touchedPoIds);
 
-            DB::commit();
-
+            // Inventory + ledger inside the transaction so a failure rolls back the voucher.
             if ($voucher->status === 'POSTED' && $oldStatus === 'DRAFT' && !$voucher->do_not_update_inventory) {
                 $this->applyPurchaseInvoiceInventory($voucher, $items);
             }
+
+            DB::commit();
 
             return response()->json([
                 'success' => true,
@@ -538,6 +557,9 @@ class PurchaseVoucherController extends Controller
                     'voucher_id' => $voucher->id,
                     'error'      => $e->getMessage(),
                 ]);
+                // Propagate so the enclosing transaction rolls back the voucher rather than
+                // committing a posted voucher with a missing/partial ledger.
+                throw $e;
             }
         }
     }

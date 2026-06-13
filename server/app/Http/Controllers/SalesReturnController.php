@@ -201,6 +201,8 @@ class SalesReturnController extends Controller
 
             $voucherNo = $this->generateVoucherNo();
 
+            // Voucher header, qty_returned, packs stock and ledger are all written in ONE
+            // transaction: a return that over-returns or whose ledger fails rolls back fully.
             DB::transaction(function () use ($sourceOrderId, $voucherNo, $docDate, $reason, $status, $items) {
                 DB::table(self::ORDERS_TABLE)->where('order_id', $sourceOrderId)->update([
                     'Sales_Return_VoucherNo' => $voucherNo,
@@ -209,7 +211,9 @@ class SalesReturnController extends Controller
                     'order_state'            => $status,
                 ]);
 
-                foreach ($items as $item) {
+                $ledger = app(InventoryLedgerService::class);
+
+                foreach ($items as $index => $item) {
                     $orderItemId = (int) (
                         $item['source_sales_invoice_item_id']
                         ?? $item['order_item_id']
@@ -217,32 +221,36 @@ class SalesReturnController extends Controller
                         ?? 0
                     );
                     $returnedQty = (float) ($item['returned_quantity'] ?? $item['return_qty'] ?? 0);
-
-                    if ($orderItemId > 0 && $returnedQty > 0) {
-                        DB::update(
-                            'UPDATE ' . self::ITEMS_TABLE . ' SET qty_returned = COALESCE(qty_returned, 0) + ? WHERE item_id = ? AND order_id = ?',
-                            [$returnedQty, $orderItemId, $sourceOrderId]
-                        );
-                    }
-                }
-            });
-
-            // Inventory: increase packs stock + CREDIT ledger for each returned item
-            $ledger = app(InventoryLedgerService::class);
-            foreach ($items as $srItem) {
-                try {
-                    $orderItemId = (int) ($srItem['source_sales_invoice_item_id'] ?? $srItem['order_item_id'] ?? $srItem['item_id'] ?? 0);
-                    $returnedQty = (float) ($srItem['returned_quantity'] ?? $srItem['return_qty'] ?? 0);
                     if ($orderItemId <= 0 || $returnedQty <= 0) continue;
 
+                    // Lock the source item and validate the return does not exceed what is
+                    // still returnable (delivered − already returned).
                     $origItem = DB::table(self::ITEMS_TABLE)
                         ->where('item_id', $orderItemId)
                         ->where('order_id', $sourceOrderId)
+                        ->lockForUpdate()
                         ->first();
-                    if (!$origItem) continue;
+                    if (!$origItem) {
+                        throw new \RuntimeException("Order item {$orderItemId} not found for order {$sourceOrderId}");
+                    }
 
-                    $pinfo   = json_decode((string) ($origItem->pinfo ?? '{}'), true) ?: [];
-                    $packId  = (string) ($pinfo['selected_pack']['id'] ?? '');
+                    $maxReturnable   = (float) ($origItem->qty_delivered ?? $origItem->quantity ?? 0);
+                    $alreadyReturned = (float) ($origItem->qty_returned ?? 0);
+                    $remaining       = $maxReturnable - $alreadyReturned;
+                    if ($returnedQty > $remaining + 1e-9) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            "items.{$index}" => ["Cannot return {$returnedQty} — only {$remaining} unit(s) remaining to return"],
+                        ]);
+                    }
+
+                    DB::table(self::ITEMS_TABLE)
+                        ->where('item_id', $orderItemId)
+                        ->where('order_id', $sourceOrderId)
+                        ->update(['qty_returned' => $alreadyReturned + $returnedQty]);
+
+                    // Inventory: increase packs stock + CREDIT ledger
+                    $pinfo  = json_decode((string) ($origItem->pinfo ?? '{}'), true) ?: [];
+                    $packId = (string) ($pinfo['selected_pack']['id'] ?? '');
                     if ($packId === '') Log::warning('SalesReturn store: missing pack_id in pinfo', ['item_id' => $orderItemId]);
 
                     $vp = $ledger->resolveVendorProduct((int) $origItem->product_id, null);
@@ -264,12 +272,16 @@ class SalesReturnController extends Controller
                         note:            "Sales Return Order #{$sourceOrderId} - {$productName}",
                         invDate:         $docDate,
                     );
-                } catch (\Throwable $ie) {
-                    Log::error('SalesReturn store: inventory failed', ['item' => $srItem, 'order_id' => $sourceOrderId, 'error' => $ie->getMessage()]);
                 }
-            }
+            });
 
             return $this->show($sourceOrderId);
+        } catch (\Illuminate\Validation\ValidationException $ve) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Return quantity exceeds returnable quantity',
+                'errors'  => $ve->errors(),
+            ], 422);
         } catch (\Throwable $e) {
             Log::error('SalesReturn store error: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Failed to create sales return'], 500);
@@ -298,52 +310,51 @@ class SalesReturnController extends Controller
                 ->map(fn ($v) => (float) $v)
                 ->toArray();
 
-            DB::transaction(function () use ($id, $docDate, $reason, $status, $items) {
+            // qty_returned, packs stock and ledger written in ONE transaction (PUT semantics):
+            // over-return or a ledger failure rolls the whole update back.
+            DB::transaction(function () use ($id, $docDate, $reason, $status, $items, $oldQtyReturned) {
+                $ledger = app(InventoryLedgerService::class);
+
                 if (!empty($items)) {
-                    // Reset all items to 0 then set each to the exact value supplied (PUT semantics)
+                    // Reset all items to 0 then set each to the exact value supplied.
                     DB::table(self::ITEMS_TABLE)->where('order_id', $id)->update(['qty_returned' => 0]);
 
-                    foreach ($items as $item) {
+                    foreach ($items as $index => $item) {
                         $orderItemId = (int) (
                             $item['source_sales_invoice_item_id']
                             ?? $item['order_item_id']
                             ?? $item['item_id']
                             ?? 0
                         );
-                        $returnedQty = (float) ($item['returned_quantity'] ?? $item['return_qty'] ?? 0);
-
-                        if ($orderItemId > 0 && $returnedQty >= 0) {
-                            DB::table(self::ITEMS_TABLE)
-                                ->where('item_id', $orderItemId)
-                                ->where('order_id', $id)
-                                ->update(['qty_returned' => $returnedQty]);
-                        }
-                    }
-                }
-
-                DB::table(self::ORDERS_TABLE)->where('order_id', $id)->update([
-                    'Sales_Return_Dt'     => $docDate,
-                    'Sales_Return_Reason' => $reason ?: null,
-                    'order_state'         => $status,
-                ]);
-            });
-
-            // Inventory: apply delta (new qty − old qty) per item
-            if (!empty($items)) {
-                $ledger = app(InventoryLedgerService::class);
-                foreach ($items as $srItem) {
-                    try {
-                        $orderItemId = (int) ($srItem['source_sales_invoice_item_id'] ?? $srItem['order_item_id'] ?? $srItem['item_id'] ?? 0);
-                        $newQty      = (float) ($srItem['returned_quantity'] ?? $srItem['return_qty'] ?? 0);
-                        $oldQty      = $oldQtyReturned[$orderItemId] ?? 0.0;
-                        $delta       = $newQty - $oldQty;
-                        if (abs($delta) < 0.001) continue;
+                        $newQty = (float) ($item['returned_quantity'] ?? $item['return_qty'] ?? 0);
+                        if ($orderItemId <= 0 || $newQty < 0) continue;
 
                         $origItem = DB::table(self::ITEMS_TABLE)
                             ->where('item_id', $orderItemId)
                             ->where('order_id', $id)
+                            ->lockForUpdate()
                             ->first();
-                        if (!$origItem) continue;
+                        if (!$origItem) {
+                            throw new \RuntimeException("Order item {$orderItemId} not found for order {$id}");
+                        }
+
+                        // Cannot return more than was delivered for this item.
+                        $maxReturnable = (float) ($origItem->qty_delivered ?? $origItem->quantity ?? 0);
+                        if ($newQty > $maxReturnable + 1e-9) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                "items.{$index}" => ["Cannot return {$newQty} — only {$maxReturnable} delivered"],
+                            ]);
+                        }
+
+                        DB::table(self::ITEMS_TABLE)
+                            ->where('item_id', $orderItemId)
+                            ->where('order_id', $id)
+                            ->update(['qty_returned' => $newQty]);
+
+                        // Inventory: apply delta (new qty − old qty)
+                        $oldQty = $oldQtyReturned[$orderItemId] ?? 0.0;
+                        $delta  = $newQty - $oldQty;
+                        if (abs($delta) < 0.001) continue;
 
                         $pinfo  = json_decode((string) ($origItem->pinfo ?? '{}'), true) ?: [];
                         $packId = (string) ($pinfo['selected_pack']['id'] ?? '');
@@ -371,13 +382,23 @@ class SalesReturnController extends Controller
                         } else {
                             $ledger->updatePacksStock($vp->id, abs($delta), 'decrease');
                         }
-                    } catch (\Throwable $ie) {
-                        Log::error('SalesReturn update: inventory failed', ['item' => $srItem, 'order_id' => $id, 'error' => $ie->getMessage()]);
                     }
                 }
-            }
+
+                DB::table(self::ORDERS_TABLE)->where('order_id', $id)->update([
+                    'Sales_Return_Dt'     => $docDate,
+                    'Sales_Return_Reason' => $reason ?: null,
+                    'order_state'         => $status,
+                ]);
+            });
 
             return $this->show($id);
+        } catch (\Illuminate\Validation\ValidationException $ve) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Return quantity exceeds returnable quantity',
+                'errors'  => $ve->errors(),
+            ], 422);
         } catch (\Throwable $e) {
             Log::error('SalesReturn update error: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Failed to update sales return'], 500);

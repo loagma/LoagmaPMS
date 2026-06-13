@@ -27,6 +27,7 @@ class PurchaseVoucher extends Model
         'charges_json',
         'created_by',
         'updated_by',
+        'idempotency_key',
     ];
 
     protected $casts = [

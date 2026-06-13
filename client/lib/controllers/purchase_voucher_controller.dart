@@ -1473,11 +1473,18 @@ class PurchaseVoucherController extends GetxController {
     return best;
   }
 
+  // One idempotency key per intended submission; reused across retries until it
+  // succeeds, so a dropped response + retry never creates a second voucher.
+  String? _pendingIdempotencyKey;
+
   Future<void> _saveVoucher(String saveStatus) async {
     if (!_validateForm()) return;
 
     isSaving.value = true;
     try {
+      if (activeVoucherId.value == null) {
+        _pendingIdempotencyKey ??= AuthController.newIdempotencyKey();
+      }
       final payload = {
         'doc_no_prefix': docNoPrefix.value,
         'doc_no_number': docNoNumber.value.trim().isEmpty ? null : docNoNumber.value,
@@ -1568,7 +1575,7 @@ class PurchaseVoucherController extends GetxController {
             )
           : await http.post(
               Uri.parse(url),
-              headers: AuthController.jsonHeaders,
+              headers: AuthController.jsonHeadersWithIdempotency(_pendingIdempotencyKey!),
               body: jsonEncode(payload),
             );
 
@@ -1584,6 +1591,7 @@ class PurchaseVoucherController extends GetxController {
 
       if ((response.statusCode == 201 || response.statusCode == 200) &&
           data['success'] == true) {
+        _pendingIdempotencyKey = null; // submission landed — next save gets a fresh key
         final successMessage = isEdit
             ? 'Voucher updated'
             : saveStatus == 'DRAFT'

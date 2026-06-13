@@ -133,6 +133,8 @@ class PurchaseOrderController extends Controller
                 'charges_total' => 0,
                 'total_with_charges' => 0,
                 'charges_json' => [],
+                'created_by' => auth()->id(),
+                'updated_by' => auth()->id(),
             ]);
 
             $itemsTotal = 0;

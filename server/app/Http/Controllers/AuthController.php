@@ -12,7 +12,7 @@ class AuthController extends Controller
     /**
      * POST /api/auth/login
      *
-     * Body: { "mobile": "9876543210", "otp": "5555" }
+     * Body: { "mobile": "9876543210", "otp": "<master-otp>" }
      */
     public function login(Request $request): JsonResponse
     {
@@ -26,7 +26,14 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $masterOtp = env('MASTER_OTP', '5555');
+        $masterOtp = (string) env('MASTER_OTP', '');
+        if ($masterOtp === '') {
+            Log::error('MASTER_OTP is not configured');
+            return response()->json([
+                'success' => false,
+                'message' => 'Login is not configured. Contact your administrator.',
+            ], 500);
+        }
         if ($otp !== $masterOtp) {
             return response()->json([
                 'success' => false,

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
@@ -9,9 +10,6 @@ import '../api_config.dart';
 class AuthController extends GetxController {
   var mobile = ''.obs;
   var isLoading = false.obs;
-
-  // Master OTP — also set as MASTER_OTP on the server side (.env)
-  static const _masterOtp = '5555';
 
   // SharedPreferences keys
   static const _keyLoggedIn    = 'auth_logged_in';
@@ -43,6 +41,25 @@ class AuthController extends GetxController {
     'Content-Type': 'application/json',
     if (_cachedToken != null) 'Authorization': 'Bearer $_cachedToken',
   };
+
+  /// jsonHeaders plus an Idempotency-Key, for create (POST) mutations that must not
+  /// be applied twice if the network drops the response and the client retries.
+  static Map<String, String> jsonHeadersWithIdempotency(String key) => {
+    ...jsonHeaders,
+    'Idempotency-Key': key,
+  };
+
+  /// Generates a v4-style UUID without an external package. Generate ONE per intended
+  /// submission and reuse it on every retry of that same submission.
+  static String newIdempotencyKey() {
+    final rng = Random.secure();
+    final bytes = List<int>.generate(16, (_) => rng.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 1
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-'
+        '${hex.substring(16, 20)}-${hex.substring(20)}';
+  }
 
   // ── Role/permission helpers ───────────────────────────────────────────────
 
@@ -225,9 +242,6 @@ class AuthController extends GetxController {
       return 'Network error: $e';
     }
   }
-
-  /// Quick local check used for offline / test flows (OTP == masterOtp).
-  bool verifyOtpLocal(String otp) => otp == _masterOtp;
 
   void reset() {
     mobile.value = '';

@@ -823,12 +823,19 @@ class SalesOrderFormController extends GetxController {
     return true;
   }
 
+  // One idempotency key per intended submission; reused across retries until it
+  // succeeds, so a dropped response + retry never creates a second order.
+  String? _pendingIdempotencyKey;
+
   Future<void> save() async {
     if (!validateForm()) return;
 
     isBrowsing.value = false;
     isSaving.value = true;
     try {
+      if (soId == null) {
+        _pendingIdempotencyKey ??= AuthController.newIdempotencyKey();
+      }
       final validItems = items
           .where((r) => r.productId.value != null && r.quantity.value.trim().isNotEmpty)
           .toList();
@@ -940,7 +947,7 @@ class SalesOrderFormController extends GetxController {
       final response = isCreate
           ? await http.post(
               Uri.parse(url),
-              headers: AuthController.jsonHeaders,
+              headers: AuthController.jsonHeadersWithIdempotency(_pendingIdempotencyKey!),
               body: jsonEncode(payload),
             )
           : await http.put(
@@ -952,6 +959,7 @@ class SalesOrderFormController extends GetxController {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
 
       if ((response.statusCode == 200 || response.statusCode == 201) && data['success'] == true) {
+        _pendingIdempotencyKey = null; // submission landed — next save gets a fresh key
         final successMessage = isCreate ? 'Sales order created' : 'Sales order updated';
         await Future.delayed(const Duration(milliseconds: 450));
         await Fluttertoast.showToast(

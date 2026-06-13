@@ -157,6 +157,19 @@ class PurchaseReturnController extends Controller
     {
         $validated = $this->validatePayload($request);
 
+        // Idempotency: replay the original result for a retried submission with the same key.
+        $idempotencyKey = $request->header('Idempotency-Key') ?: $request->input('idempotency_key');
+        if ($idempotencyKey) {
+            $existing = DB::table('purchase_returns')->where('idempotency_key', $idempotencyKey)->first();
+            if ($existing) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Purchase return created successfully.',
+                    'data' => ['id' => $existing->id],
+                ], 200);
+            }
+        }
+
         $header = $this->extractHeader($validated);
         $items = $validated['items'];
 
@@ -178,7 +191,7 @@ class PurchaseReturnController extends Controller
 
         $totals = $this->computeTotals($computedItems, $validated['charges'] ?? []);
 
-        $created = DB::transaction(function () use ($header, $computedItems, $totals, $validated): PurchaseReturn {
+        $created = DB::transaction(function () use ($header, $computedItems, $totals, $validated, $idempotencyKey): PurchaseReturn {
             $series = $this->resolveDocumentSeries(
                 (int) $header['supplier_id'],
                 $header['doc_no_prefix'] ?? null
@@ -197,20 +210,23 @@ class PurchaseReturnController extends Controller
                 'charges_total' => $totals['charges_total'],
                 'net_total' => $totals['net_total'],
                 'charges_json' => $validated['charges'] ?? [],
-                'created_by' => optional(auth()->user())->id,
-                'updated_by' => optional(auth()->user())->id,
+                'created_by' => auth()->id(),
+                'updated_by' => auth()->id(),
+                'idempotency_key' => $idempotencyKey ?: null,
             ]);
 
             foreach ($computedItems as $line) {
                 $purchaseReturn->items()->create($line);
             }
 
+            // Inventory + ledger inside the transaction so a failure rolls back the return
+            // rather than leaving a posted return with no matching ledger entry (audit gap).
+            if (($header['status'] ?? 'DRAFT') === 'POSTED') {
+                $this->applyPurchaseReturnInventory($purchaseReturn, $computedItems);
+            }
+
             return $purchaseReturn;
         });
-
-        if (($header['status'] ?? 'DRAFT') === 'POSTED') {
-            $this->applyPurchaseReturnInventory($created, $computedItems);
-        }
 
         return response()->json([
             'success' => true,
@@ -334,6 +350,8 @@ class PurchaseReturnController extends Controller
                     'purchase_return_id' => $purchaseReturn->id,
                     'error'            => $e->getMessage(),
                 ]);
+                // Propagate so the enclosing transaction rolls back the return.
+                throw $e;
             }
         }
     }

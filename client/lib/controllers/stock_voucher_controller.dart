@@ -190,11 +190,19 @@ class StockVoucherController extends GetxController {
     return true;
   }
 
+  // One idempotency key per intended submission; reused across retries until it
+  // succeeds, so a dropped response + retry never creates a second voucher.
+  String? _pendingIdempotencyKey;
+
   Future<void> _saveVoucher(String saveStatus) async {
     if (!_validateForm()) return;
 
     isSaving.value = true;
     try {
+      final isEditEarly = voucherId != null;
+      if (!isEditEarly) {
+        _pendingIdempotencyKey ??= AuthController.newIdempotencyKey();
+      }
       final payload = {
         'voucher_type': voucherType.value,
         'status': saveStatus,
@@ -224,7 +232,7 @@ class StockVoucherController extends GetxController {
             )
           : await http.post(
               Uri.parse(url),
-              headers: AuthController.jsonHeaders,
+              headers: AuthController.jsonHeadersWithIdempotency(_pendingIdempotencyKey!),
               body: jsonEncode(payload),
             );
 
@@ -240,6 +248,7 @@ class StockVoucherController extends GetxController {
 
       if ((response.statusCode == 201 || response.statusCode == 200) &&
           data['success'] == true) {
+        _pendingIdempotencyKey = null; // submission landed — next save gets a fresh key
         Get.back(result: true);
         _showSuccess(
           isEdit
