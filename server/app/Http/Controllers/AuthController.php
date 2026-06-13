@@ -41,6 +41,7 @@ class AuthController extends Controller
                     'deli_id',
                     'admin_id',
                     'role',
+                    'permissions',
                     'name',
                     'mobile',
                     'is_locked',
@@ -74,17 +75,20 @@ class AuthController extends Controller
                 'updated_at' => now(),
             ]);
 
+            $permissions = json_decode((string) ($staff->permissions ?? ''), true);
+
             return response()->json([
                 'success'    => true,
                 'token'      => $rawToken,
                 'expires_at' => $expiresAt->toISOString(),
                 'data'       => [
-                    'deli_id'  => $staff->deli_id,
-                    'admin_id' => $staff->admin_id,
-                    'role'     => $staff->role,
-                    'name'     => $staff->name,
-                    'mobile'   => $staff->mobile,
-                    'state'    => $staff->state ?? '',
+                    'deli_id'     => $staff->deli_id,
+                    'admin_id'    => $staff->admin_id,
+                    'role'        => $staff->role,
+                    'permissions' => is_array($permissions) ? $permissions : [],
+                    'name'        => $staff->name,
+                    'mobile'      => $staff->mobile,
+                    'state'       => $staff->state ?? '',
                 ],
             ]);
         } catch (\Exception $e) {

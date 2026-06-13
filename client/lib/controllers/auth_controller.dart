@@ -14,17 +14,20 @@ class AuthController extends GetxController {
   static const _masterOtp = '5555';
 
   // SharedPreferences keys
-  static const _keyLoggedIn = 'auth_logged_in';
-  static const _keyDeliId   = 'deli_staff_deli_id';
-  static const _keyAdminId  = 'deli_staff_admin_id';
-  static const _keyRole     = 'deli_staff_role';
-  static const _keyName     = 'deli_staff_name';
-  static const _keyMobile   = 'deli_staff_mobile';
-  static const _keyState    = 'deli_staff_state';
-  static const _keyToken    = 'auth_token';
+  static const _keyLoggedIn    = 'auth_logged_in';
+  static const _keyDeliId      = 'deli_staff_deli_id';
+  static const _keyAdminId     = 'deli_staff_admin_id';
+  static const _keyRole        = 'deli_staff_role';
+  static const _keyPermissions = 'deli_staff_permissions';
+  static const _keyName        = 'deli_staff_name';
+  static const _keyMobile      = 'deli_staff_mobile';
+  static const _keyState       = 'deli_staff_state';
+  static const _keyToken       = 'auth_token';
 
-  // In-memory token cache loaded at startup by loadSession()
+  // In-memory caches loaded at startup by loadSession()
   static String? _cachedToken;
+  static String? _cachedRole;
+  static List<String> _cachedPermissions = [];
 
   // ── Header helpers ────────────────────────────────────────────────────────
 
@@ -41,12 +44,39 @@ class AuthController extends GetxController {
     if (_cachedToken != null) 'Authorization': 'Bearer $_cachedToken',
   };
 
+  // ── Role/permission helpers ───────────────────────────────────────────────
+
+  /// True when the logged-in user is the admin account.
+  static bool get isAdmin => _cachedRole == 'admin';
+
+  /// True when the logged-in user is a subadmin.
+  static bool get isSubadmin => _cachedRole == 'subadmin';
+
+  /// Returns true if the current user can access the given module.
+  /// Admins and legacy roles (driver, salesman…) always return true.
+  /// Subadmins must have the module key in their permissions list.
+  static bool canAccess(String module) {
+    if (_cachedRole == null || _cachedRole!.isEmpty) return true;
+    if (_cachedRole != 'subadmin') return true;
+    return _cachedPermissions.contains(module);
+  }
+
   // ── Persistence helpers ──────────────────────────────────────────────────
 
-  /// Load token into memory cache — call once at app startup (e.g. in main.dart).
+  /// Load token and role/permissions into memory — call once at app startup.
   static Future<void> loadSession() async {
     final prefs = await SharedPreferences.getInstance();
     _cachedToken = prefs.getString(_keyToken);
+    _cachedRole  = prefs.getString(_keyRole);
+    final permsJson = prefs.getString(_keyPermissions);
+    if (permsJson != null) {
+      final decoded = jsonDecode(permsJson);
+      if (decoded is List) {
+        _cachedPermissions = decoded.map((e) => e.toString()).toList();
+      }
+    } else {
+      _cachedPermissions = [];
+    }
   }
 
   static Future<bool> isLoggedIn() async {
@@ -63,6 +93,7 @@ class AuthController extends GetxController {
     required int deliId,
     required int adminId,
     required String role,
+    required List<String> permissions,
     required String name,
     required String mobile,
     required String state,
@@ -72,12 +103,15 @@ class AuthController extends GetxController {
     await prefs.setInt(_keyDeliId, deliId);
     await prefs.setInt(_keyAdminId, adminId);
     await prefs.setString(_keyRole, role);
+    await prefs.setString(_keyPermissions, jsonEncode(permissions));
     await prefs.setString(_keyName, name);
     await prefs.setString(_keyMobile, mobile);
     await prefs.setString(_keyState, state);
     await prefs.setString(_keyToken, token);
     await prefs.setBool(_keyLoggedIn, true);
-    _cachedToken = token;
+    _cachedToken       = token;
+    _cachedRole        = role;
+    _cachedPermissions = permissions;
   }
 
   static Future<void> clearSession() async {
@@ -86,11 +120,14 @@ class AuthController extends GetxController {
     await prefs.remove(_keyDeliId);
     await prefs.remove(_keyAdminId);
     await prefs.remove(_keyRole);
+    await prefs.remove(_keyPermissions);
     await prefs.remove(_keyName);
     await prefs.remove(_keyMobile);
     await prefs.remove(_keyState);
     await prefs.remove(_keyToken);
-    _cachedToken = null;
+    _cachedToken       = null;
+    _cachedRole        = null;
+    _cachedPermissions = [];
   }
 
   // ── Stored session getters ────────────────────────────────────────────────
@@ -162,16 +199,23 @@ class AuthController extends GetxController {
       final body = jsonDecode(response.body) as Map<String, dynamic>;
 
       if (response.statusCode == 200 && body['success'] == true) {
-        final data = body['data'] as Map<String, dynamic>;
+        final data  = body['data'] as Map<String, dynamic>;
         final token = body['token']?.toString() ?? '';
+
+        final rawPerms = data['permissions'];
+        final perms = (rawPerms is List)
+            ? rawPerms.map((e) => e.toString()).toList()
+            : <String>[];
+
         await _saveStaffData(
-          deliId:  (data['deli_id']  as num).toInt(),
-          adminId: (data['admin_id'] as num).toInt(),
-          role:    data['role']?.toString()   ?? '',
-          name:    data['name']?.toString()   ?? '',
-          mobile:  data['mobile']?.toString() ?? mobile.value,
-          state:   data['state']?.toString()  ?? '',
-          token:   token,
+          deliId:      (data['deli_id']  as num).toInt(),
+          adminId:     (data['admin_id'] as num).toInt(),
+          role:        data['role']?.toString()   ?? '',
+          permissions: perms,
+          name:        data['name']?.toString()   ?? '',
+          mobile:      data['mobile']?.toString() ?? mobile.value,
+          state:       data['state']?.toString()  ?? '',
+          token:       token,
         );
         return null; // success
       }

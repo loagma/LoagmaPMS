@@ -43,6 +43,98 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // All module cards — moduleKey null means always visible (no gate)
+    final allModules = <_ModuleCard>[
+      _ModuleCard(
+        title: 'Issue to production',
+        subtitle: 'Issue raw materials to production',
+        icon: Icons.outbox_rounded,
+        moduleKey: 'production',
+        onTap: () => Get.toNamed(AppRoutes.issueToProduction),
+      ),
+      _ModuleCard(
+        title: 'Receive from production',
+        subtitle: 'Receive finished goods from production',
+        icon: Icons.inbox_rounded,
+        moduleKey: 'production',
+        onTap: () => Get.toNamed(AppRoutes.receiveFromProduction),
+      ),
+      _ModuleCard(
+        title: 'BOM',
+        subtitle: 'Create and manage bill of materials',
+        icon: Icons.list_alt_rounded,
+        moduleKey: 'bom',
+        onTap: () => Get.toNamed(AppRoutes.bom),
+      ),
+      _ModuleCard(
+        title: 'Stock General Voucher',
+        subtitle: 'Record stock IN or OUT',
+        icon: Icons.receipt_long_outlined,
+        moduleKey: 'stock',
+        onTap: () => Get.toNamed(AppRoutes.stockVoucher),
+      ),
+      _ModuleCard(
+        title: 'Products',
+        subtitle: 'Configure products & taxes',
+        icon: Icons.inventory_2_outlined,
+        moduleKey: 'products',
+        hasSubmodules: true,
+        onTap: () => Get.toNamed(AppRoutes.products),
+      ),
+      _ModuleCard(
+        title: 'Purchase',
+        subtitle: 'Purchase voucher, order and return',
+        icon: Icons.shopping_cart_checkout_outlined,
+        moduleKey: 'purchase',
+        hasSubmodules: true,
+        onTap: () => Get.toNamed(AppRoutes.purchase),
+      ),
+      _ModuleCard(
+        title: 'Sales',
+        subtitle: 'Sales order, invoice and return',
+        icon: Icons.point_of_sale_outlined,
+        moduleKey: 'sales',
+        hasSubmodules: true,
+        onTap: () => Get.toNamed(AppRoutes.sales),
+      ),
+      _ModuleCard(
+        title: 'Create Supplier',
+        subtitle: 'Add new supplier profile',
+        icon: Icons.person_add_outlined,
+        moduleKey: 'suppliers',
+        onTap: () => Get.to(() => const SupplierFormScreen()),
+      ),
+      _ModuleCard(
+        title: 'Assign Product',
+        subtitle: 'Link products to suppliers',
+        icon: Icons.shopping_bag_outlined,
+        moduleKey: 'suppliers',
+        onTap: () => Get.to(() => const SupplierProductFormScreen()),
+      ),
+      _ModuleCard(
+        title: 'Reports',
+        subtitle: 'View all module reports',
+        icon: Icons.assessment_rounded,
+        moduleKey: 'reports',
+        hasSubmodules: true,
+        onTap: () => Get.toNamed(AppRoutes.reports),
+      ),
+      // Staff Management — admin only
+      if (AuthController.isAdmin)
+        _ModuleCard(
+          title: 'Staff',
+          subtitle: 'Manage subadmin accounts & permissions',
+          icon: Icons.manage_accounts_outlined,
+          moduleKey: null,
+          onTap: () => Get.toNamed(AppRoutes.staffList),
+        ),
+    ];
+
+    // Filter by permission
+    final modules = allModules
+        .where((m) => m.moduleKey == null || AuthController.canAccess(m.moduleKey!))
+        .toList();
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, dynamic result) async {
@@ -142,101 +234,6 @@ class DashboardScreen extends StatelessWidget {
               }
 
               final childAspectRatio = width < 400 ? 0.95 : 1.1;
-
-              final modules = <_ModuleCard>[
-                _ModuleCard(
-                  title: 'Issue to production',
-                  subtitle: 'Issue raw materials to production',
-                  icon: Icons.outbox_rounded,
-                  onTap: () {
-                    Get.toNamed(AppRoutes.issueToProduction);
-                  },
-                ),
-                _ModuleCard(
-                  title: 'Receive from production',
-                  subtitle: 'Receive finished goods from production',
-                  icon: Icons.inbox_rounded,
-                  onTap: () {
-                    Get.toNamed(AppRoutes.receiveFromProduction);
-                  },
-                ),
-                _ModuleCard(
-                  title: 'BOM',
-                  subtitle: 'Create and manage bill of materials',
-                  icon: Icons.list_alt_rounded,
-                  onTap: () {
-                    Get.toNamed(AppRoutes.bom);
-                  },
-                ),
-                _ModuleCard(
-                  title: 'Stock General Voucher',
-                  subtitle: 'Record stock IN or OUT',
-                  icon: Icons.receipt_long_outlined,
-                  onTap: () {
-                    Get.toNamed(AppRoutes.stockVoucher);
-                  },
-                ),
-                _ModuleCard(
-                  title: 'Products',
-                  subtitle: 'Configure products & taxes',
-                  icon: Icons.inventory_2_outlined,
-                  hasSubmodules: true,
-                  onTap: () {
-                    Get.toNamed(AppRoutes.products);
-                  },
-                ),
-                _ModuleCard(
-                  title: 'Purchase',
-                  subtitle: 'Purchase voucher, order and return',
-                  icon: Icons.shopping_cart_checkout_outlined,
-                  hasSubmodules: true,
-                  onTap: () {
-                    Get.toNamed(AppRoutes.purchase);
-                  },
-                ),
-                _ModuleCard(
-                  title: 'Sales',
-                  subtitle: 'Sales order, invoice and return',
-                  icon: Icons.point_of_sale_outlined,
-                  hasSubmodules: true,
-                  onTap: () {
-                    Get.toNamed(AppRoutes.sales);
-                  },
-                ),
-                _ModuleCard(
-                  title: 'Create Supplier',
-                  subtitle: 'Add new supplier profile',
-                  icon: Icons.person_add_outlined,
-                  onTap: () {
-                    Get.to(() => const SupplierFormScreen());
-                  },
-                ),
-                _ModuleCard(
-                  title: 'Assign Product',
-                  subtitle: 'Link products to suppliers',
-                  icon: Icons.shopping_bag_outlined,
-                  onTap: () {
-                    Get.to(() => const SupplierProductFormScreen());
-                  },
-                ),
-                // _ModuleCard(
-                //   title: 'Taxes',
-                //   subtitle: 'Create tax definition',
-                //   icon: Icons.account_balance_outlined,
-                //   onTap: () {
-                //     Get.toNamed(AppRoutes.taxForm);
-                //   },
-                // ),
-                _ModuleCard(
-                  title: 'Reports',
-                  subtitle: 'View all module reports',
-                  icon: Icons.assessment_rounded,
-                  hasSubmodules: true,
-                  onTap: () {
-                    Get.toNamed(AppRoutes.reports);
-                  },
-                ),
-              ];
 
               return Padding(
                 padding: const EdgeInsets.all(16),
@@ -459,96 +456,118 @@ class _DashboardDrawerState extends State<_DashboardDrawer> {
                       }
                     },
                   ),
-                  _DrawerItem(
-                    icon: Icons.outbox_rounded,
-                    label: 'Issue to production',
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Get.toNamed(AppRoutes.issueToProduction);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.inbox_rounded,
-                    label: 'Receive from production',
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Get.toNamed(AppRoutes.receiveFromProduction);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.list_alt_rounded,
-                    label: 'BOM',
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Get.toNamed(AppRoutes.bom);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.receipt_long_outlined,
-                    label: 'Stock Voucher',
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Get.toNamed(AppRoutes.stockVoucher);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.inventory_2_outlined,
-                    label: 'Products',
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Get.toNamed(AppRoutes.products);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.inventory_2_outlined,
-                    label: 'Inventory',
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Get.toNamed(AppRoutes.inventory);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.local_shipping_outlined,
-                    label: 'Suppliers',
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Get.toNamed(AppRoutes.suppliers);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.shopping_cart_checkout_outlined,
-                    label: 'Purchase',
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Get.toNamed(AppRoutes.purchase);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.point_of_sale_outlined,
-                    label: 'Sales',
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Get.toNamed(AppRoutes.sales);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.account_balance_outlined,
-                    label: 'Taxes',
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Get.toNamed(AppRoutes.taxForm);
-                    },
-                  ),
+                  if (AuthController.canAccess('production')) ...[
+                    _DrawerItem(
+                      icon: Icons.outbox_rounded,
+                      label: 'Issue to production',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Get.toNamed(AppRoutes.issueToProduction);
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.inbox_rounded,
+                      label: 'Receive from production',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Get.toNamed(AppRoutes.receiveFromProduction);
+                      },
+                    ),
+                  ],
+                  if (AuthController.canAccess('bom'))
+                    _DrawerItem(
+                      icon: Icons.list_alt_rounded,
+                      label: 'BOM',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Get.toNamed(AppRoutes.bom);
+                      },
+                    ),
+                  if (AuthController.canAccess('stock'))
+                    _DrawerItem(
+                      icon: Icons.receipt_long_outlined,
+                      label: 'Stock Voucher',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Get.toNamed(AppRoutes.stockVoucher);
+                      },
+                    ),
+                  if (AuthController.canAccess('products')) ...[
+                    _DrawerItem(
+                      icon: Icons.inventory_2_outlined,
+                      label: 'Products',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Get.toNamed(AppRoutes.products);
+                      },
+                    ),
+                  ],
+                  if (AuthController.canAccess('inventory'))
+                    _DrawerItem(
+                      icon: Icons.inventory_2_outlined,
+                      label: 'Inventory',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Get.toNamed(AppRoutes.inventory);
+                      },
+                    ),
+                  if (AuthController.canAccess('suppliers'))
+                    _DrawerItem(
+                      icon: Icons.local_shipping_outlined,
+                      label: 'Suppliers',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Get.toNamed(AppRoutes.suppliers);
+                      },
+                    ),
+                  if (AuthController.canAccess('purchase'))
+                    _DrawerItem(
+                      icon: Icons.shopping_cart_checkout_outlined,
+                      label: 'Purchase',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Get.toNamed(AppRoutes.purchase);
+                      },
+                    ),
+                  if (AuthController.canAccess('sales'))
+                    _DrawerItem(
+                      icon: Icons.point_of_sale_outlined,
+                      label: 'Sales',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Get.toNamed(AppRoutes.sales);
+                      },
+                    ),
+                  if (AuthController.canAccess('products'))
+                    _DrawerItem(
+                      icon: Icons.account_balance_outlined,
+                      label: 'Taxes',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Get.toNamed(AppRoutes.taxForm);
+                      },
+                    ),
                   const Divider(height: 1, indent: 16, endIndent: 16),
                   const SizedBox(height: 8),
-                  _DrawerItem(
-                    icon: Icons.assessment_rounded,
-                    label: 'Reports',
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Get.toNamed(AppRoutes.reports);
-                    },
-                  ),
+                  if (AuthController.canAccess('reports'))
+                    _DrawerItem(
+                      icon: Icons.assessment_rounded,
+                      label: 'Reports',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Get.toNamed(AppRoutes.reports);
+                      },
+                    ),
+                  // Staff Management — admin only
+                  if (AuthController.isAdmin)
+                    _DrawerItem(
+                      icon: Icons.manage_accounts_outlined,
+                      label: 'Staff Management',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Get.toNamed(AppRoutes.staffList);
+                      },
+                    ),
                 ],
               ),
             ),
@@ -638,6 +657,7 @@ class _ModuleCard extends StatelessWidget {
     required this.subtitle,
     required this.icon,
     required this.onTap,
+    this.moduleKey,
     this.hasSubmodules = false,
   });
 
@@ -645,6 +665,7 @@ class _ModuleCard extends StatelessWidget {
   final String subtitle;
   final IconData icon;
   final VoidCallback onTap;
+  final String? moduleKey;
   final bool hasSubmodules;
 
   @override

@@ -45,6 +45,8 @@ import '../screens/modules/sales_invoice_form_screen.dart';
 import '../screens/modules/sales_invoice_list_screen.dart';
 import '../screens/modules/sales_return_form_screen.dart';
 import '../screens/modules/sales_return_list_screen.dart';
+import '../screens/modules/staff_list_screen.dart';
+import '../screens/modules/staff_form_screen.dart';
 
 /// Central route names. Use these instead of raw strings.
 abstract class AppRoutes {
@@ -97,6 +99,8 @@ abstract class AppRoutes {
   static const String salesReturnList = '/sales-returns';
   static const String salesReturnForm = '/sales-return';
   static const String salesModuleReports = '/reports/sales-module';
+  static const String staffList = '/staff';
+  static const String staffForm = '/staff-form';
 }
 
 /// All app routes. Used by [GetMaterialApp] in [main.dart].
@@ -275,5 +279,10 @@ final List<GetPage<dynamic>> appPages = [
   GetPage(
     name: AppRoutes.salesModuleReports,
     page: () => const SalesModuleReportsScreen(),
+  ),
+  GetPage(name: AppRoutes.staffList, page: () => const StaffListScreen()),
+  GetPage(
+    name: AppRoutes.staffForm,
+    page: () => StaffFormScreen(existing: Get.arguments is Map ? Map<String, dynamic>.from(Get.arguments as Map) : null),
   ),
 ];

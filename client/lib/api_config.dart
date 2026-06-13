@@ -143,4 +143,7 @@ class ApiConfig {
 
   /// POST ${ApiConfig.apiBaseUrl}/sales-returns
   static String get createSalesReturn => '$apiBaseUrl/sales-returns';
+
+  /// GET/POST ${ApiConfig.apiBaseUrl}/staff  (admin-only staff management)
+  static String get staff => '$apiBaseUrl/staff';
 }
