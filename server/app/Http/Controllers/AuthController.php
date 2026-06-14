@@ -26,7 +26,7 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $masterOtp = (string) env('MASTER_OTP', '');
+        $masterOtp = (string) config('pms.master_otp', '');
         if ($masterOtp === '') {
             Log::error('MASTER_OTP is not configured');
             return response()->json([

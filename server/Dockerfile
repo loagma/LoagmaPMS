@@ -40,9 +40,14 @@ RUN mkdir -p \
     --no-interaction \
     --no-progress
 
+# Startup script: runs migrations + admin promotion, then starts Apache.
+# Used as CMD so the base image's ENTRYPOINT (docker-php-entrypoint) still runs first.
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Expose HTTP port (Render will map this)
 EXPOSE 80
 
-# Start Apache
-CMD ["apache2-foreground"]
+# Start: runtime setup then Apache (via base image's docker-php-entrypoint)
+CMD ["docker-entrypoint.sh"]
 

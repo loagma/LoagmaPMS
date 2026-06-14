@@ -21,7 +21,7 @@ class MakeStaffAdmin extends Command
 
     public function handle(): int
     {
-        $mobile = trim((string) ($this->argument('mobile') ?? env('ADMIN_MOBILE', '')));
+        $mobile = trim((string) ($this->argument('mobile') ?? config('pms.admin_mobile', '')));
 
         if ($mobile === '') {
             $this->error('No mobile provided. Pass it as an argument or set ADMIN_MOBILE in .env.');
