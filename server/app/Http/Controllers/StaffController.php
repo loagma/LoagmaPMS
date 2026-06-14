@@ -14,7 +14,12 @@ use Illuminate\Support\Facades\Validator;
  */
 class StaffController extends Controller
 {
-    /** Modules an admin may grant to a subadmin ('staff' is never grantable). */
+    /**
+     * Modules an admin may grant to a subadmin.
+     * Note: 'staff' is never grantable, and 'reports' is intentionally excluded — the Reports
+     * screen is a hub of per-module report views, each governed by its own module permission
+     * (products, purchase, sales, ...), so there is nothing separate to grant.
+     */
     public const GRANTABLE_MODULES = [
         'products',
         'suppliers',
@@ -25,7 +30,6 @@ class StaffController extends Controller
         'production',
         'bom',
         'inventory',
-        'reports',
     ];
 
     /**

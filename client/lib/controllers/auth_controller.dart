@@ -69,14 +69,22 @@ class AuthController extends GetxController {
   /// True when the logged-in user is a subadmin.
   static bool get isSubadmin => _cachedRole == 'subadmin';
 
-  /// Returns true if the current user can access the given module.
-  /// Admins and legacy roles (driver, salesman…) always return true.
-  /// Subadmins must have the module key in their permissions list.
+  /// Returns true if the current user can access the given module (mirrors the server's
+  /// default-deny ModuleAccess): admin is unrestricted, subadmin needs the module in its
+  /// permissions, any other role gets nothing.
   static bool canAccess(String module) {
-    if (_cachedRole == null || _cachedRole!.isEmpty) return true;
-    if (_cachedRole != 'subadmin') return true;
-    return _cachedPermissions.contains(module);
+    if (_cachedRole == 'admin') return true;
+    if (_cachedRole == 'subadmin') return _cachedPermissions.contains(module);
+    return false;
   }
+
+  /// Modules whose data backs the Reports hub. Reports is shown when the user can reach at
+  /// least one of them; individual report cards are gated per-module (no separate 'reports'
+  /// permission exists server-side).
+  static const _reportModules = [
+    'production', 'bom', 'sales', 'purchase', 'stock', 'inventory', 'suppliers', 'products',
+  ];
+  static bool get canAccessReports => _reportModules.any(canAccess);
 
   // ── Persistence helpers ──────────────────────────────────────────────────
 

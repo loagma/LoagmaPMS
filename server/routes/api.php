@@ -48,8 +48,10 @@ Route::middleware('api.auth')->group(function () {
     Route::get('/unit-types', [BomController::class, 'getUnitTypes']);
     Route::get('/business-types', [MasterDataController::class, 'businessTypes']);
     Route::get('/departments', [MasterDataController::class, 'departments']);
-    Route::get('/users', [UserController::class, 'index']);
     Route::get('/admin-info', [AdminInfoController::class, 'show']);
+
+    // Salesman dropdown — only the modules that use it (subadmin needs sales OR purchase).
+    Route::middleware('module:sales,purchase')->get('/users', [UserController::class, 'index']);
 
     // --- Module: products ---
     Route::middleware('module:products')->group(function () {

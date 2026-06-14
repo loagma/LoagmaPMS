@@ -549,7 +549,7 @@ class _DashboardDrawerState extends State<_DashboardDrawer> {
                     ),
                   const Divider(height: 1, indent: 16, endIndent: 16),
                   const SizedBox(height: 8),
-                  if (AuthController.canAccess('reports'))
+                  if (AuthController.canAccessReports)
                     _DrawerItem(
                       icon: Icons.assessment_rounded,
                       label: 'Reports',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../controllers/auth_controller.dart';
 import '../../router/app_router.dart';
 import '../../theme/app_colors.dart';
 import 'bom_list_screen.dart';
@@ -63,6 +64,7 @@ class ReportsScreen extends StatelessWidget {
                 title: 'Issue to Production',
                 subtitle: 'View all issued materials',
                 icon: Icons.outbox_rounded,
+                module: 'production',
                 onTap: () {
                   Get.to(() => const IssueToProductionListScreen());
                 },
@@ -71,6 +73,7 @@ class ReportsScreen extends StatelessWidget {
                 title: 'Receive from Production',
                 subtitle: 'View all received goods',
                 icon: Icons.inbox_rounded,
+                module: 'production',
                 onTap: () {
                   Get.to(() => const ReceiveFromProductionListScreen());
                 },
@@ -79,6 +82,7 @@ class ReportsScreen extends StatelessWidget {
                 title: 'BOM',
                 subtitle: 'View all bill of materials',
                 icon: Icons.list_alt_rounded,
+                module: 'bom',
                 onTap: () {
                   Get.to(() => const BomListScreen());
                 },
@@ -88,6 +92,7 @@ class ReportsScreen extends StatelessWidget {
                 subtitle: 'Orders, invoices and return reports',
                 icon: Icons.storefront_outlined,
                 hasSubmodules: true,
+                module: 'sales',
                 onTap: () {
                   Get.toNamed(AppRoutes.salesModuleReports);
                 },
@@ -97,6 +102,7 @@ class ReportsScreen extends StatelessWidget {
                 subtitle: 'Purchase order, voucher and return reports',
                 icon: Icons.shopping_cart_checkout_outlined,
                 hasSubmodules: true,
+                module: 'purchase',
                 onTap: () {
                   Get.toNamed(AppRoutes.purchaseModuleReports);
                 },
@@ -105,6 +111,7 @@ class ReportsScreen extends StatelessWidget {
                 title: 'Stock Voucher',
                 subtitle: 'View all stock vouchers',
                 icon: Icons.receipt_long_outlined,
+                module: 'stock',
                 onTap: () {
                   Get.to(() => const StockVoucherListScreen());
                 },
@@ -113,6 +120,7 @@ class ReportsScreen extends StatelessWidget {
                 title: 'Inventory',
                 subtitle: 'View all inventory items',
                 icon: Icons.inventory_2_outlined,
+                module: 'inventory',
                 onTap: () {
                   Get.to(() => const InventoryListScreen());
                 },
@@ -121,6 +129,7 @@ class ReportsScreen extends StatelessWidget {
                 title: 'Suppliers',
                 subtitle: 'View all suppliers',
                 icon: Icons.local_shipping_outlined,
+                module: 'suppliers',
                 onTap: () {
                   Get.to(() => const SupplierListScreen());
                 },
@@ -129,6 +138,7 @@ class ReportsScreen extends StatelessWidget {
                 title: 'Supplier products',
                 subtitle: 'View and edit product listing by supplier',
                 icon: Icons.edit_note_rounded,
+                module: 'suppliers',
                 onTap: () {
                   Get.toNamed(AppRoutes.supplierProductList);
                 },
@@ -138,11 +148,12 @@ class ReportsScreen extends StatelessWidget {
                 subtitle: 'Products, HSN, categories, packages, taxes',
                 icon: Icons.inventory_2_outlined,
                 hasSubmodules: true,
+                module: 'products',
                 onTap: () {
                   Get.toNamed(AppRoutes.productModuleReports);
                 },
               ),
-            ];
+            ].where((card) => AuthController.canAccess(card.module)).toList();
 
             return Padding(
               padding: const EdgeInsets.all(16),
@@ -169,6 +180,7 @@ class _ReportCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.icon,
+    required this.module,
     required this.onTap,
     this.hasSubmodules = false,
   });
@@ -176,6 +188,7 @@ class _ReportCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
+  final String module;
   final VoidCallback onTap;
   final bool hasSubmodules;
 

@@ -12,21 +12,19 @@ class AdminInfoController extends Controller
     public function show(Request $request): JsonResponse
     {
         try {
-            $deliId  = $request->input('deli_id');
-            $adminId = $request->input('admin_id');
-
-            // Resolve admin_id from deli_staff if deli_id provided
-            if ($deliId !== null) {
-                $staff = DB::table('loagma_new.deli_staff')
-                    ->where('deli_id', (int) $deliId)
-                    ->value('admin_id');
-                if ($staff !== null) {
-                    $adminId = $staff;
-                }
+            // Always resolve the org from the authenticated caller's own account — never from
+            // request params. Otherwise any staff could read another org's bank details (IDOR).
+            $token = $request->attributes->get('api_token');
+            if (!$token || empty($token->user_id)) {
+                return response()->json(['success' => false, 'message' => 'Unauthenticated'], 401);
             }
 
+            $adminId = DB::table('loagma_new.deli_staff')
+                ->where('deli_id', (int) $token->user_id)
+                ->value('admin_id');
+
             if ($adminId === null) {
-                return response()->json(['success' => false, 'message' => 'admin_id or deli_id required'], 422);
+                return response()->json(['success' => false, 'message' => 'No organisation linked to this account'], 404);
             }
 
             $admin = DB::table('loagma_new.admin')

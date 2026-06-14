@@ -69,6 +69,15 @@ class AuthController extends Controller
                 ], 403);
             }
 
+            // Only PMS roles may authenticate. Legacy CRM roles (driver, salesman, NULL, ...)
+            // exist in deli_staff but are not authorized to use the PMS.
+            if (!in_array($staff->role, ['admin', 'subadmin'], true)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This account is not authorized to use the PMS.',
+                ], 403);
+            }
+
             $rawToken  = bin2hex(random_bytes(32));
             $expiresAt = now()->addHours(24);
 
