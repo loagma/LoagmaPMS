@@ -194,7 +194,7 @@
           <div class="charge-row">
             <span>{{ $charge['name'] }}</span>
             <span>
-              ₹{{ number_format($charge['amount'] ?? 0, 2) }}
+              Rs.{{ number_format($charge['amount'] ?? 0, 2) }}
               @if(!empty($charge['remarks']))<span class="remarks"> ({{ $charge['remarks'] }})</span>@endif
             </span>
           </div>
@@ -206,16 +206,16 @@
     <div class="summary-col">
       <div class="summary-row">
         <span class="summary-label">Subtotal (excl. tax)</span>
-        <span class="summary-value">₹{{ number_format($data['subtotal_excl_tax'] ?? 0, 2) }}</span>
+        <span class="summary-value">Rs.{{ number_format($data['subtotal_excl_tax'] ?? 0, 2) }}</span>
       </div>
       <div class="summary-row">
         <span class="summary-label">Tax</span>
-        <span class="summary-value">₹{{ number_format($data['tax_total'] ?? 0, 2) }}</span>
+        <span class="summary-value">Rs.{{ number_format($data['tax_total'] ?? 0, 2) }}</span>
       </div>
       @if(($data['charges_total'] ?? 0) != 0)
       <div class="summary-row">
         <span class="summary-label">Charges</span>
-        <span class="summary-value">₹{{ number_format($data['charges_total'], 2) }}</span>
+        <span class="summary-value">Rs.{{ number_format($data['charges_total'], 2) }}</span>
       </div>
       @endif
       @if(($data['bill_roff'] ?? 0) != 0)
@@ -226,7 +226,7 @@
       @endif
       <div class="summary-row grand">
         <span>GRAND TOTAL</span>
-        <span>₹{{ number_format($data['grand_total'] ?? 0, 2) }}</span>
+        <span>Rs.{{ number_format($data['grand_total'] ?? 0, 2) }}</span>
       </div>
     </div>
   </div>

@@ -245,8 +245,7 @@ class InvoicePdfService
             'salesman_name'  => $order->salesman_name ?? '',
             'department'     => $order->Department ?? null,
             'bill_vehicle'   => $order->Bill_Vehicle ?? null,
-            'narration'      => $order->txn_id ?? null,
-            'bill_narration' => $order->Bill_Narration ?? null,
+            'narration'      => $order->Bill_Narration ?? null,
             'bill_statement' => $order->Bill_Statement ?? null,
 
             // Items
