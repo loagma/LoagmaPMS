@@ -14,6 +14,16 @@ import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 import 'purchase_return_form_screen.dart';
 
+List<String> _pvFyOptions({String current = ''}) {
+  final now = DateTime.now();
+  final start = now.month >= 4 ? now.year : now.year - 1;
+  String fmt(int y) =>
+      '${y.toString().substring(2)}-${(y + 1).toString().substring(2)}/';
+  final opts = <String>{fmt(start - 1), fmt(start), fmt(start + 1)};
+  if (current.isNotEmpty) opts.add(current);
+  return opts.toList()..sort();
+}
+
 InputDecoration _pvInputDecoration({
   required String labelText,
   String? hintText,
@@ -871,7 +881,7 @@ class _HeaderCard extends StatelessWidget {
                           labelText: 'Financial Year',
                         ),
                         isExpanded: true,
-                        items: ['25-26/', '24-25/']
+                        items: _pvFyOptions(current: controller.docNoPrefix.value)
                             .map((s) => DropdownMenuItem(
                                   value: s,
                                   child: Text(
@@ -976,7 +986,7 @@ class _HeaderCard extends StatelessWidget {
                             ),
                           );
                           if (party != null) {
-                            controller.setVendor(party.id, party.name);
+                            controller.setVendor(party.id, party.name, state: party.state);
                             state.didChange(party.id);
                             state.validate();
                           }

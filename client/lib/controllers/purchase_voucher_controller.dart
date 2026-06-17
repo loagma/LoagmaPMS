@@ -16,6 +16,12 @@ import '../models/purchase_order_model.dart';
 import '../theme/app_colors.dart';
 import 'purchase_voucher_list_controller.dart';
 
+String _pvCurrentFY() {
+  final now = DateTime.now();
+  final start = now.month >= 4 ? now.year : now.year - 1;
+  return '${start.toString().substring(2)}-${(start + 1).toString().substring(2)}';
+}
+
 class PurchaseVoucherController extends GetxController {
   final formKey = GlobalKey<FormState>();
   final int? voucherId;
@@ -25,7 +31,7 @@ class PurchaseVoucherController extends GetxController {
   final viewOnly = false.obs;
 
   // Header
-  final docNoPrefix = '25-26/'.obs;
+  final docNoPrefix = '${_pvCurrentFY()}/'.obs;
   final docNoNumber = ''.obs;
   final vendorId = Rxn<int>();
   final vendorName = ''.obs;
@@ -59,6 +65,9 @@ class PurchaseVoucherController extends GetxController {
   final isLoading = false.obs;
   final isSaving = false.obs;
 
+  String _companyState = '';
+  String _supplierState = '';
+
   final _productTaxCache = <int, List<Map<String, dynamic>>>{};
   final Map<PVItemRow, Timer> _quantityValidationTimers = {};
 
@@ -78,6 +87,7 @@ class PurchaseVoucherController extends GetxController {
     super.onInit();
     activeVoucherId.value = voucherId;
     viewOnly.value = startInReportMode ?? false;
+    AuthController.getCompanyState().then((s) => _companyState = s);
     _loadSuppliers();
     _loadSalesmen();
     _loadUnitTypes();
@@ -555,8 +565,17 @@ class PurchaseVoucherController extends GetxController {
     }
 
     if (applied) {
+      final sameState = _isSameState();
+      final activeFixed = fixedKeys.where((k) {
+        if (k == 'IGST') return !sameState;
+        if (k == 'SGST' || k == 'CGST') return sameState;
+        return true;
+      }).toSet();
+      if (!activeFixed.contains('SGST')) row.sgst.value = '';
+      if (!activeFixed.contains('CGST')) row.cgst.value = '';
+      if (!activeFixed.contains('IGST')) row.igst.value = '';
       final ordered = ['SGST', 'CGST', 'IGST', 'CESS', 'ROFF']
-          .where(fixedKeys.contains)
+          .where(activeFixed.contains)
           .toList();
       ordered.addAll(customKeys);
       row.availableTaxKeys.assignAll(ordered);
@@ -675,6 +694,7 @@ class PurchaseVoucherController extends GetxController {
           name: e['supplier_name']?.toString() ?? e['name']?.toString() ?? 'Supplier $id',
           phone: e['phone']?.toString(),
           code: e['supplier_code']?.toString(),
+          state: e['state']?.toString(),
         );
       }).whereType<PartyResult>().toList();
     } catch (_) { return []; }
@@ -827,7 +847,7 @@ class PurchaseVoucherController extends GetxController {
 
   Future<void> _resetToNewVoucherForm() async {
     activeVoucherId.value = null;
-    docNoPrefix.value = '25-26/';
+    docNoPrefix.value = '${_pvCurrentFY()}/';
     docNoNumber.value = '';
     vendorId.value = null;
     vendorName.value = '';
@@ -1169,11 +1189,19 @@ class PurchaseVoucherController extends GetxController {
     return List<Product>.from(products);
   }
 
+  bool _isSameState() {
+    final company = _companyState.trim().toLowerCase();
+    final supplier = _supplierState.trim().toLowerCase();
+    if (company.isEmpty || supplier.isEmpty) return true;
+    return company == supplier;
+  }
+
   void setDocNoPrefix(String v) => docNoPrefix.value = v;
   void setDocNoNumber(String v) => docNoNumber.value = v;
-  void setVendor(int? id, String name) {
+  void setVendor(int? id, String name, {String? state}) {
     vendorId.value = id;
     vendorName.value = name;
+    _supplierState = state ?? '';
   }
 
   void setDocDate(String v) => docDate.value = v;

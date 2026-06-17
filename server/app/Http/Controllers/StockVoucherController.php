@@ -461,6 +461,8 @@ class StockVoucherController extends Controller
             } else {
                 // SINGLE: stock lives directly on products.stock.
                 DB::update('UPDATE product SET stock = COALESCE(stock, 0) + ? WHERE product_id = ?', [$quantity, $productId]);
+                // Sync updated product.stock into vendor_products packs so the CRM stk field stays in step.
+                $this->syncSingleProductPackStock($productId);
             }
         }
     }
@@ -484,6 +486,8 @@ class StockVoucherController extends Controller
                     );
                 }
                 DB::update('UPDATE product SET stock = ? WHERE product_id = ?', [$current - $quantity, $productId]);
+                // Sync updated product.stock into vendor_products packs so the CRM stk field stays in step.
+                $this->syncSingleProductPackStock($productId);
             }
         }
     }
@@ -560,6 +564,47 @@ class StockVoucherController extends Controller
                     'error' => $e->getMessage()
                 ]);
             }
+        }
+    }
+
+    /**
+     * For SINGLE-type products that also have vendor_products rows (NOP ≥ 1),
+     * mirror the current product.stock value into every pack's stk field so the
+     * CRM delivery app sees the correct availability.
+     */
+    private function syncSingleProductPackStock(int $productId): void
+    {
+        $newStock = (float) DB::table('product')
+            ->where('product_id', $productId)
+            ->value('stock');
+
+        $vendorProducts = DB::table('vendor_products')
+            ->where('product_id', $productId)
+            ->where('status', '1')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($vendorProducts as $vp) {
+            $packs = json_decode($vp->packs, true);
+            if (!is_array($packs) || empty($packs)) {
+                continue;
+            }
+
+            foreach ($packs as $packId => $pack) {
+                $packs[$packId]['stk']    = $newStock;
+                $packs[$packId]['in_stk'] = $newStock > 0 ? 1 : 0;
+            }
+
+            DB::table('vendor_products')->where('id', $vp->id)->update([
+                'packs'    => json_encode($packs),
+                'in_stock' => $newStock > 0 ? '1' : '0',
+            ]);
+
+            Log::info('SINGLE product pack stock synced', [
+                'vendor_product_id' => $vp->id,
+                'product_id'        => $productId,
+                'new_stock'         => $newStock,
+            ]);
         }
     }
 

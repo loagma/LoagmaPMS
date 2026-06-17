@@ -8,6 +8,12 @@ import '../api_config.dart';
 import '../models/purchase_return_model.dart';
 import '../theme/app_colors.dart';
 
+String _prCurrentFY() {
+  final now = DateTime.now();
+  final start = now.month >= 4 ? now.year : now.year - 1;
+  return '${start.toString().substring(2)}-${(start + 1).toString().substring(2)}';
+}
+
 class PurchaseReturnFormController extends GetxController {
   final formKey = GlobalKey<FormState>();
   final int? returnId;
@@ -20,7 +26,7 @@ class PurchaseReturnFormController extends GetxController {
   final viewOnly = false.obs;
 
   // Header fields
-  final docNoPrefix = '25-26/'.obs;
+  final docNoPrefix = '${_prCurrentFY()}/'.obs;
   final docNoNumber = ''.obs;
   final sourcePvIdSelected = Rxn<int>();
   final sourcePvNumber = ''.obs;

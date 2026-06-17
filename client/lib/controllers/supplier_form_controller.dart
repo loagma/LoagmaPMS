@@ -20,6 +20,7 @@ class SupplierFormController extends GetxController {
 
   // Text editing controllers
   final pincodeController = TextEditingController();
+  final addressLine1Controller = TextEditingController();
 
   // Updated fields to match new schema
   final supplierCode = ''.obs;
@@ -91,6 +92,7 @@ class SupplierFormController extends GetxController {
   @override
   void onClose() {
     pincodeController.dispose();
+    addressLine1Controller.dispose();
     super.onClose();
   }
 
@@ -230,6 +232,7 @@ class SupplierFormController extends GetxController {
     contactPersonPhone.value = supplier.contactPersonPhone ?? '';
     contactPersonDesignation.value = supplier.contactPersonDesignation ?? '';
     addressLine1.value = supplier.addressLine1 ?? '';
+    addressLine1Controller.text = supplier.addressLine1 ?? '';
     city.value = supplier.city ?? '';
     state.value = supplier.state ?? '';
     country.value = supplier.country ?? '';
@@ -313,6 +316,7 @@ class SupplierFormController extends GetxController {
     contactPersonPhone.value = '';
     contactPersonDesignation.value = '';
     addressLine1.value = '';
+    addressLine1Controller.clear();
     area.value = '';
     city.value = '';
     state.value = '';

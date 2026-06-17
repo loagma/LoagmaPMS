@@ -31,6 +31,8 @@ use App\Http\Controllers\StaffController;
 // Public routes — no authentication required
 Route::get('/health', [HealthController::class, 'index']);
 Route::post('/auth/login', [AuthController::class, 'login']);
+Route::get('/sales-orders/{id}/pdf', [SalesOrderController::class, 'generatePdf'])->where('id', '[0-9]+');
+Route::post('/sales-orders/bulk-invoice', [SalesOrderController::class, 'bulkInvoice']);
 
 // Authenticated routes
 Route::middleware('api.auth')->group(function () {
@@ -182,9 +184,7 @@ Route::middleware('api.auth')->group(function () {
         Route::get('/sales-orders/invoice-series', [SalesOrderController::class, 'series']);
         Route::get('/sales-orders', [SalesOrderController::class, 'index']);
         Route::post('/sales-orders/bulk', [SalesOrderController::class, 'storeBulk']);
-        Route::post('/sales-orders/bulk-invoice', [SalesOrderController::class, 'bulkInvoice']);
         Route::post('/sales-orders', [SalesOrderController::class, 'store']);
-        Route::get('/sales-orders/{id}/pdf', [SalesOrderController::class, 'generatePdf'])->where('id', '[0-9]+');
         Route::get('/sales-orders/{id}', [SalesOrderController::class, 'show'])->where('id', '[0-9]+');
         Route::put('/sales-orders/{id}', [SalesOrderController::class, 'update'])->where('id', '[0-9]+');
         Route::delete('/sales-orders/{id}', [SalesOrderController::class, 'destroy'])->where('id', '[0-9]+');

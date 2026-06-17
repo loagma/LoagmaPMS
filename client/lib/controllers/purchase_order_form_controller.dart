@@ -51,6 +51,9 @@ class PurchaseOrderFormController extends GetxController {
   final isLoading = false.obs;
   final isSaving = false.obs;
 
+  String _companyState = '';
+  String _supplierState = '';
+
   static const List<String> chargeTypeNames = addonChargeTypeNames;
 
   PurchaseOrderFormController({this.poId, this.startInViewOnly = false});
@@ -70,6 +73,7 @@ class PurchaseOrderFormController extends GetxController {
     _loadSalesmen();
     _loadDepartments();
     _loadUnitTypes();
+    AuthController.getCompanyState().then((s) => _companyState = s);
     if (poId != null) {
       _loadPurchaseOrder();
     } else {
@@ -230,7 +234,6 @@ class PurchaseOrderFormController extends GetxController {
   bool _applyTaxRowsToRow(POLineRow row, List<Map<String, dynamic>> rows) {
     if (rows.isEmpty) return false;
     var applied = false;
-    var totalPercent = 0.0;
     final fixedKeys = <String>{};
     final customKeys = <String>[];
 
@@ -246,7 +249,6 @@ class PurchaseOrderFormController extends GetxController {
           : double.tryParse(map['tax_percent']?.toString() ?? '') ?? 0;
 
       if (percent <= 0) continue;
-      totalPercent += percent;
       final canonical = _canonicalTaxKey(taxName, taxSub);
       final label = canonical ?? (rawName.isNotEmpty ? rawName : (rawSub.isNotEmpty ? rawSub : 'Tax'));
       row.taxFieldValues[label] = percent.toStringAsFixed(2);
@@ -280,12 +282,35 @@ class PurchaseOrderFormController extends GetxController {
     }
 
     if (applied) {
+      // Keep only the correct tax type for the supply direction:
+      // intra-state → SGST + CGST only; inter-state → IGST only.
+      final sameState = _isSameState();
+      final activeFixed = fixedKeys.where((k) {
+        if (k == 'IGST') return !sameState;
+        if (k == 'SGST' || k == 'CGST') return sameState;
+        return true; // CESS, ROFF always shown
+      }).toSet();
+
+      // Clear tax fields that are not active for this direction.
+      if (!activeFixed.contains('SGST')) row.sgst.value = '';
+      if (!activeFixed.contains('CGST')) row.cgst.value = '';
+      if (!activeFixed.contains('IGST')) row.igst.value = '';
+
+      // Recalculate total from only the active taxes.
+      final activePercent = activeFixed.fold(0.0, (sum, k) {
+        final v = row.taxFieldValues[k];
+        return sum + (v != null ? (double.tryParse(v) ?? 0) : 0);
+      }) + customKeys.fold(0.0, (sum, k) {
+        final v = row.taxFieldValues[k];
+        return sum + (v != null ? (double.tryParse(v) ?? 0) : 0);
+      });
+
       final ordered = ['SGST', 'CGST', 'IGST', 'CESS', 'ROFF']
-          .where(fixedKeys.contains)
+          .where(activeFixed.contains)
           .toList();
       ordered.addAll(customKeys);
       row.availableTaxKeys.assignAll(ordered);
-      row.taxPercent.value = totalPercent.toStringAsFixed(2);
+      row.taxPercent.value = activePercent.toStringAsFixed(2);
     }
     return applied;
   }
@@ -322,10 +347,26 @@ class PurchaseOrderFormController extends GetxController {
     return null;
   }
 
+  void _autoSetExpectedDate(String fromDate) {
+    final parsed = DateTime.tryParse(fromDate);
+    if (parsed == null) return;
+    final next = parsed.add(const Duration(days: 1));
+    expectedDate.value =
+        '${next.year}-${next.month.toString().padLeft(2, '0')}-${next.day.toString().padLeft(2, '0')}';
+  }
+
   void _setDefaultDocDate() {
     final now = DateTime.now();
     docDate.value =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    _autoSetExpectedDate(docDate.value);
+  }
+
+  bool _isSameState() {
+    final company = _companyState.trim().toLowerCase();
+    final supplier = _supplierState.trim().toLowerCase();
+    if (company.isEmpty || supplier.isEmpty) return true;
+    return company == supplier;
   }
 
   Future<void> _loadSuppliers() async {
@@ -372,6 +413,7 @@ class PurchaseOrderFormController extends GetxController {
           name: e['supplier_name']?.toString() ?? e['name']?.toString() ?? 'Supplier $id',
           phone: e['phone']?.toString(),
           code: e['supplier_code']?.toString(),
+          state: e['state']?.toString(),
         );
       }).whereType<PartyResult>().toList();
     } catch (_) { return []; }
@@ -736,13 +778,17 @@ class PurchaseOrderFormController extends GetxController {
 
   void setFinancialYear(String v) => financialYear.value = v;
   void setSupplierId(int? v) => supplierId.value = v;
-  void setSupplier(int id, String name) {
+  void setSupplier(int id, String name, {String? state}) {
     supplierId.value = id;
     supplierName.value = name;
+    _supplierState = state ?? '';
   }
   void setSalesmanId(String? v) => salesmanId.value = v;
   void setDepartmentId(String? v) => departmentId.value = v;
-  void setDocDate(String v) => docDate.value = v;
+  void setDocDate(String v) {
+    docDate.value = v;
+    _autoSetExpectedDate(v);
+  }
   void setExpectedDate(String v) => expectedDate.value = v;
   void setStatus(String v) => status.value = v;
   void setNarration(String v) => narration.value = v;

@@ -539,17 +539,14 @@ class _SupplierAddressCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Obx(
-            () => TextFormField(
-              key: ValueKey('address_${controller.addressLine1.value}'),
-              initialValue: controller.addressLine1.value,
-              decoration: AppInputDecoration.standard(
-                labelText: 'Address Line',
-                hintText: 'Building, Street, Landmark',
-              ),
-              maxLines: 2,
-              onChanged: (value) => controller.addressLine1.value = value,
+          TextFormField(
+            controller: controller.addressLine1Controller,
+            decoration: AppInputDecoration.standard(
+              labelText: 'Address Line',
+              hintText: 'Building, Street, Landmark',
             ),
+            maxLines: 2,
+            onChanged: (value) => controller.addressLine1.value = value,
           ),
           const SizedBox(height: 12),
           Row(

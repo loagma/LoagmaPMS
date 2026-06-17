@@ -26,6 +26,16 @@ InputDecoration _poInputDecoration({
   );
 }
 
+List<String> _poFyOptions({String current = ''}) {
+  final now = DateTime.now();
+  final start = now.month >= 4 ? now.year : now.year - 1;
+  String fmt(int y) =>
+      '${y.toString().substring(2)}-${(y + 1).toString().substring(2)}';
+  final opts = <String>{fmt(start - 1), fmt(start), fmt(start + 1)};
+  if (current.isNotEmpty) opts.add(current);
+  return opts.toList()..sort();
+}
+
 const double _fieldGap = 10;
 const double _fieldVerticalGap = 6;
 const double _sectionGap = 10;
@@ -56,6 +66,53 @@ Future<void> _pickPoDate(
   final month = picked.month.toString().padLeft(2, '0');
   final day = picked.day.toString().padLeft(2, '0');
   onPicked('${picked.year}-$month-$day');
+}
+
+Future<void> _addAndSearchProductPO(
+  BuildContext context,
+  PurchaseOrderFormController controller,
+) async {
+  bool showAll = controller.supplierId.value == null;
+  final selections = await showDialog<List<ProductSelection>>(
+    context: context,
+    useRootNavigator: true,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx2, setLocal) => ProductSearchDialog(
+        title: 'Select Products',
+        searchFn: (q) => controller.searchProductsAsModels(q, includeAll: showAll),
+        allowMultiSelect: true,
+        showSupplierToggle: controller.supplierId.value != null,
+        supplierToggleValue: showAll,
+        onSupplierToggle: (v) => setLocal(() => showAll = v),
+      ),
+    ),
+  );
+  if (selections == null || selections.isEmpty) return;
+  for (int i = 0; i < selections.length; i++) {
+    final sel = selections[i];
+    final POLineRow r;
+    if (i == 0 &&
+        controller.items.isNotEmpty &&
+        controller.items.last.productId.value == null) {
+      r = controller.items.last;
+    } else {
+      controller.addItem();
+      r = controller.items.last;
+    }
+    r.productId.value = sel.product.id;
+    r.productName.value = sel.product.name;
+    r.hsnCode.value = sel.product.hsnCode ?? '';
+    if (sel.selectedPack?.price != null) {
+      r.price.value = sel.selectedPack!.price!.toStringAsFixed(2);
+    } else if (sel.product.packs.isNotEmpty) {
+      final pack = sel.product.packs.firstWhere(
+        (p) => p.id == sel.product.defaultPackId,
+        orElse: () => sel.product.packs.first,
+      );
+      if (pack.price != null) r.price.value = pack.price!.toStringAsFixed(2);
+    }
+    await controller.applyProductTaxesToRow(r, sel.product.id);
+  }
 }
 
 Future<void> _printPurchaseOrderReport(PurchaseOrderFormController controller) async {
@@ -113,7 +170,7 @@ class PurchaseOrderFormScreen extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 80),
           child: FloatingActionButton(
             heroTag: 'po_add_item_fab',
-            onPressed: controller.addItem,
+            onPressed: () => _addAndSearchProductPO(context, controller),
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
             tooltip: 'Add Product',
@@ -539,11 +596,7 @@ class _HeaderCard extends StatelessWidget {
                   height: 48,
                   child: Obx(() {
                     final fy = controller.financialYear.value.trim();
-                    final options = <String>{
-                      if (fy.isNotEmpty) fy,
-                      '25-26',
-                      '24-25',
-                    }.toList();
+                    final options = _poFyOptions(current: fy);
                     return DropdownButtonFormField<String>(
                       value: fy.isEmpty ? null : fy,
                       decoration: _poInputDecoration(
@@ -644,7 +697,7 @@ class _HeaderCard extends StatelessWidget {
                             ),
                           );
                           if (party != null) {
-                            controller.setSupplier(party.id, party.name);
+                            controller.setSupplier(party.id, party.name, state: party.state);
                             state.didChange(party.id);
                             state.validate();
                           }
