@@ -325,17 +325,10 @@ class SalesOrderController extends Controller
 
             $pdfUrl = null;
             if ($status === 'billed') {
-                $adminId = (int) $request->input('admin_id', 108);
-                try {
-                    $pdfUrl = app(InvoicePdfService::class)->generateAndStore($orderId, $adminId);
-                    if ($pdfUrl) {
-                        DB::table(self::ORDERS_TABLE)->where('order_id', $orderId)
-                            ->update(['invoice_pdf_url' => $pdfUrl]);
-                        $order->invoice_pdf_url = $pdfUrl;
-                    }
-                } catch (\Throwable $pdfErr) {
-                    Log::warning('Invoice PDF generation failed after store: ' . $pdfErr->getMessage());
-                }
+                $pdfUrl = rtrim(config('app.url'), '/') . '/api/sales-orders/' . $orderId . '/pdf';
+                DB::table(self::ORDERS_TABLE)->where('order_id', $orderId)
+                    ->update(['invoice_pdf_url' => $pdfUrl]);
+                $order->invoice_pdf_url = $pdfUrl;
             }
 
             return response()->json([
@@ -606,20 +599,11 @@ class SalesOrderController extends Controller
                 ->values()
                 ->all();
 
-            // Generate PDFs for all billed orders (non-blocking — failures are logged, not returned as errors)
-            $pdfService = app(InvoicePdfService::class);
+            // Store API endpoint URL as invoice_pdf_url — PDF is generated on-demand, no disk writes needed
+            $baseUrl = rtrim(config('app.url'), '/');
             foreach ($billedIds as $billedId) {
-                try {
-                    $url = $pdfService->generateAndStore($billedId, $adminId);
-                    if ($url) {
-                        DB::table(self::ORDERS_TABLE)->where('order_id', $billedId)
-                            ->update(['invoice_pdf_url' => $url]);
-                    } else {
-                        Log::warning("bulkInvoice: PDF generation returned null for order {$billedId}");
-                    }
-                } catch (\Throwable $pdfErr) {
-                    Log::warning("bulkInvoice: PDF generation failed for order {$billedId}: " . $pdfErr->getMessage());
-                }
+                DB::table(self::ORDERS_TABLE)->where('order_id', $billedId)
+                    ->update(['invoice_pdf_url' => $baseUrl . '/api/sales-orders/' . $billedId . '/pdf']);
             }
 
             return response()->json([
@@ -839,17 +823,10 @@ class SalesOrderController extends Controller
 
             $pdfUrl = null;
             if ($status === 'billed') {
-                $adminId = (int) $request->input('admin_id', 108);
-                try {
-                    $pdfUrl = app(InvoicePdfService::class)->generateAndStore($id, $adminId);
-                    if ($pdfUrl) {
-                        DB::table(self::ORDERS_TABLE)->where('order_id', $id)
-                            ->update(['invoice_pdf_url' => $pdfUrl]);
-                        $updated->invoice_pdf_url = $pdfUrl;
-                    }
-                } catch (\Throwable $pdfErr) {
-                    Log::warning('Invoice PDF generation failed after update: ' . $pdfErr->getMessage());
-                }
+                $pdfUrl = rtrim(config('app.url'), '/') . '/api/sales-orders/' . $id . '/pdf';
+                DB::table(self::ORDERS_TABLE)->where('order_id', $id)
+                    ->update(['invoice_pdf_url' => $pdfUrl]);
+                $updated->invoice_pdf_url = $pdfUrl;
             }
 
             return response()->json([
@@ -977,7 +954,7 @@ class SalesOrderController extends Controller
     }
 
     // GET /sales-orders/{id}/pdf?admin_id=1
-    public function generatePdf(Request $request, int $id): JsonResponse|\Illuminate\Http\RedirectResponse
+    public function generatePdf(Request $request, int $id): JsonResponse|\Illuminate\Http\Response
     {
         $adminId = (int) $request->input('admin_id', 108);
 
@@ -990,13 +967,14 @@ class SalesOrderController extends Controller
         }
 
         try {
-            $url = app(InvoicePdfService::class)->generateAndStore($id, $adminId);
-            if ($url === null) {
+            $pdfContent = app(InvoicePdfService::class)->generateContent($id, $adminId);
+            if ($pdfContent === null) {
                 return response()->json(['success' => false, 'message' => 'Failed to generate PDF — admin not found or order data incomplete'], 500);
             }
-            DB::table(self::ORDERS_TABLE)->where('order_id', $id)
-                ->update(['invoice_pdf_url' => $url]);
-            return redirect($url);
+            $filename = str_replace('/', '_', $order->bill_no) . '.pdf';
+            return response($pdfContent, 200)
+                ->header('Content-Type', 'application/pdf')
+                ->header('Content-Disposition', 'inline; filename="' . $filename . '"');
         } catch (\Throwable $e) {
             Log::error('SalesOrder generatePdf error: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'PDF generation failed: ' . $e->getMessage()], 500);

@@ -45,6 +45,19 @@ class InvoicePdfService
     }
 
     /**
+     * Generate PDF bytes without writing to disk. Returns null if data is incomplete.
+     */
+    public function generateContent(int $orderId, int $adminId): ?string
+    {
+        $data = $this->buildData($orderId, $adminId);
+        if ($data === null) return null;
+
+        return Pdf::loadView('pdf.sales-invoice', ['data' => $data])
+            ->setPaper('a4', 'portrait')
+            ->output();
+    }
+
+    /**
      * Build the complete $data array required by the Blade template.
      */
     private function buildData(int $orderId, int $adminId): ?array
