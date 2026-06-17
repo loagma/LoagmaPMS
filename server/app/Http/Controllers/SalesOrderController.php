@@ -977,7 +977,7 @@ class SalesOrderController extends Controller
     }
 
     // GET /sales-orders/{id}/pdf?admin_id=1
-    public function generatePdf(Request $request, int $id): JsonResponse
+    public function generatePdf(Request $request, int $id): JsonResponse|\Illuminate\Http\RedirectResponse
     {
         $adminId = (int) $request->input('admin_id', 108);
 
@@ -996,7 +996,7 @@ class SalesOrderController extends Controller
             }
             DB::table(self::ORDERS_TABLE)->where('order_id', $id)
                 ->update(['invoice_pdf_url' => $url]);
-            return response()->json(['success' => true, 'pdf_url' => $url]);
+            return redirect($url);
         } catch (\Throwable $e) {
             Log::error('SalesOrder generatePdf error: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'PDF generation failed: ' . $e->getMessage()], 500);
