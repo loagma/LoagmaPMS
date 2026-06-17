@@ -24,10 +24,13 @@ class SalesOrderController extends Controller
         try {
             $prefix  = $this->invoicePrefix();
             $docYear = $this->currentDocYear();
-            $maxNum  = (int) DB::table(self::ORDERS_TABLE)
+            $row    = DB::table(self::ORDERS_TABLE)
                 ->where('Doc_Year', $docYear)
                 ->whereNotNull('Doc_Year')
-                ->max('invoice_number');
+                ->where('bill_no', 'like', $prefix . '%')
+                ->selectRaw("COALESCE(MAX(CAST(SUBSTRING_INDEX(bill_no, '/', -1) AS UNSIGNED)), 0) as max_num")
+                ->first();
+            $maxNum  = (int) ($row->max_num ?? 0);
             $nextNum = str_pad((string) ($maxNum + 1), 3, '0', STR_PAD_LEFT);
             return response()->json([
                 'success'     => true,
@@ -198,9 +201,9 @@ class SalesOrderController extends Controller
                 $billVehicle, $billStatement, $billRoff, $docYear, $salesmanIdStore,
                 $chargesJson, $idempotencyKey, &$orderId
             ) {
-                [$billNo, $invoiceNumber] = $status === 'billed'
-                    ? $this->resolveInvoiceNumber($requestedBillNo, $docYear)
-                    : [$requestedBillNo, null];
+                $billNo = $status === 'billed'
+                    ? $this->resolveInvoiceNumber($requestedBillNo, $docYear)[0]
+                    : $requestedBillNo;
 
                 $orderId = $this->nextOrderId();
 
@@ -240,7 +243,6 @@ class SalesOrderController extends Controller
                     'feedback'        => '',
                     'bill_number'     => 0,
                     'bill_no'         => $billNo,
-                    'invoice_number'  => $invoiceNumber,
                     'Bill_Dt'         => $billDt,
                     'Department'      => $department,
                     'Bill_Narration'  => $billNarration,
@@ -412,9 +414,9 @@ class SalesOrderController extends Controller
                     $orderTotal = round($lineTotal - $discount + $delivery, 2);
 
                     // resolveInvoiceNumber() uses lockForUpdate internally — safe inside this transaction
-                    [$billNo, $invoiceNumber] = $status === 'billed'
-                        ? $this->resolveInvoiceNumber($requestedBillNo, $docYear)
-                        : [$requestedBillNo, null];
+                    $billNo = $status === 'billed'
+                        ? $this->resolveInvoiceNumber($requestedBillNo, $docYear)[0]
+                        : $requestedBillNo;
 
                     $orderId = $nextOrderId++;
                     $createdOrderIds[] = $orderId;
@@ -451,7 +453,6 @@ class SalesOrderController extends Controller
                         'feedback'        => '',
                         'bill_number'     => 0,
                         'bill_no'         => $billNo,
-                        'invoice_number'  => $invoiceNumber,
                         'Bill_Dt'         => $billDt,
                         'Department'      => $department,
                         'Bill_Narration'  => $billNarration,
@@ -571,12 +572,11 @@ class SalesOrderController extends Controller
 
             DB::transaction(function () use ($orderIds, $orders, $billDt, $docYear, $billRoff, $department, $billNarration, $billVehicle, $billStatement, $chargesJson, &$billedIds) {
                 foreach ($orderIds as $orderId) {
-                    [$billNo, $invoiceNumber] = $this->resolveInvoiceNumber(null, $docYear);
+                    $billNo = $this->resolveInvoiceNumber(null, $docYear)[0];
 
                     DB::table(self::ORDERS_TABLE)->where('order_id', $orderId)->update([
                         'order_state'     => 'billed',
                         'bill_no'         => $billNo,
-                        'invoice_number'  => $invoiceNumber,
                         'Bill_Dt'         => $billDt,
                         'Doc_Year'        => $docYear,
                         'bill_roff'       => $billRoff,
@@ -629,7 +629,6 @@ class SalesOrderController extends Controller
             if ($request->boolean('cancel_invoice')) {
                 DB::table(self::ORDERS_TABLE)->where('order_id', $id)->update([
                     'bill_no'        => null,
-                    'invoice_number' => null,
                     'Bill_Dt'        => null,
                     'order_state'    => 'pending',
                 ]);
@@ -701,9 +700,9 @@ class SalesOrderController extends Controller
             $orderTotal = round($lineTotal - $discount + $delivery, 2);
 
             DB::transaction(function () use ($id, $order, $status, $orderTotal, $discount, $delivery, $items, $oldItems, $currentState, $docDate, $narration, $requestedBillNo, $billDt, $department, $billNarration, $billVehicle, $billStatement, $billRoff, $docYear, $salesmanId, $chargesJson) {
-                [$billNo, $invoiceNumber] = $status === 'billed'
-                    ? $this->resolveInvoiceNumber($requestedBillNo, $docYear, $id)
-                    : [$requestedBillNo, $order->invoice_number ?? null];
+                $billNo = $status === 'billed'
+                    ? $this->resolveInvoiceNumber($requestedBillNo, $docYear, $id)[0]
+                    : $requestedBillNo;
 
                 // Keep master_orders totals in sync with orders.
                 DB::table('loagma_new.master_orders')->where('id', $id)->update([
@@ -723,7 +722,6 @@ class SalesOrderController extends Controller
                     'items_count'     => count($items),
                     'txn_id'          => $narration,
                     'bill_no'         => $billNo,
-                    'invoice_number'  => $invoiceNumber,
                     'Bill_Dt'         => $billDt,
                     'Department'      => $department,
                     'Bill_Narration'  => $billNarration,
@@ -1020,13 +1018,12 @@ class SalesOrderController extends Controller
         // same one already on the order (i.e. the user did not change it), preserve
         // the existing number — do NOT burn a new sequence slot.
         if ($excludeOrderId !== null && $requestedBillNo !== null && $requestedBillNo !== '') {
-            $existing = DB::table(self::ORDERS_TABLE)
+            $existingBillNo = DB::table(self::ORDERS_TABLE)
                 ->where('order_id', $excludeOrderId)
-                ->value('invoice_number');
+                ->value('bill_no');
 
-            if ($existing !== null) {
-                // Order already owns a sequence number — keep bill_no and number unchanged.
-                return [$requestedBillNo, (int) $existing];
+            if ($existingBillNo !== null && $existingBillNo !== '') {
+                return [$requestedBillNo, null];
             }
         }
 
@@ -1042,13 +1039,15 @@ class SalesOrderController extends Controller
         $query = DB::table(self::ORDERS_TABLE)
             ->where('Doc_Year', $docYear)
             ->whereNotNull('Doc_Year')
+            ->where('bill_no', 'like', $prefix . '%')
             ->lockForUpdate();
 
         if ($excludeOrderId !== null) {
             $query->where('order_id', '<>', $excludeOrderId);
         }
 
-        $maxNum  = (int) $query->max('invoice_number');
+        $row     = $query->selectRaw("COALESCE(MAX(CAST(SUBSTRING_INDEX(bill_no, '/', -1) AS UNSIGNED)), 0) as max_num")->first();
+        $maxNum  = (int) ($row->max_num ?? 0);
         $nextNum = $maxNum + 1;
         $billNo  = $prefix . str_pad((string) $nextNum, 3, '0', STR_PAD_LEFT);
 
