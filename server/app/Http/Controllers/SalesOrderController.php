@@ -268,6 +268,9 @@ class SalesOrderController extends Controller
                     if (!empty($item['description']))      $pinfo['description']      = $item['description'];
                     if (isset($item['discount_percent']))  $pinfo['discount_percent'] = (float) $item['discount_percent'];
                     if (isset($item['tax_percent']))       $pinfo['tax_percent']      = (float) $item['tax_percent'];
+                    if (isset($item['sgst_percent']))      $pinfo['sgst_percent']     = (float) $item['sgst_percent'];
+                    if (isset($item['cgst_percent']))      $pinfo['cgst_percent']     = (float) $item['cgst_percent'];
+                    if (isset($item['igst_percent']))      $pinfo['igst_percent']     = (float) $item['igst_percent'];
 
                     DB::table(self::ITEMS_TABLE)->insert([
                         'item_id'       => $nextId++,
@@ -475,6 +478,9 @@ class SalesOrderController extends Controller
                         if (!empty($item['description']))     $pinfo['description']      = $item['description'];
                         if (isset($item['discount_percent'])) $pinfo['discount_percent'] = (float) $item['discount_percent'];
                         if (isset($item['tax_percent']))      $pinfo['tax_percent']      = (float) $item['tax_percent'];
+                        if (isset($item['sgst_percent']))     $pinfo['sgst_percent']     = (float) $item['sgst_percent'];
+                        if (isset($item['cgst_percent']))     $pinfo['cgst_percent']     = (float) $item['cgst_percent'];
+                        if (isset($item['igst_percent']))     $pinfo['igst_percent']     = (float) $item['igst_percent'];
 
                         $itemRows[] = [
                             'item_id'       => $nextItemId++,
@@ -756,6 +762,9 @@ class SalesOrderController extends Controller
                     if (!empty($item['description']))     $pinfo['description']     = $item['description'];
                     if (isset($item['discount_percent'])) $pinfo['discount_percent'] = (float) $item['discount_percent'];
                     if (isset($item['tax_percent']))      $pinfo['tax_percent']     = (float) $item['tax_percent'];
+                    if (isset($item['sgst_percent']))     $pinfo['sgst_percent']    = (float) $item['sgst_percent'];
+                    if (isset($item['cgst_percent']))     $pinfo['cgst_percent']    = (float) $item['cgst_percent'];
+                    if (isset($item['igst_percent']))     $pinfo['igst_percent']    = (float) $item['igst_percent'];
 
                     DB::table(self::ITEMS_TABLE)->insert([
                         'item_id'       => $nextId++,

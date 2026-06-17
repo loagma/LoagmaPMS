@@ -917,12 +917,12 @@ class SalesOrderFormController extends GetxController {
           final qty = double.tryParse(r.quantity.value) ?? 0;
           final price = double.tryParse(r.price.value) ?? 0;
           final discount = double.tryParse(r.discountPercent.value);
-          final sgst = double.tryParse(r.sgst.value) ?? 0;
-          final cgst = double.tryParse(r.cgst.value) ?? 0;
-          final igst = double.tryParse(r.igst.value) ?? 0;
+          final sgstPct = double.tryParse(r.sgst.value) ?? 0;
+          final cgstPct = double.tryParse(r.cgst.value) ?? 0;
+          final igstPct = double.tryParse(r.igst.value) ?? 0;
           final cess = double.tryParse(r.cess.value) ?? 0;
           final roff = double.tryParse(r.roff.value) ?? 0;
-          final taxFromBreakdown = sgst + cgst + igst + cess + roff;
+          final taxFromBreakdown = sgstPct + cgstPct + igstPct + cess + roff;
           final tax = taxFromBreakdown > 0
               ? taxFromBreakdown
               : (double.tryParse(r.taxPercent.value));
@@ -936,6 +936,9 @@ class SalesOrderFormController extends GetxController {
             'price': price,
             if (discount != null && discount > 0) 'discount_percent': discount,
             if (tax != null && tax > 0) 'tax_percent': tax,
+            if (sgstPct > 0) 'sgst_percent': sgstPct,
+            if (cgstPct > 0) 'cgst_percent': cgstPct,
+            if (igstPct > 0) 'igst_percent': igstPct,
             if (r.description.value.trim().isNotEmpty) 'description': r.description.value.trim(),
           };
         }).toList(),

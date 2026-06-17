@@ -571,6 +571,12 @@ class PurchaseVoucherController extends GetxController {
         if (k == 'SGST' || k == 'CGST') return sameState;
         return true;
       }).toSet();
+      // Zero out inactive tax percents so recalcItemRow computes '' for them
+      if (!activeFixed.contains('SGST')) row.sgstPercent.value = '0';
+      if (!activeFixed.contains('CGST')) row.cgstPercent.value = '0';
+      if (!activeFixed.contains('IGST')) row.igstPercent.value = '0';
+      if (!activeFixed.contains('CESS')) row.cessPercent.value = '0';
+      if (!activeFixed.contains('ROFF')) row.roffPercent.value = '0';
       if (!activeFixed.contains('SGST')) row.sgst.value = '';
       if (!activeFixed.contains('CGST')) row.cgst.value = '';
       if (!activeFixed.contains('IGST')) row.igst.value = '';

@@ -11,6 +11,23 @@ class InvoicePdfService
     private const ORDERS_TABLE = 'loagma_new.orders';
     private const ITEMS_TABLE  = 'loagma_new.orders_item';
 
+    // Maps India GST state code (first 2 digits of GSTIN) to lowercase state name
+    private const GST_STATE_NAMES = [
+        '01' => 'jammu & kashmir', '02' => 'himachal pradesh', '03' => 'punjab',
+        '04' => 'chandigarh',      '05' => 'uttarakhand',      '06' => 'haryana',
+        '07' => 'delhi',           '08' => 'rajasthan',        '09' => 'uttar pradesh',
+        '10' => 'bihar',           '11' => 'sikkim',           '12' => 'arunachal pradesh',
+        '13' => 'nagaland',        '14' => 'manipur',          '15' => 'mizoram',
+        '16' => 'tripura',         '17' => 'meghalaya',        '18' => 'assam',
+        '19' => 'west bengal',     '20' => 'jharkhand',        '21' => 'odisha',
+        '22' => 'chhattisgarh',    '23' => 'madhya pradesh',   '24' => 'gujarat',
+        '25' => 'daman & diu',     '26' => 'dadra & nagar haveli', '27' => 'maharashtra',
+        '29' => 'karnataka',       '30' => 'goa',              '31' => 'lakshadweep',
+        '32' => 'kerala',          '33' => 'tamil nadu',       '34' => 'puducherry',
+        '35' => 'andaman & nicobar islands',
+        '36' => 'telangana',       '37' => 'andhra pradesh',   '38' => 'ladakh',
+    ];
+
     /**
      * Generate the invoice PDF for a sales order, persist it to public storage,
      * and return the publicly accessible URL.
@@ -111,7 +128,9 @@ class InvoicePdfService
             ->get();
 
         $productIds = $rawItems->pluck('product_id')->filter()->unique()->values()->toArray();
-        $productMap = [];
+        $productMap    = [];
+        // product_id => ['sgst' => x, 'cgst' => y, 'igst' => z] — fallback for old orders without pinfo tax data
+        $productTaxMap = [];
         if (!empty($productIds)) {
             DB::table('product')
                 ->whereIn('product_id', $productIds)
@@ -125,13 +144,36 @@ class InvoicePdfService
                         'default_pack_id' => $p->default_pack_id ?? null,
                     ];
                 });
+
+            DB::table('product_taxes as pt')
+                ->join('taxes as t', 'pt.tax_id', '=', 't.id')
+                ->whereIn('pt.product_id', $productIds)
+                ->where('t.is_active', 1)
+                ->select('pt.product_id', 't.tax_name', 't.tax_sub_category', 'pt.tax_percent')
+                ->get()
+                ->each(function ($row) use (&$productTaxMap) {
+                    $pid  = (int) $row->product_id;
+                    $name = strtoupper(trim((string) ($row->tax_name ?? '')));
+                    $sub  = strtoupper(trim((string) ($row->tax_sub_category ?? '')));
+                    $pct  = (float) $row->tax_percent;
+                    if (!isset($productTaxMap[$pid])) {
+                        $productTaxMap[$pid] = ['sgst' => 0.0, 'cgst' => 0.0, 'igst' => 0.0];
+                    }
+                    if ($name === 'SGST' || $sub === 'SGST') {
+                        $productTaxMap[$pid]['sgst'] += $pct;
+                    } elseif ($name === 'CGST' || $sub === 'CGST') {
+                        $productTaxMap[$pid]['cgst'] += $pct;
+                    } elseif ($name === 'IGST' || $sub === 'IGST') {
+                        $productTaxMap[$pid]['igst'] += $pct;
+                    }
+                });
         }
 
         // ── 5. Tax split: SGST/CGST for same state, IGST for inter-state ────
-        // Company state is derived from the GST number (chars 1-2 are the state code).
-        // If GST is unavailable, $companyState stays empty and all tax defaults to IGST.
+        // GST state code (first 2 digits of GSTIN) is mapped to a state name for comparison.
         $gstNo         = (string) ($admin->org_gst ?? $admin->gst_no ?? '');
-        $companyState  = strlen($gstNo) >= 2 ? strtolower(substr($gstNo, 0, 2)) : '';
+        $gstStateCode  = strlen($gstNo) >= 2 ? substr($gstNo, 0, 2) : '';
+        $companyState  = strtolower(self::GST_STATE_NAMES[$gstStateCode] ?? '');
         $customerState = strtolower(trim((string) ($customer->state ?? '')));
         $sameState     = $companyState !== '' && $customerState !== ''
                          && $companyState === $customerState;
@@ -160,8 +202,29 @@ class InvoicePdfService
                 $price = round((float) ($raw->item_total ?? 0) / $qty, 4);
             }
 
-            $discPct    = (float) ($pinfo['discount_percent'] ?? 0);
-            $taxPct     = (float) ($pinfo['tax_percent'] ?? 0);
+            $discPct = (float) ($pinfo['discount_percent'] ?? 0);
+
+            // Resolve per-component tax percents — prefer saved pinfo, fall back to product_taxes
+            $sgstPct = (float) ($pinfo['sgst_percent'] ?? 0);
+            $cgstPct = (float) ($pinfo['cgst_percent'] ?? 0);
+            $igstPct = (float) ($pinfo['igst_percent'] ?? 0);
+            $taxPct  = (float) ($pinfo['tax_percent'] ?? 0);
+
+            $hasSavedBreakdown = $sgstPct > 0 || $cgstPct > 0 || $igstPct > 0;
+
+            if (!$hasSavedBreakdown) {
+                // Old order — resolve from product_taxes using state
+                $ptax = $productTaxMap[$productId] ?? ['sgst' => 0.0, 'cgst' => 0.0, 'igst' => 0.0];
+                if ($sameState) {
+                    $sgstPct = $ptax['sgst'];
+                    $cgstPct = $ptax['cgst'];
+                    $taxPct  = $sgstPct + $cgstPct ?: $taxPct;
+                } else {
+                    $igstPct = $ptax['igst'] ?: ($ptax['sgst'] + $ptax['cgst']); // use IGST or total GST
+                    $taxPct  = $igstPct ?: $taxPct;
+                }
+            }
+
             $usedQty    = (float) ($raw->qty_loaded ?? 0);
 
             $taxableAmt = round($qty * $price * (1 - $discPct / 100), 2);
@@ -173,11 +236,16 @@ class InvoicePdfService
 
             // Tax label
             if ($taxPct > 0) {
-                if ($sameState) {
-                    $half     = $taxPct / 2;
-                    $taxLabel = "SGST {$half}%, CGST {$half}%";
+                if ($igstPct > 0) {
+                    $taxLabel = "IGST {$igstPct}%";
+                } elseif ($sgstPct > 0 || $cgstPct > 0) {
+                    $parts = [];
+                    if ($sgstPct > 0) $parts[] = "SGST {$sgstPct}%";
+                    if ($cgstPct > 0) $parts[] = "CGST {$cgstPct}%";
+                    $taxLabel = implode(', ', $parts);
                 } else {
-                    $taxLabel = "IGST {$taxPct}%";
+                    $half     = $taxPct / 2;
+                    $taxLabel = $sameState ? "SGST {$half}%, CGST {$half}%" : "IGST {$taxPct}%";
                 }
             } else {
                 $taxLabel = 'Nil';
