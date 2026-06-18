@@ -6,6 +6,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class ProductController extends Controller
 {
@@ -237,6 +238,7 @@ class ProductController extends Controller
     {
         $validated = $request->validate([
             'product_name' => 'required|string|max:255',
+            'product_code' => 'nullable|string|max:255',
             'cat_id' => 'required|integer|min:0',
             'parent_cat_id' => 'nullable|integer|min:0',
             'brand' => 'required|string|max:255',
@@ -246,11 +248,11 @@ class ProductController extends Controller
             'in_stock' => 'nullable|integer|in:0,1',
             'inventory_type' => 'nullable|in:SINGLE,PACK_WISE',
             'inventory_unit_type' => 'nullable|string|max:255',
-            'description' => 'required|string',
+            'description' => 'nullable|string',
             'keywords' => 'nullable|string',
             'packs' => 'nullable',
             'default_pack_id' => 'nullable|string|max:255',
-            'hsn_code' => 'required|string|max:10',
+            'hsn_code' => 'required|string|max:50',
             'gst_percent' => 'nullable|numeric|min:0|max:999.99',
             'order_limit' => 'nullable|integer|min:0',
             'buffer_limit' => 'nullable|integer|min:0',
@@ -269,56 +271,50 @@ class ProductController extends Controller
                 $packsValue = json_encode($packsValue, JSON_UNESCAPED_UNICODE);
             }
 
-            DB::table('product')->insert([
-                'product_id' => $nextId,
-                'cat_id' => (int) ($validated['cat_id'] ?? 0),
-                'parent_cat_id' => (int) ($validated['parent_cat_id'] ?? 0),
-                'brand' => trim((string) $validated['brand']),
-                'ctype_id' => trim((string) ($validated['ctype_id'] ?? 'vegetables_fruits')),
-                'seq_no' => (int) ($validated['seq_no'] ?? 0),
-                'start_date' => time(),
-                'is_published' => (int) ($validated['is_published'] ?? 0),
-                'is_used' => 0,
-                'is_deleted' => 0,
-                'in_stock' => (int) ($validated['in_stock'] ?? 0),
-                'inventory_type' => (string) ($validated['inventory_type'] ?? 'SINGLE'),
-                'inventory_unit_type' => (string) ($validated['inventory_unit_type'] ?? 'WEIGHT'),
-                'name' => trim((string) $validated['product_name']),
-                'description' => (string) $validated['description'],
-                'display_photo' => null,
-                'keywords' => $validated['keywords'] ?? null,
-                'spec_params' => '{}',
-                'packs' => $packsValue,
-                'default_pack_id' => (string) ($validated['default_pack_id'] ?? ' '),
-                'hsn_code' => (string) $validated['hsn_code'],
-                'gst_percent' => (float) ($validated['gst_percent'] ?? 0),
-                'offers' => null,
-                'cache_txt' => null,
-                'img_last_updated' => 0,
-                'stock' => null,
-                'stock_ut_id' => null,
-                'order_limit' => (int) ($validated['order_limit'] ?? 0),
-                'buffer_limit' => (int) ($validated['buffer_limit'] ?? 0),
+            // Only insert known-safe columns; omit legacy columns that may not exist
+            // on all deployments (spec_params, offers, cache_txt, img_last_updated, etc.).
+            $row = [
+                'product_id'         => $nextId,
+                'name'               => trim((string) $validated['product_name']),
+                'description'        => (string) ($validated['description'] ?? ''),
+                'brand'              => trim((string) $validated['brand']),
+                'cat_id'             => (int) ($validated['cat_id'] ?? 0),
+                'parent_cat_id'      => (int) ($validated['parent_cat_id'] ?? 0),
+                'ctype_id'           => trim((string) ($validated['ctype_id'] ?? 'vegetables_fruits')),
+                'seq_no'             => (int) ($validated['seq_no'] ?? 0),
+                'is_published'       => (int) ($validated['is_published'] ?? 0),
+                'is_deleted'         => 0,
+                'in_stock'           => (int) ($validated['in_stock'] ?? 0),
+                'inventory_type'     => (string) ($validated['inventory_type'] ?? 'SINGLE'),
+                'inventory_unit_type'=> (string) ($validated['inventory_unit_type'] ?? 'WEIGHT'),
+                'keywords'           => $validated['keywords'] ?? null,
+                'packs'              => $packsValue,
+                'default_pack_id'    => (string) ($validated['default_pack_id'] ?? ''),
+                'hsn_code'           => (string) $validated['hsn_code'],
+                'gst_percent'        => (float) ($validated['gst_percent'] ?? 0),
+                'stock'              => null,
+                'order_limit'        => (int) ($validated['order_limit'] ?? 0),
+                'buffer_limit'       => (int) ($validated['buffer_limit'] ?? 0),
                 'product_pack_count' => (int) (
-                    $validated['product_pack_count']
-                        ?? $validated['nop']
-                        ?? 0
+                    $validated['product_pack_count'] ?? $validated['nop'] ?? 0
                 ),
-                'nop' => (int) (
-                    $validated['nop']
-                        ?? $validated['product_pack_count']
-                        ?? 0
+                'nop'                => (int) (
+                    $validated['nop'] ?? $validated['product_pack_count'] ?? 0
                 ),
-                'pack_prd_wt' => isset($validated['pack_prd_wt'])
-                    ? (float) $validated['pack_prd_wt']
-                    : null,
-                'gross_wt_of_pack' => isset($validated['gross_wt_of_pack'])
-                    ? (float) $validated['gross_wt_of_pack']
-                    : null,
-                'gst_tax_type' => isset($validated['gst_tax_type'])
-                    ? trim((string) $validated['gst_tax_type'])
-                    : null,
-            ]);
+                'pack_prd_wt'        => isset($validated['pack_prd_wt'])
+                    ? (float) $validated['pack_prd_wt'] : null,
+                'gross_wt_of_pack'   => isset($validated['gross_wt_of_pack'])
+                    ? (float) $validated['gross_wt_of_pack'] : null,
+                'gst_tax_type'       => isset($validated['gst_tax_type'])
+                    ? trim((string) $validated['gst_tax_type']) : null,
+            ];
+
+            // Include product_code only if the column exists (old table may or may not have it).
+            if (Schema::hasColumn('product', 'product_code')) {
+                $row['product_code'] = $validated['product_code'] ?? null;
+            }
+
+            DB::table('product')->insert($row);
 
             $created = DB::table('product')->where('product_id', $nextId)->first();
 

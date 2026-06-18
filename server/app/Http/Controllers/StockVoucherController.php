@@ -185,7 +185,7 @@ class StockVoucherController extends Controller
                         amount:          0,
                         actionType:      $svType === 'IN' ? 'stock_in' : 'stock_out',
                         invType:         $svType === 'IN' ? 'CREDIT' : 'DEBIT',
-                        source:          'stock_voucher',
+                        source:          $svType === 'IN' ? 'stock_voucher_in' : 'stock_voucher_out',
                         note:            "Stock Voucher #{$voucherId} {$svType} - " . ($svItem['unit_type'] ?? ''),
                         invDate:         $svDate,
                     );
@@ -338,7 +338,7 @@ class StockVoucherController extends Controller
                         amount:          0,
                         actionType:      $svType === 'IN' ? 'stock_in' : 'stock_out',
                         invType:         $svType === 'IN' ? 'CREDIT' : 'DEBIT',
-                        source:          'stock_voucher',
+                        source:          $svType === 'IN' ? 'stock_voucher_in' : 'stock_voucher_out',
                         note:            "Stock Voucher #{$id} {$svType} - " . ($svItem['unit_type'] ?? ''),
                         invDate:         $svDate,
                     );

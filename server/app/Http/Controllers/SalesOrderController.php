@@ -287,24 +287,16 @@ class SalesOrderController extends Controller
                     ]);
                 }
 
-                // Inventory + ledger inside the transaction so a failure rolls back the order
-                // instead of committing it with a missing/partial ledger (audit gap).
+                // Stock deducted + ledger written only on BILLED. DRAFT orders do not touch inventory.
                 $supplierIdForVp = is_numeric($salesmanIdStore) ? (int) $salesmanIdStore : null;
                 $ledger = app(InventoryLedgerService::class);
-                foreach ($items as $soItem) {
-                    $pid = (int) ($soItem['product_id'] ?? 0);
-                    if ($pid <= 0) continue;
-                    $vp = $ledger->resolveVendorProduct($pid, $supplierIdForVp);
-                    if (!$vp) { Log::warning('SO store: no vendor_product', ['product_id' => $pid, 'order_id' => $orderId]); continue; }
-                    $ledger->updatePacksStock($vp->id, (float) ($soItem['quantity'] ?? 0), 'decrease');
-                }
-                // Ledger: DEBIT entry when order is created as billed
                 if ($status === 'billed') {
                     foreach ($items as $soItem) {
                         $pid = (int) ($soItem['product_id'] ?? 0);
                         if ($pid <= 0) continue;
                         $vp = $ledger->resolveVendorProduct($pid, $supplierIdForVp);
-                        if (!$vp) continue;
+                        if (!$vp) { Log::warning('SO store BILLED: no vendor_product', ['product_id' => $pid, 'order_id' => $orderId]); continue; }
+                        $ledger->updatePacksStock($vp->id, (float) ($soItem['quantity'] ?? 0), 'decrease');
                         $packId = (string) ($soItem['pack_id'] ?? '');
                         if ($packId === '') Log::warning('SO store BILLED: missing pack_id', ['product_id' => $pid, 'order_id' => $orderId]);
                         $qty   = (float) ($soItem['quantity'] ?? 0);
@@ -782,29 +774,40 @@ class SalesOrderController extends Controller
                     ]);
                 }
 
-                // Inventory + ledger inside the transaction so a failure rolls back the order.
-                // Reverse old packs stock, then re-apply new packs stock.
+                // Stock + ledger: only billed orders hold inventory.
+                // Reverse old stock if old status was billed; apply new stock only if new status is billed.
                 $supplierIdForVp    = is_numeric($salesmanId) ? (int) $salesmanId : null;
                 $oldSupplierIdForVp = is_numeric($order->salesman_id ?? null) ? (int) $order->salesman_id : null;
                 $ledger = app(InventoryLedgerService::class);
 
-                foreach ($oldItems as $oldItem) {
-                    $vp = $ledger->resolveVendorProduct($oldItem['product_id'], $oldSupplierIdForVp);
-                    if ($vp) $ledger->updatePacksStock($vp->id, $oldItem['quantity'], 'increase');
+                if ($currentState === 'billed') {
+                    foreach ($oldItems as $oldItem) {
+                        $vp = $ledger->resolveVendorProduct($oldItem['product_id'], $oldSupplierIdForVp);
+                        if (!$vp) continue;
+                        $ledger->updatePacksStock($vp->id, $oldItem['quantity'], 'increase');
+                        $ledger->recordLedger(
+                            vendorProductId: $vp->id,
+                            productId:       $oldItem['product_id'],
+                            packId:          '',
+                            quantity:        $oldItem['quantity'],
+                            unitType:        'Nos',
+                            amount:          0,
+                            actionType:      'sale_reversal',
+                            invType:         'CREDIT',
+                            source:          'sales_invoice_reversal',
+                            note:            "Sales Invoice Reversal SO#{$id}",
+                            invDate:         $docDate,
+                        );
+                    }
                 }
-                foreach ($items as $soItem) {
-                    $pid = (int) ($soItem['product_id'] ?? 0);
-                    if ($pid <= 0) continue;
-                    $vp = $ledger->resolveVendorProduct($pid, $supplierIdForVp);
-                    if ($vp) $ledger->updatePacksStock($vp->id, (float) ($soItem['quantity'] ?? 0), 'decrease');
-                }
-                // BILLED ledger: write DEBIT entries only on DRAFT→BILLED transition
-                if ($status === 'billed' && $currentState !== 'billed') {
+
+                if ($status === 'billed') {
                     foreach ($items as $soItem) {
                         $pid = (int) ($soItem['product_id'] ?? 0);
                         if ($pid <= 0) continue;
                         $vp = $ledger->resolveVendorProduct($pid, $supplierIdForVp);
                         if (!$vp) { Log::warning('SO update BILLED: no vendor_product', ['product_id' => $pid, 'order_id' => $id]); continue; }
+                        $ledger->updatePacksStock($vp->id, (float) ($soItem['quantity'] ?? 0), 'decrease');
                         $packId = (string) ($soItem['pack_id'] ?? '');
                         if ($packId === '') Log::warning('SO update BILLED: missing pack_id', ['product_id' => $pid, 'order_id' => $id]);
                         $qty   = (float) ($soItem['quantity'] ?? 0);

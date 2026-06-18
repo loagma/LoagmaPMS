@@ -81,6 +81,21 @@ class InventoryLedgerService
             return '';
         }
 
+        // Strict pre-check: reject if total available stock is less than requested
+        if ($operation === 'decrease') {
+            $totalAvailable = 0.0;
+            foreach ($packsData as $packData) {
+                if (is_array($packData) && isset($packData['stk'])) {
+                    $totalAvailable += (float) $packData['stk'];
+                }
+            }
+            if ($totalAvailable + 1e-9 < $qty) {
+                throw new \RuntimeException(
+                    "Insufficient stock for vendor_product {$vendorProductId}. Available: {$totalAvailable}, Requested: {$qty}"
+                );
+            }
+        }
+
         $firstPackPi  = '';
         $updatedPacks = [];
 
@@ -94,7 +109,7 @@ class InventoryLedgerService
                 $currentStock = (float) $packData['stk'];
                 $newStock     = $operation === 'increase'
                     ? $currentStock + $qty
-                    : max(0.0, $currentStock - $qty);
+                    : $currentStock - $qty; // safe: pre-validated above
                 $packData['stk']    = $newStock;
                 $packData['in_stk'] = $newStock > 0 ? 1 : 0;
             }

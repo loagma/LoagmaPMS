@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\InventoryLedgerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -127,7 +128,8 @@ class ReceiveFromProductionController extends Controller
 
             // Update stock if received
             if ($request->status === 'RECEIVED') {
-                $this->increaseStock($request->items);
+                $invDate = now()->format('Y-m-d');
+                $this->increaseStock($request->items, $receiveId, $invDate);
             }
 
             DB::commit();
@@ -190,7 +192,8 @@ class ReceiveFromProductionController extends Controller
 
             // Reverse previous stock changes if receive was posted
             if ($existing->status === 'RECEIVED' && count($existingItems) > 0) {
-                $this->reduceStock($existingItems);
+                $invDate = now()->format('Y-m-d');
+                $this->reduceStock($existingItems, (int) $id, $invDate);
             }
 
             DB::table('receive_from_production')
@@ -219,7 +222,8 @@ class ReceiveFromProductionController extends Controller
 
             // Apply new stock changes if received
             if ($request->status === 'RECEIVED') {
-                $this->increaseStock($request->items);
+                $invDate = now()->format('Y-m-d');
+                $this->increaseStock($request->items, (int) $id, $invDate);
             }
 
             DB::commit();
@@ -240,121 +244,71 @@ class ReceiveFromProductionController extends Controller
         }
     }
 
-    private function increaseStock(array $items): void
+    private function increaseStock(array $items, int $receiveId, string $invDate): void
     {
+        $ledger = app(InventoryLedgerService::class);
         foreach ($items as $item) {
             $productId = (int) $item['finished_product_id'];
-            $quantity = (float) $item['quantity'];
-            
-            $this->updateVendorProductStock($productId, $quantity, 'increase');
-            
-            DB::statement(
-                'UPDATE product SET stock = COALESCE(stock, 0) + ? WHERE product_id = ?',
-                [$quantity, $productId]
-            );
+            $quantity  = (float) $item['quantity'];
+
+            $vp = $ledger->resolveVendorProduct($productId);
+            if ($vp) {
+                $ledger->updatePacksStock($vp->id, $quantity, 'increase');
+                $ledger->recordLedger(
+                    vendorProductId: $vp->id,
+                    productId:       $productId,
+                    packId:          '',
+                    quantity:        $quantity,
+                    unitType:        (string) ($item['unit_type'] ?? 'Nos'),
+                    amount:          0,
+                    actionType:      'receive_from_production',
+                    invType:         'CREDIT',
+                    source:          'production_receive',
+                    note:            "Receive from Production #{$receiveId} - Product #{$productId}",
+                    invDate:         $invDate,
+                );
+            } else {
+                Log::warning('ReceiveFromProduction increaseStock: no vendor_product', ['product_id' => $productId, 'receive_id' => $receiveId]);
+            }
+
+            DB::statement('UPDATE product SET stock = COALESCE(stock, 0) + ? WHERE product_id = ?', [$quantity, $productId]);
         }
     }
 
-    private function reduceStock(array $items): void
+    private function reduceStock(array $items, int $receiveId, string $invDate): void
     {
+        $ledger = app(InventoryLedgerService::class);
         foreach ($items as $item) {
             $productId = (int) $item['finished_product_id'];
-            $quantity = (float) $item['quantity'];
-            
-            $this->updateVendorProductStock($productId, $quantity, 'reduce');
-            
-            $product = DB::table('product')->where('product_id', $productId)->first();
+            $quantity  = (float) $item['quantity'];
+
+            $vp = $ledger->resolveVendorProduct($productId);
+            if ($vp) {
+                $ledger->updatePacksStock($vp->id, $quantity, 'increase');
+                $ledger->recordLedger(
+                    vendorProductId: $vp->id,
+                    productId:       $productId,
+                    packId:          '',
+                    quantity:        $quantity,
+                    unitType:        (string) ($item['unit_type'] ?? 'Nos'),
+                    amount:          0,
+                    actionType:      'receive_from_production_reversal',
+                    invType:         'DEBIT',
+                    source:          'production_receive_reversal',
+                    note:            "Receive from Production Reversal #{$receiveId} - Product #{$productId}",
+                    invDate:         $invDate,
+                );
+            } else {
+                Log::warning('ReceiveFromProduction reduceStock: no vendor_product', ['product_id' => $productId, 'receive_id' => $receiveId]);
+            }
+
+            $product      = DB::table('product')->where('product_id', $productId)->first();
             $currentStock = $product && $product->stock !== null ? (float) $product->stock : 0;
-            
             if ($currentStock > 0) {
                 $reduceAmount = min($quantity, $currentStock);
-                DB::update(
-                    'UPDATE product SET stock = COALESCE(stock, 0) - ? WHERE product_id = ?',
-                    [$reduceAmount, $productId]
-                );
+                DB::update('UPDATE product SET stock = COALESCE(stock, 0) - ? WHERE product_id = ?', [$reduceAmount, $productId]);
             }
         }
     }
 
-    private function updateVendorProductStock(int $productId, float $quantity, string $operation): void
-    {
-        $vendorProducts = DB::table('vendor_products')
-            ->where('product_id', $productId)
-            ->where('status', '1')
-            ->get();
-
-        if ($vendorProducts->isEmpty()) {
-            return;
-        }
-
-        foreach ($vendorProducts as $vendorProduct) {
-            try {
-                $packsData = json_decode($vendorProduct->packs, true);
-                if (!is_array($packsData) || empty($packsData)) {
-                    continue;
-                }
-
-                $totalStock = 0;
-                foreach ($packsData as $packData) {
-                    if (isset($packData['stk'])) {
-                        $totalStock += (float) $packData['stk'];
-                    }
-                }
-
-                if ($operation === 'reduce' && $totalStock <= 0) {
-                    continue;
-                }
-
-                $updatedPacks = [];
-                foreach ($packsData as $packId => $packData) {
-                    if (isset($packData['stk'])) {
-                        $currentStock = (float) $packData['stk'];
-                        
-                        if ($operation === 'increase') {
-                            $newStock = $currentStock + $quantity;
-                        } else {
-                            $newStock = max(0, $currentStock - $quantity);
-                        }
-                        
-                        $packData['stk'] = $newStock;
-                        $packData['in_stk'] = $newStock > 0 ? 1 : 0;
-                    }
-                    $updatedPacks[$packId] = $packData;
-                }
-
-                $updatedPacksJson = json_encode($updatedPacks);
-                DB::table('vendor_products')
-                    ->where('id', $vendorProduct->id)
-                    ->update([
-                        'packs' => $updatedPacksJson,
-                        'in_stock' => $this->hasAnyStock($updatedPacks) ? '1' : '0'
-                    ]);
-
-                Log::info("Vendor product stock {$operation}d for finished goods", [
-                    'vendor_product_id' => $vendorProduct->id,
-                    'product_id' => $productId,
-                    'quantity' => $quantity,
-                    'operation' => $operation
-                ]);
-
-                break;
-            } catch (\Exception $e) {
-                Log::error('Error updating vendor product stock', [
-                    'vendor_product_id' => $vendorProduct->id,
-                    'product_id' => $productId,
-                    'error' => $e->getMessage()
-                ]);
-            }
-        }
-    }
-
-    private function hasAnyStock(array $packs): bool
-    {
-        foreach ($packs as $pack) {
-            if (isset($pack['stk']) && (float) $pack['stk'] > 0) {
-                return true;
-            }
-        }
-        return false;
-    }
 }

@@ -293,7 +293,8 @@ class ProductFormScreen extends StatelessWidget {
                                 controller.goToStep(2);
                                 return;
                               }
-                              // Step 2 -> save
+                              // Step 2 -> save (re-validate Step 1 state too)
+                              if (!controller.validateStep1()) return;
                               if (!(controller.formKey.currentState
                                       ?.validate() ??
                                   false)) {
@@ -1175,9 +1176,19 @@ class _ProductStepTwo extends StatelessWidget {
                       TextFormField(
                         controller: retailPricesController,
                         decoration: const InputDecoration(
-                          labelText: 'Retail Prices (Comma Separated)',
+                          labelText: 'Retail Prices (Comma Separated) *',
                           hintText: '100.00, 95.00, 90.00',
                         ),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Required';
+                          final parts = v.trim().split(',').map((p) => p.trim()).toList();
+                          if (parts.length != 3) return 'Enter exactly 3 prices';
+                          for (final p in parts) {
+                            if (double.tryParse(p) == null) return 'All values must be numbers';
+                          }
+                          return null;
+                        },
                       ),
                     ],
                   ),

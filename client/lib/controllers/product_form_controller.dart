@@ -60,9 +60,14 @@ class PackageUiModel {
       'id': id,
       'description': description,
       'size': size,
+      'ps': size,           // vendor_products.packs alias
       'unit': unit,
+      'pu': unit,           // vendor_products.packs alias
       'market_price': marketPrice,
+      'price': marketPrice,
+      'op': marketPrice,    // vendor_products.packs alias (original price)
       if (prices != null) 'prices': prices,
+      if (prices != null) 'rp': prices['regular'] ?? marketPrice,
       if (mv != null) 'mv': mv,
       'min_limit': minLimit,
       'max_limit': maxLimit,
@@ -301,9 +306,28 @@ class ProductFormController extends GetxController {
   }
 
   bool validateStep1() {
-    // Rely on form validators for now; they run on overall form submit.
-    // Here we just check essential fields from controller state.
-    return name.value.trim().isNotEmpty;
+    if (name.value.trim().isEmpty) {
+      Get.snackbar('Validation', 'Product name is required',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orange,
+          colorText: Colors.white);
+      return false;
+    }
+    if (description.value.trim().isEmpty) {
+      Get.snackbar('Validation', 'Description is required',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orange,
+          colorText: Colors.white);
+      return false;
+    }
+    if (brand.value.trim().isEmpty) {
+      Get.snackbar('Validation', 'Brand is required',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orange,
+          colorText: Colors.white);
+      return false;
+    }
+    return true;
   }
 
   static int _intFromJson(dynamic v) {
@@ -905,12 +929,18 @@ class ProductFormController extends GetxController {
         }
       }
 
+      final errorMsg = data['error']?.toString();
+      final displayMsg = errorMsg != null
+          ? '${data['message'] ?? 'Failed to save product'}: $errorMsg'
+          : (data['message']?.toString() ?? 'Failed to save product');
+      debugPrint('[PRODUCT_FORM] Save failed: $displayMsg');
       Get.snackbar(
         'Error',
-        data['message']?.toString() ?? 'Failed to save product',
+        displayMsg,
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.redAccent,
         colorText: Colors.white,
+        duration: const Duration(seconds: 6),
       );
       return false;
     } catch (e) {
