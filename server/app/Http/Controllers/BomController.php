@@ -330,6 +330,7 @@ class BomController extends Controller
                 ->orderBy('unit_name')
                 ->pluck('unit_name')
                 ->filter()
+                ->unique()
                 ->values();
 
             return response()->json([

@@ -570,7 +570,7 @@ class PurchaseReturnFormController extends GetxController {
                 ? 'Return saved successfully'
                 : 'Return updated successfully',
           );
-          await Future.delayed(const Duration(milliseconds: 500));
+          await Future.delayed(const Duration(milliseconds: 1500));
           Get.back(result: true);
           return;
         }
@@ -603,7 +603,7 @@ class PurchaseReturnFormController extends GetxController {
       if (response.statusCode == 200) {
         if (data['success'] == true) {
           _showSuccess('Return deleted successfully');
-          await Future.delayed(const Duration(milliseconds: 500));
+          await Future.delayed(const Duration(milliseconds: 1500));
           Get.back(result: true);
           return;
         }
@@ -665,7 +665,7 @@ void _showSuccess(String message) {
     colorText: Colors.white,
     margin: const EdgeInsets.all(12),
     borderRadius: 8,
-    duration: const Duration(seconds: 2),
+    duration: const Duration(seconds: 3),
   );
 }
 

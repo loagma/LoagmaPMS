@@ -309,6 +309,10 @@ class PurchaseReturnController extends Controller
         $ledger  = app(InventoryLedgerService::class);
         $invDate = optional($purchaseReturn->doc_date)->format('Y-m-d') ?? now()->format('Y-m-d');
 
+        $adminVendorId = (int) DB::table('deli_staff')
+            ->where('deli_id', auth()->id())
+            ->value('admin_id');
+
         foreach ($items as $item) {
             try {
                 $productId = (int) ($item['product_id'] ?? 0);
@@ -316,11 +320,12 @@ class PurchaseReturnController extends Controller
                     continue;
                 }
 
-                $vp = $ledger->resolveVendorProduct($productId, (int) $purchaseReturn->supplier_id);
+                $vp = $ledger->resolveVendorProduct($productId, $adminVendorId ?: null);
                 if (!$vp) {
                     Log::error('PurchaseReturn inventory: no vendor_product', [
-                        'product_id'       => $productId,
-                        'supplier_id'      => $purchaseReturn->supplier_id,
+                        'product_id'        => $productId,
+                        'admin_vendor_id'   => $adminVendorId,
+                        'supplier_id'       => $purchaseReturn->supplier_id,
                         'purchase_return_id' => $purchaseReturn->id,
                     ]);
                     continue;

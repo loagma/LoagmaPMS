@@ -645,33 +645,28 @@ class _ProductStepOne extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            Obx(
-              () => DropdownButtonFormField<String>(
-                value: controller.defaultUnit.value.isEmpty
-                    ? 'WEIGHT'
-                    : controller.defaultUnit.value,
+            Obx(() {
+              final currentUnit = controller.defaultUnit.value.isEmpty
+                  ? null
+                  : (controller.units.contains(controller.defaultUnit.value)
+                      ? controller.defaultUnit.value
+                      : null);
+              return DropdownButtonFormField<String>(
+                initialValue: currentUnit,
                 isExpanded: true,
                 decoration: AppInputDecoration.standard(
                   labelText: 'Unit Type (Input Type)',
                   hintText: 'Select unit type',
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'WEIGHT', child: Text('WEIGHT')),
-                  DropdownMenuItem(value: 'QUANTITY', child: Text('QUANTITY')),
-                  DropdownMenuItem(value: 'LITRE', child: Text('LITRE')),
-                  DropdownMenuItem(value: 'METER', child: Text('METER')),
-                  DropdownMenuItem(value: 'GM', child: Text('GM')),
-                  DropdownMenuItem(value: 'KG', child: Text('KG')),
-                  DropdownMenuItem(value: 'ML', child: Text('ML')),
-                  DropdownMenuItem(value: 'PIECE', child: Text('PIECE')),
-                  DropdownMenuItem(value: 'BOX', child: Text('BOX')),
-                  DropdownMenuItem(value: 'PACK', child: Text('PACK')),
-                ],
+                hint: const Text('Select unit type'),
+                items: controller.units
+                    .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                    .toList(),
                 onChanged: (v) {
                   if (v != null) controller.defaultUnit.value = v;
                 },
-              ),
-            ),
+              );
+            }),
             const SizedBox(height: 24),
             const Text(
               'Order & Buffer Limits',
@@ -1086,7 +1081,8 @@ class _ProductStepTwo extends StatelessWidget {
   ) async {
     final descController = TextEditingController();
     final sizeController = TextEditingController();
-    String selectedUnit = 'KG';
+    final availableUnits = controller.units.toList();
+    String selectedUnit = availableUnits.contains('KG') ? 'KG' : (availableUnits.isNotEmpty ? availableUnits.first : 'KG');
     final marketPriceController = TextEditingController();
     final retailPricesController = TextEditingController();
     final formKey = GlobalKey<FormState>();
@@ -1136,15 +1132,9 @@ class _ProductStepTwo extends StatelessWidget {
                         decoration: const InputDecoration(
                           labelText: 'Unit *',
                         ),
-                        items: const [
-                          DropdownMenuItem(value: 'KG', child: Text('KG')),
-                          DropdownMenuItem(value: 'GM', child: Text('GM')),
-                          DropdownMenuItem(value: 'L', child: Text('L')),
-                          DropdownMenuItem(value: 'ML', child: Text('ML')),
-                          DropdownMenuItem(value: 'PCS', child: Text('PCS')),
-                          DropdownMenuItem(value: 'BOX', child: Text('BOX')),
-                          DropdownMenuItem(value: 'PACK', child: Text('PACK')),
-                        ],
+                        items: availableUnits
+                            .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                            .toList(),
                         onChanged: (v) {
                           if (v != null) {
                             setState(() {

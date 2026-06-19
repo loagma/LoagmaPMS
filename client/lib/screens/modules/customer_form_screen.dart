@@ -105,29 +105,25 @@ class _BasicInfoCard extends StatelessWidget {
                 onChanged: (v) { if (v != null) controller.status.value = v; },
               )),
           const SizedBox(height: 14),
-          Obx(() => TextFormField(
-                key: ValueKey('name_${controller.name.value.isEmpty}'),
-                initialValue: controller.name.value,
-                decoration: AppInputDecoration.standard(
-                  labelText: 'Customer Name *',
-                  hintText: 'Full name or company name',
-                ),
-                textCapitalization: TextCapitalization.words,
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? 'Required' : null,
-                onChanged: (v) => controller.name.value = v,
-              )),
+          TextFormField(
+            controller: controller.nameController,
+            decoration: AppInputDecoration.standard(
+              labelText: 'Customer Name *',
+              hintText: 'Full name or company name',
+            ),
+            textCapitalization: TextCapitalization.words,
+            validator: (v) =>
+                v == null || v.trim().isEmpty ? 'Required' : null,
+          ),
           const SizedBox(height: 12),
-          Obx(() => TextFormField(
-                key: ValueKey('shop_${controller.shopName.value.isEmpty}'),
-                initialValue: controller.shopName.value,
-                decoration: AppInputDecoration.standard(
-                  labelText: 'Shop Name',
-                  hintText: 'Business or shop name',
-                ),
-                textCapitalization: TextCapitalization.words,
-                onChanged: (v) => controller.shopName.value = v,
-              )),
+          TextFormField(
+            controller: controller.shopNameController,
+            decoration: AppInputDecoration.standard(
+              labelText: 'Shop Name',
+              hintText: 'Business or shop name',
+            ),
+            textCapitalization: TextCapitalization.words,
+          ),
         ],
       ),
     );
@@ -148,38 +144,32 @@ class _ContactCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Obx(() => TextFormField(
-                      key: ValueKey('phone_${controller.contactNumber.value.isEmpty}'),
-                      initialValue: controller.contactNumber.value,
-                      decoration: AppInputDecoration.standard(labelText: 'Phone'),
-                      keyboardType: TextInputType.phone,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      maxLength: 10,
-                      onChanged: (v) => controller.contactNumber.value = v,
-                    )),
+                child: TextFormField(
+                  controller: controller.contactController,
+                  decoration: AppInputDecoration.standard(labelText: 'Phone'),
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  maxLength: 10,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Obx(() => TextFormField(
-                      key: ValueKey('alt_phone_${controller.alternatePhone.value.isEmpty}'),
-                      initialValue: controller.alternatePhone.value,
-                      decoration: AppInputDecoration.standard(labelText: 'Alt. Phone'),
-                      keyboardType: TextInputType.phone,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      maxLength: 10,
-                      onChanged: (v) => controller.alternatePhone.value = v,
-                    )),
+                child: TextFormField(
+                  controller: controller.altPhoneController,
+                  decoration: AppInputDecoration.standard(labelText: 'Alt. Phone'),
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  maxLength: 10,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          Obx(() => TextFormField(
-                key: ValueKey('email_${controller.email.value.isEmpty}'),
-                initialValue: controller.email.value,
-                decoration: AppInputDecoration.standard(labelText: 'Email'),
-                keyboardType: TextInputType.emailAddress,
-                onChanged: (v) => controller.email.value = v,
-              )),
+          TextFormField(
+            controller: controller.emailController,
+            decoration: AppInputDecoration.standard(labelText: 'Email'),
+            keyboardType: TextInputType.emailAddress,
+          ),
         ],
       ),
     );
@@ -197,39 +187,45 @@ class _AddressCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Obx(() => TextFormField(
-                key: ValueKey('addr_${controller.addressLine1.value.isEmpty}'),
-                initialValue: controller.addressLine1.value,
-                decoration: AppInputDecoration.standard(
-                  labelText: 'Address',
-                  hintText: 'Street, Building, Landmark',
-                ),
-                maxLines: 2,
-                onChanged: (v) => controller.addressLine1.value = v,
-              )),
+          TextFormField(
+            controller: controller.addressController,
+            decoration: AppInputDecoration.standard(
+              labelText: 'Address',
+              hintText: 'Street, Building, Landmark',
+            ),
+            maxLines: 2,
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
                 child: Obx(() => TextFormField(
-                      key: ValueKey('pincode_${controller.pincode.value.isEmpty}'),
-                      initialValue: controller.pincode.value,
-                      decoration: AppInputDecoration.standard(labelText: 'Pincode'),
+                      controller: controller.pincodeController,
+                      decoration: AppInputDecoration.standard(
+                        labelText: 'Pincode',
+                        suffixIcon: controller.isPincodeLoading.value
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              )
+                            : null,
+                      ),
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       maxLength: 6,
-                      onChanged: (v) => controller.pincode.value = v,
                     )),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Obx(() => TextFormField(
-                      key: ValueKey('city_${controller.city.value.isEmpty}'),
-                      initialValue: controller.city.value,
-                      decoration: AppInputDecoration.standard(labelText: 'City'),
-                      textCapitalization: TextCapitalization.words,
-                      onChanged: (v) => controller.city.value = v,
-                    )),
+                child: TextFormField(
+                  controller: controller.cityController,
+                  decoration: AppInputDecoration.standard(labelText: 'City'),
+                  readOnly: true,
+                ),
               ),
             ],
           ),
@@ -237,23 +233,19 @@ class _AddressCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Obx(() => TextFormField(
-                      key: ValueKey('state_${controller.state.value.isEmpty}'),
-                      initialValue: controller.state.value,
-                      decoration: AppInputDecoration.standard(labelText: 'State'),
-                      textCapitalization: TextCapitalization.words,
-                      onChanged: (v) => controller.state.value = v,
-                    )),
+                child: TextFormField(
+                  controller: controller.stateController,
+                  decoration: AppInputDecoration.standard(labelText: 'State'),
+                  readOnly: true,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Obx(() => TextFormField(
-                      key: ValueKey('country_${controller.country.value.isEmpty}'),
-                      initialValue: controller.country.value,
-                      decoration: AppInputDecoration.standard(labelText: 'Country'),
-                      textCapitalization: TextCapitalization.words,
-                      onChanged: (v) => controller.country.value = v,
-                    )),
+                child: TextFormField(
+                  controller: controller.countryController,
+                  decoration: AppInputDecoration.standard(labelText: 'Country'),
+                  readOnly: true,
+                ),
               ),
             ],
           ),
@@ -274,23 +266,19 @@ class _TaxCard extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Obx(() => TextFormField(
-                  key: ValueKey('gst_${controller.gstNo.value.isEmpty}'),
-                  initialValue: controller.gstNo.value,
-                  decoration: AppInputDecoration.standard(labelText: 'GST No'),
-                  textCapitalization: TextCapitalization.characters,
-                  onChanged: (v) => controller.gstNo.value = v,
-                )),
+            child: TextFormField(
+              controller: controller.gstNoController,
+              decoration: AppInputDecoration.standard(labelText: 'GST No'),
+              textCapitalization: TextCapitalization.characters,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Obx(() => TextFormField(
-                  key: ValueKey('pan_${controller.panNo.value.isEmpty}'),
-                  initialValue: controller.panNo.value,
-                  decoration: AppInputDecoration.standard(labelText: 'PAN No'),
-                  textCapitalization: TextCapitalization.characters,
-                  onChanged: (v) => controller.panNo.value = v,
-                )),
+            child: TextFormField(
+              controller: controller.panNoController,
+              decoration: AppInputDecoration.standard(labelText: 'PAN No'),
+              textCapitalization: TextCapitalization.characters,
+            ),
           ),
         ],
       ),
@@ -306,16 +294,14 @@ class _NotesCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return ContentCard(
       title: 'Notes',
-      child: Obx(() => TextFormField(
-            key: ValueKey('notes_${controller.notes.value.isEmpty}'),
-            initialValue: controller.notes.value,
-            decoration: AppInputDecoration.standard(
-              labelText: 'Notes',
-              hintText: 'Optional notes about this customer...',
-            ),
-            maxLines: 3,
-            onChanged: (v) => controller.notes.value = v,
-          )),
+      child: TextFormField(
+        controller: controller.notesController,
+        decoration: AppInputDecoration.standard(
+          labelText: 'Notes',
+          hintText: 'Optional notes about this customer...',
+        ),
+        maxLines: 3,
+      ),
     );
   }
 }

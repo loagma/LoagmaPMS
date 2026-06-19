@@ -165,6 +165,7 @@ class SalesOrderController extends Controller
 
             $status    = strtolower(trim((string) $request->input('status', 'pending')));
             $docDate   = trim((string) $request->input('doc_date', date('Y-m-d')));
+
             $discount  = (float) $request->input('discount', 0);
             $delivery  = (float) $request->input('delivery_charge', 0);
             $narration = trim((string) $request->input('narration', ''));
@@ -387,6 +388,7 @@ class SalesOrderController extends Controller
                     $items         = $order['items'];
                     $status        = strtolower(trim((string) ($order['status'] ?? 'pending')));
                     $docDate       = trim((string) ($order['doc_date'] ?? date('Y-m-d')));
+
                     $discount      = (float) ($order['discount'] ?? 0);
                     $delivery      = (float) ($order['delivery_charge'] ?? 0);
                     $narration     = trim((string) ($order['narration'] ?? ''));
@@ -668,6 +670,7 @@ class SalesOrderController extends Controller
 
             $status   = strtolower(trim((string) $request->input('status', $order->order_state ?? 'pending')));
             $docDate  = trim((string) $request->input('doc_date', $order->short_datetime ?? date('Y-m-d')));
+
             $discount = (float) $request->input('discount', is_numeric($order->discount ?? '') ? $order->discount : 0);
             $delivery = (float) $request->input('delivery_charge', is_numeric($order->delivery_charge ?? '') ? $order->delivery_charge : 0);
             $narration = trim((string) $request->input('narration', ''));

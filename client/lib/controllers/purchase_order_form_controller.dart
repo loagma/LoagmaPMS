@@ -27,7 +27,7 @@ class PurchaseOrderFormController extends GetxController {
   final salesmen = <Map<String, dynamic>>[].obs;
   final departments = <Map<String, dynamic>>[].obs;
   final products = <Map<String, dynamic>>[].obs;
-  final unitTypes = <String>[].obs;
+  final unitTypes = <String>['KG', 'GM', 'LTR', 'ML', 'NOS', 'PCS', 'BOX', 'PKT'].obs;
   final viewOnly = false.obs;
 
   /// Current purchase order number label for navigation/display (e.g. PO-1001 or just 1001).
@@ -487,7 +487,8 @@ class PurchaseOrderFormController extends GetxController {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         if (data['success'] == true) {
           final List types = data['data'] ?? [];
-          unitTypes.value = types.cast<String>();
+          final parsed = types.map((e) => e.toString().trim()).where((u) => u.isNotEmpty).toSet().toList();
+          if (parsed.isNotEmpty) unitTypes.value = parsed;
         }
       }
     } catch (e) {
@@ -795,7 +796,7 @@ class PurchaseOrderFormController extends GetxController {
 
   void addItem() {
     final row = POLineRow();
-    if (unitTypes.isNotEmpty && row.unit.value.isEmpty) {
+    if (unitTypes.isNotEmpty && !unitTypes.contains(row.unit.value)) {
       row.unit.value = unitTypes.first;
     }
     items.add(row);

@@ -1054,8 +1054,10 @@ class _ItemRow extends StatelessWidget {
                     () {
                       final units = controller.unitTypes;
                       final current = row.unit.value;
-                      final value = units.contains(current) ? current : units.first;
-                      if (value != current && !controller.isReadOnly) {
+                      final value = units.contains(current)
+                          ? current
+                          : (units.isNotEmpty ? units.first : null);
+                      if (value != null && value != current && !controller.isReadOnly) {
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           row.unit.value = value;
                         });

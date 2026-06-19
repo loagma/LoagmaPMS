@@ -105,8 +105,20 @@
       @if(!empty($data['customer_name']))
         <div class="line"><strong>{{ $data['customer_name'] }}</strong></div>
       @endif
+      @if(!empty($data['customer_shop']) && $data['customer_shop'] !== $data['customer_name'])
+        <div class="line">{{ $data['customer_shop'] }}</div>
+      @endif
+      @if(!empty($data['customer_address']))
+        <div class="line" style="color:#475569; font-size:7.5pt">{{ $data['customer_address'] }}</div>
+      @endif
       @if(!empty($data['customer_phone']))
         <div class="line"><span>Phone:</span> {{ $data['customer_phone'] }}</div>
+      @endif
+      @if(!empty($data['customer_email']))
+        <div class="line"><span>Email:</span> {{ $data['customer_email'] }}</div>
+      @endif
+      @if(!empty($data['customer_gst']))
+        <div class="line"><span>GSTIN:</span> {{ $data['customer_gst'] }}</div>
       @endif
     </div>
     <div class="info-box" style="width:60%">

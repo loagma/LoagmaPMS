@@ -589,11 +589,14 @@ class ReportExportService {
           ])),
           pw.SizedBox(width: 8),
           pw.Expanded(child: _infoBox('ORDER DETAILS', [
-                                                   _kvSmall('Financial Year', c.financialYear.value),
-            if (c.expectedDate.value.trim().isNotEmpty) _kvSmall('Expected Date', _normalizeDate(c.expectedDate.value)),
+            _kvSmall('Financial Year', c.financialYear.value),
+            if (c.expectedDate.value.trim().isNotEmpty)   _kvSmall('Expected Date', _normalizeDate(c.expectedDate.value)),
             if (c.departmentId.value != null && c.departmentId.value!.trim().isNotEmpty)
-                                                   _kvSmall('Department',    c.departmentId.value!.trim()),
-            if (c.narration.value.trim().isNotEmpty) _kvSmall('Narration',    c.narration.value.trim()),
+                                                          _kvSmall('Department',    c.departmentId.value!.trim()),
+            if (c.salesmanName.value.trim().isNotEmpty)   _kvSmall('Salesman',      c.salesmanName.value.trim()),
+            if (c.billVehicle.value.trim().isNotEmpty)    _kvSmall('Vehicle',       c.billVehicle.value.trim()),
+            if (c.narration.value.trim().isNotEmpty)      _kvSmall('Narration',     c.narration.value.trim()),
+            if (c.billNarration.value.trim().isNotEmpty)  _kvSmall('Bill Note',     c.billNarration.value.trim()),
           ])),
         ]),
         pw.SizedBox(height: 10),
@@ -698,6 +701,14 @@ class ReportExportService {
               ])),
             ]),
           ),
+        ],
+
+        // ── Terms & Conditions ──
+        if (c.billStatement.value.trim().isNotEmpty) ...[
+          pw.SizedBox(height: 10),
+          _infoBox('TERMS & CONDITIONS', [
+            pw.Text(c.billStatement.value.trim(), style: const pw.TextStyle(fontSize: 8)),
+          ]),
         ],
       ],
     ));
@@ -867,7 +878,6 @@ class ReportExportService {
         taxable.toStringAsFixed(2),
         total.toStringAsFixed(2),
         row.returnReason.value.trim().isEmpty ? '-' : row.returnReason.value.trim(),
-        row.remarks.value.trim().isEmpty ? '-' : row.remarks.value.trim(),
       ];
     }).toList();
 
@@ -933,7 +943,7 @@ class ReportExportService {
           headerDecoration: const pw.BoxDecoration(color: PdfColors.grey200),
           cellAlignment: pw.Alignment.centerLeft,
           columnWidths: {
-            0: const pw.FlexColumnWidth(2.5),
+            0: const pw.FlexColumnWidth(2.8),
             1: const pw.FlexColumnWidth(1.0),
             2: const pw.FlexColumnWidth(1.0),
             3: const pw.FlexColumnWidth(1.0),
@@ -941,14 +951,13 @@ class ReportExportService {
             5: const pw.FlexColumnWidth(1.2),
             6: const pw.FlexColumnWidth(1.2),
             7: const pw.FlexColumnWidth(1.2),
-            8: const pw.FlexColumnWidth(1.8),
-            9: const pw.FlexColumnWidth(1.5),
+            8: const pw.FlexColumnWidth(2.2),
           },
           headers: const [
             'Product', 'Unit',
             'Orig Qty', 'Avail Qty', 'Ret Qty',
             'Unit Rate', 'Taxable', 'Line Total',
-            'Return Reason', 'Remarks',
+            'Return Reason',
           ],
           data: itemRows,
         ),
@@ -1199,6 +1208,8 @@ class ReportExportService {
               _kvSmall('Vehicle', c.billVehicle.value.trim()),
             if (c.narration.value.trim().isNotEmpty)
               _kvSmall('Narration', c.narration.value.trim()),
+            if (c.billNarration.value.trim().isNotEmpty)
+              _kvSmall('Bill Note', c.billNarration.value.trim()),
           ])),
         ]),
         pw.SizedBox(height: 10),

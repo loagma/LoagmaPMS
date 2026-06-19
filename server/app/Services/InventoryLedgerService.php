@@ -14,15 +14,16 @@ class InventoryLedgerService
      */
     public function resolveVendorProduct(int $productId, ?int $adminVendorId = null): ?object
     {
-        $query = DB::table('vendor_products')
+        $base = DB::table('vendor_products')
             ->where('product_id', $productId)
             ->where('status', '1');
 
         if ($adminVendorId !== null) {
-            $query->where('admin_vendor_id', $adminVendorId);
+            $exact = (clone $base)->where('admin_vendor_id', $adminVendorId)->first();
+            if ($exact) return $exact;
         }
 
-        return $query->first();
+        return $base->first();
     }
 
     /**

@@ -104,7 +104,8 @@ class InvoicePdfService
         // ── 2. Fetch customer ────────────────────────────────────────────────
         $customer = DB::table('loagma_new.user')
             ->where('userid', $order->buyer_userid)
-            ->select(['userid', 'name', 'contactno', 'state'])
+            ->select(['userid', 'name', 'shop_name', 'contactno', 'state',
+                      'address_line1', 'address', 'city', 'pincode', 'gst_no', 'email'])
             ->first();
 
         // ── 3. Fetch admin / org info ────────────────────────────────────────
@@ -315,14 +316,24 @@ class InvoicePdfService
             'account_number' => $admin->account_number ?? '',
             'ifsc_code'      => $admin->ifsc_code ?? '',
 
+            // Customer
+            'customer_name'     => $customer->name ?? '',
+            'customer_shop'     => $customer->shop_name ?? '',
+            'customer_phone'    => $customer->contactno ?? '',
+            'customer_email'    => $customer->email ?? '',
+            'customer_gst'      => $customer->gst_no ?? '',
+            'customer_address'  => trim(implode(', ', array_filter([
+                $customer->address_line1 ?? $customer->address ?? null,
+                $customer->city ?? null,
+                $customer->pincode ?? null,
+            ]))),
+
             // Invoice header
             'bill_no'        => $order->bill_no,
             'bill_dt'        => $order->Bill_Dt,
             'doc_year'       => $order->Doc_Year ?? '',
             'so_number'      => 'ORD-' . $order->order_id,
             'doc_date'       => $this->parseDate($order->short_datetime ?? ''),
-            'customer_name'  => $customer->name ?? '',
-            'customer_phone' => $customer->contactno ?? '',
             'salesman_name'  => $order->salesman_name ?? '',
             'department'     => $order->Department ?? null,
             'bill_vehicle'   => $order->Bill_Vehicle ?? null,

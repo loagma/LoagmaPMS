@@ -148,6 +148,7 @@ class SalesReturnController extends Controller
                     'oi.item_price',
                     'oi.qty_delivered',
                     'oi.qty_returned',
+                    'oi.return_reason',
                     'p.name as db_product_name',
                     'p.hsn_code as db_product_code',
                 ])
@@ -203,12 +204,16 @@ class SalesReturnController extends Controller
 
             // Voucher header, qty_returned, packs stock and ledger are all written in ONE
             // transaction: a return that over-returns or whose ledger fails rolls back fully.
-            DB::transaction(function () use ($sourceOrderId, $voucherNo, $docDate, $reason, $status, $items) {
+            $charges      = $request->input('charges', []);
+            $chargesJson  = !empty($charges) ? json_encode($charges) : null;
+
+            DB::transaction(function () use ($sourceOrderId, $voucherNo, $docDate, $reason, $status, $items, $chargesJson) {
                 DB::table(self::ORDERS_TABLE)->where('order_id', $sourceOrderId)->update([
-                    'Sales_Return_VoucherNo' => $voucherNo,
-                    'Sales_Return_Dt'        => $docDate,
-                    'Sales_Return_Reason'    => $reason ?: null,
-                    'order_state'            => $status,
+                    'Sales_Return_VoucherNo'      => $voucherNo,
+                    'Sales_Return_Dt'             => $docDate,
+                    'Sales_Return_Reason'         => $reason ?: null,
+                    'sales_return_charges_json'   => $chargesJson,
+                    'order_state'                 => $status,
                 ]);
 
                 $ledger = app(InventoryLedgerService::class);
@@ -234,7 +239,8 @@ class SalesReturnController extends Controller
                         throw new \RuntimeException("Order item {$orderItemId} not found for order {$sourceOrderId}");
                     }
 
-                    $maxReturnable   = (float) ($origItem->qty_delivered ?? $origItem->quantity ?? 0);
+                    $qtyDelivered    = (float) ($origItem->qty_delivered ?? 0);
+                    $maxReturnable   = $qtyDelivered > 0 ? $qtyDelivered : (float) ($origItem->quantity ?? 0);
                     $alreadyReturned = (float) ($origItem->qty_returned ?? 0);
                     $remaining       = $maxReturnable - $alreadyReturned;
                     if ($returnedQty > $remaining + 1e-9) {
@@ -243,10 +249,14 @@ class SalesReturnController extends Controller
                         ]);
                     }
 
+                    $returnReason = trim((string) ($item['return_reason'] ?? ''));
                     DB::table(self::ITEMS_TABLE)
                         ->where('item_id', $orderItemId)
                         ->where('order_id', $sourceOrderId)
-                        ->update(['qty_returned' => $alreadyReturned + $returnedQty]);
+                        ->update([
+                            'qty_returned'  => $alreadyReturned + $returnedQty,
+                            'return_reason' => $returnReason ?: null,
+                        ]);
 
                     // Inventory: increase packs stock + CREDIT ledger
                     $pinfo  = json_decode((string) ($origItem->pinfo ?? '{}'), true) ?: [];
@@ -297,11 +307,13 @@ class SalesReturnController extends Controller
                 return response()->json(['success' => false, 'message' => 'Sales return not found'], 404);
             }
 
-            $docDate = trim((string) $request->input('doc_date', $order->Sales_Return_Dt));
-            $reason  = trim((string) $request->input('reason', $order->Sales_Return_Reason ?? ''));
-            $items   = $request->input('items', []);
-            $rawStatus = strtoupper(trim((string) $request->input('status', $order->order_state ?? 'DRAFT')));
-            $status  = in_array($rawStatus, ['DRAFT', 'POSTED', 'CANCELLED']) ? $rawStatus : ($order->order_state ?? 'DRAFT');
+            $docDate    = trim((string) $request->input('doc_date', $order->Sales_Return_Dt));
+            $reason     = trim((string) $request->input('reason', $order->Sales_Return_Reason ?? ''));
+            $items      = $request->input('items', []);
+            $rawStatus  = strtoupper(trim((string) $request->input('status', $order->order_state ?? 'DRAFT')));
+            $status     = in_array($rawStatus, ['DRAFT', 'POSTED', 'CANCELLED']) ? $rawStatus : ($order->order_state ?? 'DRAFT');
+            $charges    = $request->input('charges', []);
+            $chargesJson = !empty($charges) ? json_encode($charges) : null;
 
             // Capture old qty_returned per item_id before transaction resets them
             $oldQtyReturned = DB::table(self::ITEMS_TABLE)
@@ -339,17 +351,22 @@ class SalesReturnController extends Controller
                         }
 
                         // Cannot return more than was delivered for this item.
-                        $maxReturnable = (float) ($origItem->qty_delivered ?? $origItem->quantity ?? 0);
+                        $qtyDelivered  = (float) ($origItem->qty_delivered ?? 0);
+                        $maxReturnable = $qtyDelivered > 0 ? $qtyDelivered : (float) ($origItem->quantity ?? 0);
                         if ($newQty > $maxReturnable + 1e-9) {
                             throw \Illuminate\Validation\ValidationException::withMessages([
                                 "items.{$index}" => ["Cannot return {$newQty} — only {$maxReturnable} delivered"],
                             ]);
                         }
 
+                        $returnReason = trim((string) ($item['return_reason'] ?? ''));
                         DB::table(self::ITEMS_TABLE)
                             ->where('item_id', $orderItemId)
                             ->where('order_id', $id)
-                            ->update(['qty_returned' => $newQty]);
+                            ->update([
+                                'qty_returned'  => $newQty,
+                                'return_reason' => $returnReason ?: null,
+                            ]);
 
                         // Inventory: apply delta (new qty − old qty)
                         $oldQty = $oldQtyReturned[$orderItemId] ?? 0.0;
@@ -386,9 +403,10 @@ class SalesReturnController extends Controller
                 }
 
                 DB::table(self::ORDERS_TABLE)->where('order_id', $id)->update([
-                    'Sales_Return_Dt'     => $docDate,
-                    'Sales_Return_Reason' => $reason ?: null,
-                    'order_state'         => $status,
+                    'Sales_Return_Dt'           => $docDate,
+                    'Sales_Return_Reason'       => $reason ?: null,
+                    'sales_return_charges_json' => $chargesJson,
+                    'order_state'               => $status,
                 ]);
             });
 
@@ -466,6 +484,12 @@ class SalesReturnController extends Controller
 
     private function normalizeHeader(object $order): array
     {
+        $charges = [];
+        if (!empty($order->sales_return_charges_json)) {
+            $decoded = json_decode((string) $order->sales_return_charges_json, true);
+            if (is_array($decoded)) $charges = $decoded;
+        }
+
         return [
             'id'                      => (int) ($order->order_id ?? 0),
             'voucher_no'              => $order->Sales_Return_VoucherNo ?? null,
@@ -481,6 +505,7 @@ class SalesReturnController extends Controller
             'customer_name'           => $order->buyer_name ?? null,
             'reason'                  => $order->Sales_Return_Reason ?? null,
             'status'                  => $order->order_state ?? 'DRAFT',
+            'charges'                 => $charges,
         ];
     }
 
@@ -508,6 +533,7 @@ class SalesReturnController extends Controller
             'returned_qty'                 => $qtyReturned,
             'returned_quantity'            => $qtyReturned,
             'unit_price'                   => (float) ($item->item_price ?? 0),
+            'return_reason'                => $item->return_reason ?? null,
         ];
     }
 }

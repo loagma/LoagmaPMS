@@ -107,6 +107,7 @@ class ProductFormController extends GetxController {
 
   final productType = 'SINGLE'.obs;
   final defaultUnit = 'WEIGHT'.obs;
+  final units = <String>['KG', 'GM', 'LTR', 'ML', 'NOS', 'PCS', 'BOX', 'PKT', 'WEIGHT', 'QUANTITY', 'LITRE', 'PIECE'].obs;
   final orderLimit = ''.obs;
   final bufferLimit = ''.obs;
   final productPackCount = ''.obs;
@@ -164,6 +165,7 @@ class ProductFormController extends GetxController {
   }
 
   Future<void> _init() async {
+    _loadUnits();
     await _loadCategories();
     await loadAvailableTaxes();
     activeProductId.value = productId;
@@ -213,6 +215,30 @@ class ProductFormController extends GetxController {
   Future<void> _loadNextProductNumberForNew() async {
     final latest = await _fetchLatestProductSequence();
     currentProductSeq.value = (latest ?? 0) + 1;
+  }
+
+  Future<void> _loadUnits() async {
+    try {
+      final response = await http
+          .get(Uri.parse(ApiConfig.unitTypes), headers: AuthController.getHeaders)
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        if (decoded['success'] == true) {
+          final List data = decoded['data'] ?? [];
+          final parsed = data.map((e) => e.toString().trim()).where((u) => u.isNotEmpty).toSet().toList();
+          if (parsed.isNotEmpty) {
+            // Keep current defaultUnit valid after reload
+            if (!parsed.contains(defaultUnit.value)) {
+              defaultUnit.value = parsed.first;
+            }
+            units.value = parsed;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[PRODUCT_FORM] Units load error: $e');
+    }
   }
 
   Future<void> loadAvailableTaxes() async {

@@ -1167,7 +1167,10 @@ class _SearchProductDialogState extends State<_SearchProductDialog> {
   @override
   void initState() {
     super.initState();
-    _filteredProducts = widget.items.take(50).toList();
+    _filteredProducts = widget.items
+        .where((p) => !widget.excludeIds.contains(p.id))
+        .take(50)
+        .toList();
   }
 
   @override
@@ -1181,18 +1184,35 @@ class _SearchProductDialogState extends State<_SearchProductDialog> {
     _debounce?.cancel();
     _debounce = Timer(_debounceDuration, () {
       if (!mounted) return;
-      final currentText = _searchController.text;
-      if (currentText != query) return;
-      _runSearch(query);
+      if (_searchController.text == query) _runSearch(query);
     });
   }
 
   Future<void> _runSearch(String query) async {
     final normalized = query.trim();
     if (normalized.isEmpty) {
-      setState(() => _filteredProducts = widget.items.take(50).toList());
+      setState(() {
+        _filteredProducts = widget.items
+            .where((p) => !widget.excludeIds.contains(p.id))
+            .take(50)
+            .toList();
+      });
       return;
     }
+
+    // If query is numeric, first try local ID match
+    final isNumeric = RegExp(r'^\d+$').hasMatch(normalized);
+    if (isNumeric) {
+      final idMatches = widget.items
+          .where((p) => !widget.excludeIds.contains(p.id) &&
+              p.id.toString().contains(normalized))
+          .toList();
+      if (idMatches.isNotEmpty) {
+        setState(() => _filteredProducts = idMatches.take(50).toList());
+        return;
+      }
+    }
+
     if (normalized.length < 2) return;
     setState(() => _isSearching = true);
     try {
@@ -1214,69 +1234,137 @@ class _SearchProductDialogState extends State<_SearchProductDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Container(
-        width: 500,
-        height: 600,
-        padding: const EdgeInsets.all(16),
+        width: 520,
+        height: 620,
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Header
             Row(
               children: [
+                const Icon(Icons.inventory_2_outlined, color: AppColors.primary, size: 20),
+                const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
-                    'Search Products',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    'Select Product',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close),
+                  icon: const Icon(Icons.close, size: 20),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const Divider(height: 16),
+            // Search
             TextField(
               controller: _searchController,
               decoration: AppInputDecoration.standard(
-                labelText: 'Search by product name',
-                hintText: 'Type at least 2 characters...',
-                prefixIcon: const Icon(Icons.search),
+                labelText: 'Search products',
+                hintText: 'Search by name, code or ID...',
+                prefixIcon: const Icon(Icons.search, size: 20),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        onPressed: () {
+                          _searchController.clear();
+                          _runSearch('');
+                        },
+                      )
+                    : null,
               ),
               autofocus: true,
               onChanged: _onSearchChanged,
             ),
-            const SizedBox(height: 16),
-            if (_isSearching)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(20),
-                  child: CircularProgressIndicator(),
+            const SizedBox(height: 8),
+            // Count row
+            if (!_isSearching)
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 4),
+                child: Text(
+                  _filteredProducts.isEmpty
+                      ? ''
+                      : '${_filteredProducts.length} product${_filteredProducts.length == 1 ? '' : 's'}',
+                  style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
                 ),
+              ),
+            const SizedBox(height: 4),
+            // List
+            if (_isSearching)
+              const Expanded(
+                child: Center(child: CircularProgressIndicator()),
               )
             else
               Expanded(
                 child: _filteredProducts.isEmpty
                     ? Center(
-                        child: Text(
-                          _searchController.text.isEmpty
-                              ? 'Start typing to search'
-                              : 'No products found',
-                          style: const TextStyle(
-                            color: AppColors.textMuted,
-                            fontSize: 14,
-                          ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.search_off, size: 40, color: AppColors.textMuted),
+                            const SizedBox(height: 8),
+                            Text(
+                              _searchController.text.isEmpty
+                                  ? 'Type to search products'
+                                  : 'No products found for "${_searchController.text}"',
+                              style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
                         ),
                       )
-                    : ListView.builder(
+                    : ListView.separated(
                         itemCount: _filteredProducts.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1, indent: 56),
                         itemBuilder: (context, i) {
                           final product = _filteredProducts[i];
-                          final isSelected =
-                              widget.currentSelection?.id == product.id;
+                          final isSelected = widget.currentSelection?.id == product.id;
                           return ListTile(
-                            title: Text(product.name),
-                            selected: isSelected,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            leading: CircleAvatar(
+                              radius: 20,
+                              backgroundColor: isSelected
+                                  ? AppColors.primary
+                                  : AppColors.primary.withValues(alpha: 0.1),
+                              child: Text(
+                                product.name.isNotEmpty ? product.name[0].toUpperCase() : '?',
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : AppColors.primary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              product.name,
+                              style: TextStyle(
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                fontSize: 14,
+                                color: isSelected ? AppColors.primary : null,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'LOAGMA Code : ${product.id}',
+                                  style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                                ),
+                                if (product.code != null && product.code!.isNotEmpty)
+                                  Text(
+                                    product.code!,
+                                    style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                                  ),
+                              ],
+                            ),
+                            trailing: isSelected
+                                ? const Icon(Icons.check_circle, color: AppColors.primary, size: 20)
+                                : null,
                             onTap: () => Navigator.pop(context, product),
                           );
                         },

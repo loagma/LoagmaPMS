@@ -516,6 +516,12 @@ class PurchaseVoucherController extends Controller
         $ledger  = app(InventoryLedgerService::class);
         $invDate = optional($voucher->doc_date)->format('Y-m-d') ?? now()->format('Y-m-d');
 
+        // Resolve the logged-in user's admin_vendor_id from deli_staff.
+        // vendor_products uses admin_vendor_id (admin.userid), not the external supplier_id.
+        $adminVendorId = (int) DB::table('deli_staff')
+            ->where('deli_id', auth()->id())
+            ->value('admin_id');
+
         foreach ($items as $item) {
             try {
                 $productId = (int) ($item['product_id'] ?? 0);
@@ -523,12 +529,13 @@ class PurchaseVoucherController extends Controller
                     continue;
                 }
 
-                $vp = $ledger->resolveVendorProduct($productId, (int) $voucher->supplier_id);
+                $vp = $ledger->resolveVendorProduct($productId, $adminVendorId ?: null);
                 if (!$vp) {
                     Log::error('PurchaseVoucher inventory: no vendor_product', [
-                        'product_id'  => $productId,
-                        'supplier_id' => $voucher->supplier_id,
-                        'voucher_id'  => $voucher->id,
+                        'product_id'     => $productId,
+                        'admin_vendor_id' => $adminVendorId,
+                        'supplier_id'    => $voucher->supplier_id,
+                        'voucher_id'     => $voucher->id,
                     ]);
                     continue;
                 }

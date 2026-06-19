@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 /// Simple central configuration for backend API access.
 ///
 /// You can switch between **local** and **production** using a boolean
@@ -5,8 +7,9 @@
 class ApiConfig {
   ApiConfig._();
 
-//   static const String _localBaseUrl = 'http://192.168.1.4:8000';
-  static const String _localBaseUrl = 'http://10.0.2.2:8000';
+  // Web browsers cannot reach 10.0.2.2 (Android emulator loopback) — use localhost instead.
+  static String get _localBaseUrl =>
+      kIsWeb ? 'http://localhost:8000' : 'http://10.0.2.2:8000';
   static const String _productionBaseUrl = 'https://loagmapms.onrender.com';
 
   /// Pass --dart-define=USE_LOCAL=true to hit local server during dev.

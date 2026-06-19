@@ -284,7 +284,7 @@ class ReceiveFromProductionController extends Controller
 
             $vp = $ledger->resolveVendorProduct($productId);
             if ($vp) {
-                $ledger->updatePacksStock($vp->id, $quantity, 'increase');
+                $ledger->updatePacksStock($vp->id, $quantity, 'decrease');
                 $ledger->recordLedger(
                     vendorProductId: $vp->id,
                     productId:       $productId,

@@ -86,7 +86,17 @@ class CustomerController extends Controller
                 ], 422);
             }
 
-            $id = DB::table(self::TABLE)->insertGetId($payload, 'userid');
+            $nextId = (int) DB::table(self::TABLE)->max('userid') + 1;
+            $payload['userid']        = $nextId;
+            $payload['contactno']     = $payload['contactno'] ?? $payload['phone'] ?? '';
+            $payload['address']       = $payload['address'] ?? $payload['address_line1'] ?? '';
+            $payload['user_type']     = $payload['user_type'] ?? 'B2C';
+            $payload['session_id']    = $payload['session_id'] ?? '';
+            $payload['push_notif_id'] = $payload['push_notif_id'] ?? '';
+            $payload['register_date'] = $payload['register_date'] ?? time();
+            unset($payload['phone'], $payload['address_line1']);
+            DB::table(self::TABLE)->insert($payload);
+            $id = $nextId;
 
             return response()->json([
                 'success' => true,

@@ -294,52 +294,6 @@ class SupplierFormController extends GetxController {
     }
   }
 
-  void _resetAddFormFields() {
-    supplierCode.value = '';
-    supplierName.value = '';
-    shortName.value = '';
-    businessType.value = '';
-    department.value = '';
-    gstNo.value = '';
-    panNo.value = '';
-    tanNo.value = '';
-    cinNo.value = '';
-    vatNo.value = '';
-    registrationNo.value = '';
-    fssaiNo.value = '';
-    website.value = '';
-    email.value = '';
-    phone.value = '';
-    alternatePhone.value = '';
-    contactPerson.value = '';
-    contactPersonEmail.value = '';
-    contactPersonPhone.value = '';
-    contactPersonDesignation.value = '';
-    addressLine1.value = '';
-    addressLine1Controller.clear();
-    area.value = '';
-    city.value = '';
-    state.value = '';
-    country.value = '';
-    pincode.value = '';
-    pincodeController.clear();
-    areas.clear();
-    bankName.value = '';
-    bankBranch.value = '';
-    bankAccountName.value = '';
-    bankAccountNumber.value = '';
-    ifscCode.value = '';
-    swiftCode.value = '';
-    paymentTermsDays.value = '';
-    creditLimit.value = '';
-    rating.value = '';
-    isPreferred.value = false;
-    status.value = 'ACTIVE';
-    notes.value = '';
-    supplierProducts.clear();
-    supplierProducts.add(SupplierProductRow());
-    formKey.currentState?.reset();
-  }
 
   Future<void> lookupPincode(String pin) async {
     if (pin.length != 6) return;
@@ -651,7 +605,7 @@ class SupplierFormController extends GetxController {
                 ? 'Supplier updated successfully'
                 : (data['message'] as String? ?? 'Supplier created successfully'),
           );
-          if (!isEditMode) _resetAddFormFields();
+          await Future.delayed(const Duration(milliseconds: 1500));
           Get.back(result: true);
         } else {
           _showError(data['message'] ?? 'Failed to save supplier');

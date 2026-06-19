@@ -16,21 +16,22 @@ class CustomerFormController extends GetxController {
 
   final isLoading = false.obs;
   final isSaving = false.obs;
-
-  final name = ''.obs;
-  final shopName = ''.obs;
-  final email = ''.obs;
-  final contactNumber = ''.obs;
-  final alternatePhone = ''.obs;
-  final gstNo = ''.obs;
-  final panNo = ''.obs;
-  final addressLine1 = ''.obs;
-  final city = ''.obs;
-  final state = ''.obs;
-  final country = ''.obs;
-  final pincode = ''.obs;
-  final notes = ''.obs;
+  final isPincodeLoading = false.obs;
   final status = 'ACTIVE'.obs;
+
+  final nameController        = TextEditingController();
+  final shopNameController    = TextEditingController();
+  final emailController       = TextEditingController();
+  final contactController     = TextEditingController();
+  final altPhoneController    = TextEditingController();
+  final gstNoController       = TextEditingController();
+  final panNoController       = TextEditingController();
+  final addressController     = TextEditingController();
+  final cityController        = TextEditingController();
+  final stateController       = TextEditingController();
+  final countryController     = TextEditingController();
+  final pincodeController     = TextEditingController();
+  final notesController       = TextEditingController();
 
   bool get isEditMode => customerId != null;
 
@@ -39,7 +40,63 @@ class CustomerFormController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    pincodeController.addListener(_onPincodeChanged);
     if (customerId != null) _loadCustomer();
+  }
+
+  String _lastLookedUpPincode = '';
+
+  void _onPincodeChanged() {
+    final pin = pincodeController.text.trim();
+    if (pin.length == 6 && pin != _lastLookedUpPincode) {
+      _lastLookedUpPincode = pin;
+      _lookupPincode(pin);
+    }
+  }
+
+  Future<void> _lookupPincode(String pin) async {
+    try {
+      isPincodeLoading.value = true;
+      final response = await http
+          .get(Uri.parse('https://api.postalpincode.in/pincode/$pin'))
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body) as List;
+        if (data.isNotEmpty && data[0]['Status'] == 'Success') {
+          final offices = data[0]['PostOffice'] as List;
+          if (offices.isNotEmpty) {
+            final office = offices[0] as Map<String, dynamic>;
+            cityController.text    = office['District']?.toString() ?? '';
+            stateController.text   = office['State']?.toString() ?? '';
+            countryController.text = office['Country']?.toString() ?? 'India';
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[CUSTOMER FORM] Pincode lookup error: $e');
+    } finally {
+      isPincodeLoading.value = false;
+    }
+  }
+
+  @override
+  void onClose() {
+    pincodeController.removeListener(_onPincodeChanged);
+    nameController.dispose();
+    shopNameController.dispose();
+    emailController.dispose();
+    contactController.dispose();
+    altPhoneController.dispose();
+    gstNoController.dispose();
+    panNoController.dispose();
+    addressController.dispose();
+    cityController.dispose();
+    stateController.dispose();
+    countryController.dispose();
+    pincodeController.dispose();
+    notesController.dispose();
+    super.onClose();
   }
 
   Future<void> _loadCustomer() async {
@@ -47,20 +104,20 @@ class CustomerFormController extends GetxController {
       isLoading.value = true;
       final c = await CustomerApiService.fetchCustomerById(customerId!);
       if (c != null) {
-        name.value = c.name;
-        shopName.value = c.shopName ?? '';
-        email.value = c.email ?? '';
-        contactNumber.value = c.contactNumber ?? '';
-        alternatePhone.value = c.alternatePhone ?? '';
-        gstNo.value = c.gstNo ?? '';
-        panNo.value = c.panNo ?? '';
-        addressLine1.value = c.addressLine1 ?? '';
-        city.value = c.city ?? '';
-        state.value = c.state ?? '';
-        country.value = c.country ?? '';
-        pincode.value = c.pincode ?? '';
-        notes.value = c.notes ?? '';
-        status.value = c.status;
+        nameController.text     = c.name;
+        shopNameController.text = c.shopName ?? '';
+        emailController.text    = c.email ?? '';
+        contactController.text  = c.contactNumber ?? '';
+        altPhoneController.text = c.alternatePhone ?? '';
+        gstNoController.text    = c.gstNo ?? '';
+        panNoController.text    = c.panNo ?? '';
+        addressController.text  = c.addressLine1 ?? '';
+        cityController.text     = c.city ?? '';
+        stateController.text    = c.state ?? '';
+        countryController.text  = c.country ?? '';
+        pincodeController.text  = c.pincode ?? '';
+        notesController.text    = c.notes ?? '';
+        status.value            = c.status;
       }
     } catch (e) {
       debugPrint('[CUSTOMER FORM] Load error: $e');
@@ -73,27 +130,41 @@ class CustomerFormController extends GetxController {
     if (!formKey.currentState!.validate()) return;
     isSaving.value = true;
     try {
+      final name        = nameController.text.trim();
+      final shopName    = shopNameController.text.trim();
+      final email       = emailController.text.trim();
+      final phone       = contactController.text.trim();
+      final altPhone    = altPhoneController.text.trim();
+      final gstNo       = gstNoController.text.trim();
+      final panNo       = panNoController.text.trim();
+      final address     = addressController.text.trim();
+      final city        = cityController.text.trim();
+      final state       = stateController.text.trim();
+      final country     = countryController.text.trim();
+      final pincode     = pincodeController.text.trim();
+      final notes       = notesController.text.trim();
+
       final payload = {
-        'name': name.value.trim(),
-        if (shopName.value.trim().isNotEmpty) 'shop_name': shopName.value.trim(),
-        if (shopName.value.trim().isNotEmpty) 'shopName': shopName.value.trim(),
+        'name': name,
+        if (shopName.isNotEmpty) 'shop_name': shopName,
+        if (shopName.isNotEmpty) 'shopName': shopName,
         'status': status.value,
-        if (email.value.trim().isNotEmpty) 'email': email.value.trim(),
-        if (contactNumber.value.trim().isNotEmpty) 'phone': contactNumber.value.trim(),
-        if (contactNumber.value.trim().isNotEmpty) 'contactNumber': contactNumber.value.trim(),
-        if (alternatePhone.value.trim().isNotEmpty) 'alternate_phone': alternatePhone.value.trim(),
-        if (alternatePhone.value.trim().isNotEmpty) 'alternatePhone': alternatePhone.value.trim(),
-        if (gstNo.value.trim().isNotEmpty) 'gst_no': gstNo.value.trim(),
-        if (gstNo.value.trim().isNotEmpty) 'gstNo': gstNo.value.trim(),
-        if (panNo.value.trim().isNotEmpty) 'pan_no': panNo.value.trim(),
-        if (panNo.value.trim().isNotEmpty) 'panNo': panNo.value.trim(),
-        if (addressLine1.value.trim().isNotEmpty) 'address_line1': addressLine1.value.trim(),
-        if (addressLine1.value.trim().isNotEmpty) 'addressLine1': addressLine1.value.trim(),
-        if (city.value.trim().isNotEmpty) 'city': city.value.trim(),
-        if (state.value.trim().isNotEmpty) 'state': state.value.trim(),
-        if (country.value.trim().isNotEmpty) 'country': country.value.trim(),
-        if (pincode.value.trim().isNotEmpty) 'pincode': pincode.value.trim(),
-        if (notes.value.trim().isNotEmpty) 'notes': notes.value.trim(),
+        if (email.isNotEmpty) 'email': email,
+        if (phone.isNotEmpty) 'phone': phone,
+        if (phone.isNotEmpty) 'contactNumber': phone,
+        if (altPhone.isNotEmpty) 'alternate_phone': altPhone,
+        if (altPhone.isNotEmpty) 'alternatePhone': altPhone,
+        if (gstNo.isNotEmpty) 'gst_no': gstNo,
+        if (gstNo.isNotEmpty) 'gstNo': gstNo,
+        if (panNo.isNotEmpty) 'pan_no': panNo,
+        if (panNo.isNotEmpty) 'panNo': panNo,
+        if (address.isNotEmpty) 'address_line1': address,
+        if (address.isNotEmpty) 'addressLine1': address,
+        if (city.isNotEmpty) 'city': city,
+        if (state.isNotEmpty) 'state': state,
+        if (country.isNotEmpty) 'country': country,
+        if (pincode.isNotEmpty) 'pincode': pincode,
+        if (notes.isNotEmpty) 'notes': notes,
       };
 
       final url = isEditMode
